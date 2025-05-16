@@ -30,15 +30,6 @@ class Job(ResponseModel):
         max_length=300,
     )
 
-    @classmethod
-    def none(cls) -> "Job":
-        return cls.model_construct(
-            name=None,
-            description=None,
-            automation_potential=None,
-            reason=None,
-        )
-
 
 class Jobs(ResponseModel):
     jobs: list[Job] = Field(
