@@ -12,6 +12,7 @@ dependencies = [
     "litellm>=1.69.1",
     "pandas>=2.2.3",
     "pyyaml>=6.0.2",
+    "rich>=13.9.4",
     "ruff>=0.11.9",
     "typer>=0.15.3",
 ]
@@ -47,6 +48,8 @@ select = [
     "RET",  # Return statements
 ]
 
+[tool.ruff.lint.pylint]
+max-args = 8
 
 [tool.ruff.format]
 quote-style = "double"

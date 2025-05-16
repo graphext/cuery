@@ -17,31 +17,24 @@ class Message(BaseModel):
 
 
 class Prompt(BaseModel):
-    messages: list[Message] = Field(
-        description="A list of messages to be used in the prompt",
-        min_items=1,
-    )
-    required: list[str] = Field(
-        description="A list of required keys that must be present in the context",
-        default_factory=list,
-    )
+    messages: list[Message] = Field(min_items=1)
+    required: list[str] = Field(default_factory=list)
 
     def __iter__(self):
         yield from (dict(message) for message in self.messages)
 
 
 def load(relpath: str | Path) -> dict:
-    """Load prompts from a YAML file."""
     configs = load_yaml(relpath)
     return {k: Prompt(**v) for k, v in configs.items()}
 
 
 async def call(
-    client: Instructor | None,
-    model: str | None,
+    client: Instructor,
     prompt: Prompt,
     context: dict | None,
     response_model: BaseModel,
+    model: str | None = None,
     **kwds,
 ) -> BaseModel:
     """Prompt once with the given context (validated)."""
@@ -70,11 +63,11 @@ async def call(
 
 
 async def iter_calls(
-    client: Instructor | None,
-    model: str | None,
+    client: Instructor,
     prompt: Prompt,
     context: dict | list[dict] | DataFrame,
     response_model: BaseModel,
+    model: str | None = None,
     **kwds,
 ) -> list[BaseModel]:
     """Sequential iteration of prompt over iterable contexts."""
@@ -85,7 +78,7 @@ async def iter_calls(
     for c in context:
         result = await call(
             client,
-            model,
+            model=model,
             prompt=prompt,
             context=c,
             response_model=response_model,
@@ -102,11 +95,11 @@ async def rate_limited(func: Callable, sem: Semaphore, **kwds):
 
 
 async def gather_calls(
-    client: Instructor | None,
-    model: str | None,
+    client: Instructor,
     prompt: Prompt,
     context: dict | list[dict] | DataFrame,
     response_model: BaseModel,
+    model: str | None = None,
     max_concurrent: int = 2,
     **kwds,
 ) -> list[BaseModel]:

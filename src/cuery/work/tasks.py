@@ -1,5 +1,3 @@
-from functools import partial
-
 from pydantic import BaseModel, Field
 
 from .. import prompt

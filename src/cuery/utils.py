@@ -29,7 +29,7 @@ def set_api_keys(keys: dict | str | Path | None = None):
 def resource_path(relpath: str | Path) -> Path:
     relpath = Path(relpath)
     dp, fn = relpath.parent, relpath.name
-    dp = Path("cellmagic") / dp
+    dp = Path("cuery") / dp
     dp = str(dp).replace("/", ".")
     return files(dp).joinpath(str(fn))
 

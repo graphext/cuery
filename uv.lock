@@ -265,41 +265,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cellmagic"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "instructor", extra = ["anthropic", "google-generativeai"] },
-    { name = "ipykernel" },
-    { name = "jupyter" },
-    { name = "litellm" },
-    { name = "pandas" },
-    { name = "pyyaml" },
-    { name = "ruff" },
-    { name = "typer" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "ipykernel" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "instructor", extras = ["anthropic", "google-generativeai", "litellm"], specifier = ">=1.8.1" },
-    { name = "ipykernel", specifier = ">=6.29.5" },
-    { name = "jupyter", specifier = ">=1.1.1" },
-    { name = "litellm", specifier = ">=1.69.1" },
-    { name = "pandas", specifier = ">=2.2.3" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "ruff", specifier = ">=0.11.9" },
-    { name = "typer", specifier = ">=0.15.3" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "ipykernel", specifier = ">=6.29.5" }]
-
-[[package]]
 name = "certifi"
 version = "2025.4.26"
 source = { registry = "https://pypi.org/simple" }
@@ -433,6 +398,43 @@ sdist = { url = "https://files.pythonhosted.org/packages/e9/a8/fb783cb0abe2b5fde
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/75/49e5bfe642f71f272236b5b2d2691cf915a7283cc0ceda56357b61daa538/comm-0.2.2-py3-none-any.whl", hash = "sha256:e6fb86cb70ff661ee8c9c14e7d36d6de3b4066f1441be4063df9c5009f0a64d3", size = 7180, upload-time = "2024-03-12T16:53:39.226Z" },
 ]
+
+[[package]]
+name = "cuery"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "instructor", extra = ["anthropic", "google-generativeai"] },
+    { name = "ipykernel" },
+    { name = "jupyter" },
+    { name = "litellm" },
+    { name = "pandas" },
+    { name = "pyyaml" },
+    { name = "rich" },
+    { name = "ruff" },
+    { name = "typer" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipykernel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "instructor", extras = ["anthropic", "google-generativeai", "litellm"], specifier = ">=1.8.1" },
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "jupyter", specifier = ">=1.1.1" },
+    { name = "litellm", specifier = ">=1.69.1" },
+    { name = "pandas", specifier = ">=2.2.3" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "rich", specifier = ">=13.9.4" },
+    { name = "ruff", specifier = ">=0.11.9" },
+    { name = "typer", specifier = ">=0.15.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ipykernel", specifier = ">=6.29.5" }]
 
 [[package]]
 name = "debugpy"
