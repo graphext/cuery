@@ -6,10 +6,8 @@ from openai import AsyncOpenAI
 from pandas import DataFrame
 from pydantic import BaseModel
 
-from . import prompt
-from .prompt import Prompt
-
-BaseModelClass = type[BaseModel]
+from . import prompt, utils
+from .prompt import Prompt, ResponseClass
 
 
 def is_iterable(obj):
@@ -26,11 +24,19 @@ def context_is_iterable(context: dict | list[dict] | DataFrame) -> bool:
     return isinstance(context, list) and all(isinstance(d, dict) for d in context)
 
 
+class ErrorCounter:
+    def __init__(self) -> None:
+        self.count = 0
+
+    def count_error(self, error: Exception) -> None:
+        self.count += 1
+
+
 class Task:
     def __init__(
         self,
         prompt: Prompt,
-        response: BaseModelClass,
+        response: ResponseClass,
         client: str | None = None,
         model: str | None = None,
     ):
@@ -72,7 +78,11 @@ class Task:
     ) -> list[BaseModel]:
         client = client or self.client
         model = model or self.model
-        return await prompt.iter_calls(
+
+        self.error_counter = ErrorCounter()
+        client.on("parse:error", self.error_counter.count_error)
+
+        result = await prompt.iter_calls(
             client=client,
             model=model,
             prompt=self.prompt,
@@ -80,6 +90,11 @@ class Task:
             response_model=self.response,
             **kwds,
         )
+
+        if self.error_counter.count > 0:
+            print(f"Encountered: {self.error_counter.count} response parsing errors!")
+
+        return result
 
     async def gather(
         self,
@@ -91,7 +106,11 @@ class Task:
     ) -> list[BaseModel]:
         client = client or self.client
         model = model or self.model
-        return await prompt.gather_calls(
+
+        self.error_counter = ErrorCounter()
+        client.on("parse:error", self.error_counter.count_error)
+
+        result = await prompt.gather_calls(
             client=client,
             model=model,
             prompt=self.prompt,
@@ -100,6 +119,11 @@ class Task:
             max_concurrent=n_concurrent,
             **kwds,
         )
+
+        if self.error_counter.count > 0:
+            print(f"Encountered: {self.error_counter.count} response parsing errors!")
+
+        return result
 
     async def __call__(
         self,
@@ -120,3 +144,31 @@ class Task:
             return await self.iter(context, client, model, **kwds)
 
         return await self.call(context, client, model)
+
+    def explode_responses(
+        self,
+        responses: Iterable[BaseModel],
+        context_df: DataFrame,
+        to_pandas: bool = True,
+    ):
+        """Explode a list of pydantic models containing lists into a flat list of records.
+
+        Useful to flatten multi-option LLM responses.
+        """
+        is_multi, field = utils.is_multi_output(self.response)
+        if not is_multi:
+            raise ValueError(
+                "Responses don't seem to be multi-output (1:N or having a single list/array field)."
+            )
+
+        records = []
+        for i, response in enumerate(responses):
+            context = context_df.iloc[i].to_dict()
+            for item in getattr(response, field):
+                rec = context | dict(item)
+                records.append(rec)
+
+        if to_pandas:
+            return DataFrame.from_records(records)
+
+        return records

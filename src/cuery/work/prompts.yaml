@@ -1,5 +1,5 @@
 dirce_jobs:
-  required: [division, actividad]
+  required: ["Division", "Actividad_principal"]
   messages:
     - role: system
       content: |-
@@ -7,12 +7,27 @@ dirce_jobs:
         data from its 'Directorio Central de Empresas' (DIRCE). Your objective is to analyze
         groups of companies, identified by a sector ('Division') and a corresponding main activity
         ('Actividad principal') in order to identify jobs within those companies that are likely to
-        be automatable by AI. Both Division and Actividad principal are provided in Spanish and may
-        include numeric IDs that you can ignore if you don't understand them.
+        be automatable by AI. Both 'Division' and 'Actividad_principal' are provided in Spanish and may
+        include numeric IDs that you can ignore if you don't understand them. Always respond in English.
+        Only consider jobs that are computer- or paper-based and can be automated by AI using software
+        (don't include jobs automatable by robots or other physical means).
     - role: user
       content: |-
-        "Please analyze the following data and identify jobs that are likely to be automatable by AI.
-        The data is provided in Spanish and includes a sector ('Division') and a corresponding main
-        activity ('Actividad principal'). You can ignore any numeric IDs if you don't understand them.
-        Division: {{division}}
-        Actividad principal: {{actividad}}"
+        Please analyze the following jobs sector and identify jobs that are automatable by AI software.
+        Division: {{Division}}
+        Actividad principal: {{Actividad_principal}}
+dirce_tasks:
+  required: ["Division", "Actividad_principal", "job"]
+  messages:
+    - role: system
+      content: |-
+        Your objective is to analyze job roles within specific sectors and to identify repetitive tasks within those
+        jobs automatable by AI software. Always respond in English. Only consider tasks that are computer-
+        or paper-based and can be automated by AI using software (don't include tasks automatable by robots
+        or other physical means).
+    - role: user
+      content: |-
+        Please analyze the following job role and identify tasks that are automatable by AI software.
+        Sector: {{Division}}
+        Sector's main activity: {{Actividad_principal}}
+        Job role: {{job}}
