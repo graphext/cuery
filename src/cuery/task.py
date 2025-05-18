@@ -156,7 +156,7 @@ class Task:
         to_pandas: bool = True,
     ):
         """Flatten a list of pydantic models containing lists into a flat list of records."""
-        is_multi, field = utils.is_multi_output(self.response)
+        is_multi, field = self.response.is_multi_output()
         if not is_multi:
             raise ValueError(
                 "Responses don't seem to be multi-output "
