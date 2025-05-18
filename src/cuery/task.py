@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from pathlib import Path
 
 import instructor
 from instructor import Instructor
@@ -7,7 +8,10 @@ from pandas import DataFrame
 from pydantic import BaseModel
 
 from . import prompt, utils
-from .prompt import Prompt, ResponseClass
+from .prompt import Prompt
+from .response import ResponseClass
+
+AnyCfg = str | Path | dict
 
 
 def is_iterable(obj):
@@ -151,14 +155,12 @@ class Task:
         context_df: DataFrame,
         to_pandas: bool = True,
     ):
-        """Explode a list of pydantic models containing lists into a flat list of records.
-
-        Useful to flatten multi-option LLM responses.
-        """
+        """Flatten a list of pydantic models containing lists into a flat list of records."""
         is_multi, field = utils.is_multi_output(self.response)
         if not is_multi:
             raise ValueError(
-                "Responses don't seem to be multi-output (1:N or having a single list/array field)."
+                "Responses don't seem to be multi-output "
+                "(1:N or having a single list/array field)."
             )
 
         records = []
@@ -172,3 +174,8 @@ class Task:
             return DataFrame.from_records(records)
 
         return records
+
+    def from_config(prompt: AnyCfg, response: AnyCfg) -> "Task":
+        prompt = Prompt.from_config(prompt)
+        response = ResponseClass.from_config(response)
+        return Task(prompt=prompt, response=response)

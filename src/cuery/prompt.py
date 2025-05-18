@@ -10,18 +10,8 @@ from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
 
 from .context import check_context_iterable
-from .utils import load_yaml
-
-
-class ResponseModel(BaseModel):
-    """Base class for all response models."""
-
-    @classmethod
-    def fallback(cls) -> "ResponseModel":
-        return cls.model_construct(**dict.fromkeys(cls.model_fields, None))
-
-
-ResponseClass = type[ResponseModel]
+from .response import ResponseModel
+from .utils import get_config
 
 
 class Message(BaseModel):
@@ -36,10 +26,10 @@ class Prompt(BaseModel):
     def __iter__(self):
         yield from (dict(message) for message in self.messages)
 
-
-def load(relpath: str | Path) -> dict:
-    configs = load_yaml(relpath)
-    return {k: Prompt(**v) for k, v in configs.items()}
+    @classmethod
+    def from_config(cls, source: str | Path | dict, *keys: list) -> "Prompt":
+        config = get_config(source, *keys)
+        return cls(**config)
 
 
 async def call(

@@ -1,11 +1,10 @@
 import json
 import os
 from importlib.resources import files
+from inspect import cleandoc
 from pathlib import Path
-from typing import get_origin
 
 import yaml
-from pandas import DataFrame
 from pydantic import BaseModel
 
 BaseModelClass = type[BaseModel]
@@ -49,24 +48,36 @@ def load_yaml(relpath: str | Path) -> dict:
         return yaml.safe_load(f)
 
 
-def iterrecords(df: DataFrame, index: bool = False):
-    """Iterate over rows of a DataFrame as dictionaries."""
-    for row in df.itertuples(index=index):
-        yield row._asdict()
+def dedent(text):
+    """Dedent a string, removing leading whitespace like yaml blocks."""
+    text = cleandoc(text)
+    paragraphs = text.split("\n\n")
+    paragraphs = [p.replace("\n", " ") for p in paragraphs]
+    return "\n\n".join(paragraphs).strip()
 
 
-def is_multi_output(model: BaseModel | BaseModelClass) -> tuple[bool, str | None]:
-    """Check if a pydantic model has a single field that is a list."""
-    if isinstance(model, BaseModel):
-        model = model.__class__
+def get(dct, *keys, on_error="raise"):
+    """Safely access a nested obj with variable length path."""
+    for key in keys:
+        try:
+            dct = dct[key]
+        except (KeyError, TypeError, IndexError):
+            if isinstance(key, str):
+                try:
+                    dct = getattr(dct, key)
+                except AttributeError:
+                    if on_error == "raise":
+                        raise
+                    return on_error
+            else:
+                if on_error == "raise":
+                    raise
+                return on_error
+    return dct
 
-    fields = model.model_fields
-    if len(fields) != 1:
-        return False
 
-    name = next(iter(fields.keys()))
-    field = fields[name]
-    if get_origin(field.annotation) is list:
-        return True, name
+def get_config(source: str | Path | dict, *keys: list, on_error="raise"):
+    if isinstance(source, str | Path):
+        source = load_yaml(source)
 
-    return False, None
+    return get(source, *keys, on_error=on_error)

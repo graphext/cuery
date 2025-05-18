@@ -3,7 +3,11 @@ from warnings import warn
 
 from pandas import DataFrame
 
-from .utils import iterrecords
+
+def iterrecords(df: DataFrame, index: bool = False):
+    """Iterate over rows of a DataFrame as dictionaries."""
+    for row in df.itertuples(index=index):
+        yield row._asdict()
 
 
 def contexts_from_dataframe(df: DataFrame, required: list[str] | None) -> Iterable[dict] | None:

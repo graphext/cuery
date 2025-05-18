@@ -1,7 +1,7 @@
 from pydantic import Field
 
-from .. import prompt
-from ..prompt import ResponseModel
+from ..prompt import Prompt
+from ..response import ResponseModel
 from ..task import Task
 
 
@@ -105,7 +105,7 @@ class JobTasks(ResponseModel):
     )
 
 
-PROMPTS = prompt.load("work/prompts.yaml")
+PROMPTS = "work/prompts.yaml"
 
-DirceJobs = Task(prompt=PROMPTS["dirce_jobs"], response=Jobs)
-DirceTasks = Task(prompt=PROMPTS["dirce_tasks"], response=JobTasks)
+DirceJobs = Task(prompt=Prompt.from_config(PROMPTS, "dirce_jobs"), response=Jobs)
+DirceTasks = Task(prompt=Prompt.from_config(PROMPTS, "dirce_tasks"), response=JobTasks)

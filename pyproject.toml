@@ -17,6 +17,9 @@ dependencies = [
     "typer>=0.15.3",
 ]
 
+[dependency-groups]
+dev = ["ipykernel>=6.29.5"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -54,6 +57,3 @@ max-args = 8
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
-
-[dependency-groups]
-dev = ["ipykernel>=6.29.5"]

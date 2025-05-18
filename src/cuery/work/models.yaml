@@ -1,0 +1,15 @@
+Job:
+  name:
+    type: string
+    description: Name of the job role (job title, less than 50 characters)
+    min_length: 5
+    max_length: 50
+  description:
+    type: string
+    description: A short description of the job role (less than 200 characters)
+    min_length: 20
+    max_length: 200
+  potential:
+    type: integer
+    description: A score from 1 to 10 indicating the job's potential for automation
+    ge: 0
