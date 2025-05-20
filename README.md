@@ -169,3 +169,14 @@ Cuery extends the Instructor library with higher-level abstractions for managing
 - Configuration-based workflow setup
 
 By providing these abstractions, Cuery aims to simplify the development of complex LLM workflows while maintaining the type safety and structured outputs that Instructor provides.
+
+# Docs
+
+Cuery uses [Sphinx](https://sphinx-autoapi.readthedocs.io/en/latest/) with the [AutoApi extension](https://sphinx-autoapi.readthedocs.io/en/latest/index.html) and the [PyData theme](https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html).
+
+To build and render:
+
+``` bash
+(cd docs && uv run make clean html)
+(cd docs/build/html && uv run python -m http.server)
+```

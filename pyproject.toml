@@ -18,7 +18,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["ipykernel>=6.29.5"]
+dev = [
+    "pydata-sphinx-theme>=0.16.1",
+    "sphinx>=8.2.3",
+    "sphinx-autoapi>=3.6.0",
+]
 
 [build-system]
 requires = ["hatchling"]
