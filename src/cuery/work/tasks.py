@@ -42,7 +42,7 @@ class Jobs(ResponseModel):
 
 class JobTask(ResponseModel):
     name: str = Field(
-        description="Name of the task (less than 50 characters)",
+        description="Name of the task automatable with AI (less than 50 characters)",
         min_length=5,
         max_length=50,
     )
@@ -88,9 +88,9 @@ class JobTask(ResponseModel):
     )
     products: list[str] = Field(
         description=(
-            "A list of existing software solutions or providers (products or services) "
-            "to automate the task, less than 10 words each, less than 50 characters each), "
-            "ideally just the name and url."
+            "A list of existing AI startups/companies or AI software solutions and providers "
+            "(products or services) to automate the task, less than 10 words each, less than 50 "
+            "characters each), ideally just the name and url."
         ),
         min_items=1,
         max_items=5,
