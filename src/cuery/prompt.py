@@ -6,17 +6,21 @@ from pathlib import Path
 from instructor.client import Instructor
 from pandas import DataFrame
 from pydantic import BaseModel, Field
-from rich import box
-from rich.console import Console, ConsoleOptions, Group, RenderResult
-from rich.padding import Padding
-from rich.panel import Panel
-from rich.pretty import Pretty
-from rich.syntax import Syntax
-from rich.text import Text
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
 
 from .context import check_context_iterable
+from .pretty import (
+    Console,
+    ConsoleOptions,
+    Group,
+    Padding,
+    Panel,
+    Pretty,
+    RenderResult,
+    Syntax,
+    Text,
+)
 from .response import ResponseModel
 from .utils import get_config
 

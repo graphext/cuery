@@ -6,9 +6,9 @@ from instructor import Instructor
 from openai import AsyncOpenAI
 from pandas import DataFrame
 from pydantic import BaseModel
-from rich.console import Console, ConsoleOptions, RenderResult
 
 from . import prompt
+from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult
 from .prompt import Prompt
 from .response import ResponseClass
 
@@ -185,12 +185,6 @@ class Task:
         return Task(prompt=prompt, response=response)
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        """Rich console representation of the task."""
-        from rich.text import Text
-        from rich.panel import Panel
-        from rich.console import Group
-        from rich.padding import Padding
-
         group = [
             Padding(self.prompt, (1, 0, 0, 0)),
             Padding(self.response.fallback(), (1, 0, 0, 0)),

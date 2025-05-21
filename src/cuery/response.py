@@ -3,12 +3,8 @@ from typing import get_args, get_origin
 
 import pydantic
 from pydantic import BaseModel, Field
-from rich import box
-from rich.console import Console, ConsoleOptions, Group, RenderResult
-from rich.padding import Padding
-from rich.panel import Panel
-from rich.text import Text
 
+from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
 from .utils import get_config, pretty_field_info
 
 TYPES = {

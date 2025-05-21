@@ -1,6 +1,5 @@
 import json
 import os
-from functools import partial
 from importlib.resources import files
 from inspect import cleandoc
 from pathlib import Path
@@ -11,29 +10,8 @@ from glom import glom
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
-from rich import box, panel
-from rich.console import Group
-from rich.padding import Padding
-from rich.panel import Panel
-from rich.pretty import Pretty
-from rich.text import Text
 
-NO_BOTTOM_BOX = box.Box(
-    "╭─┬╮\n"  # top
-    "│ ││\n"  # head
-    "├─┼┤\n"  # headrow
-    "│ ││\n"  # mid
-    "├─┼┤\n"  # row
-    "├─┼┤\n"  # foot row
-    "│ ││\n"  # foot
-    # "╰─┴╯\n"  # bottom
-    "    \n"  # bottom
-)
-
-DEFAULT_BOX = box.ROUNDED
-
-panel.Panel = partial(Panel, box=DEFAULT_BOX)
-
+from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, Text
 
 BaseModelClass = type[BaseModel]
 
