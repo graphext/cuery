@@ -2,6 +2,21 @@
 
 Cuery is a Python library for LLM prompt management that extends the capabilities of the Instructor library. It provides a structured approach to working with prompts, contexts, response models, and tasks for effective LLM workflow management.
 
+## To Do
+- Integrate web search API:
+  - Depends on Instructor integration of OpenAI Responses API
+  - PR: https://github.com/567-labs/instructor/pull/1520
+- Easier selection of clients:
+  - PR: https://github.com/567-labs/instructor/issues/1534
+- More info about execution:
+  - Cost
+  - Token count
+  - Other errors
+- Seperate retry logic for rate limit errors and structured output validation errors
+  - Issue: https://github.com/567-labs/instructor/issues/1503
+- Prompt registry
+
+
 ## Key Concepts
 
 ### 1. Prompts
