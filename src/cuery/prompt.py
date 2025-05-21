@@ -43,7 +43,7 @@ class Message(BaseModel):
         text = Syntax(
             self.content,
             "django",
-            # code_width=84,
+            code_width=None,
             word_wrap=True,
             theme="friendly",
             padding=1,
