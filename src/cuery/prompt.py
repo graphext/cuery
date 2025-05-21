@@ -22,7 +22,7 @@ from .pretty import (
     Text,
 )
 from .response import ResponseModel
-from .utils import get_config
+from .utils import LOG, get_config
 
 ROLE_STYLES = {
     "system": "bold cyan",
@@ -93,7 +93,7 @@ async def call(
     model: str | None = None,
     fallback: bool = True,
     **kwds,
-) -> BaseModel:
+) -> ResponseModel:
     """Prompt once with the given context (validated)."""
     if prompt.required and not context:
         raise ValueError("Context is required for prompt but wasn't provided!")
@@ -104,36 +104,24 @@ async def call(
             f"Missing required keys in context: {', '.join(missing)}\nContext:\n{context}"
         )
 
-    if model is None:
-        try:
-            return await client.chat.completions.create(
-                messages=list(prompt),
-                response_model=response_model,
-                context=context,
-                **kwds,
-            )
-        except Exception as exception:
-            if not fallback:
-                raise
-
-            print(f"Error: {exception}")
-            print("Falling back to default response.")
-            return response_model.fallback()
+    if model is not None:
+        kwds["model"] = model
 
     try:
-        return await client.chat.completions.create(
-            model=model,
+        response, completion = await client.chat.completions.create_with_completion(
             messages=list(prompt),
             response_model=response_model,
             context=context,
             **kwds,
         )
+        response._raw_response = completion
+        return response
     except Exception as exception:
         if not fallback:
             raise
 
-        print(f"Error: {exception}")
-        print("Falling back to default response.")
+        LOG.error(f"{exception}")
+        LOG.error("Falling back to default response.")
         return response_model.fallback()
 
 

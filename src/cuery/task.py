@@ -11,6 +11,7 @@ from . import prompt
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult
 from .prompt import Prompt
 from .response import ResponseClass
+from .utils import LOG
 
 AnyCfg = str | Path | dict
 
@@ -100,7 +101,7 @@ class Task:
         )
 
         if self.error_counter.count > 0:
-            print(f"Encountered: {self.error_counter.count} response parsing errors!")
+            LOG.warning(f"Encountered: {self.error_counter.count} response parsing errors!")
 
         return result
 
@@ -129,7 +130,7 @@ class Task:
         )
 
         if self.error_counter.count > 0:
-            print(f"Encountered: {self.error_counter.count} response parsing errors!")
+            LOG.warning(f"Encountered: {self.error_counter.count} response parsing errors!")
 
         return result
 

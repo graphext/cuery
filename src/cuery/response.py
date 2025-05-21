@@ -1,7 +1,9 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import get_args, get_origin
+from typing import Any, get_args, get_origin
 
 import pydantic
+from pandas import DataFrame
 from pydantic import BaseModel, Field
 
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
@@ -26,6 +28,18 @@ TYPES = {
 
 class ResponseModel(BaseModel):
     """Base class for all response models."""
+
+    _raw_response: Any | None = None
+
+    def token_usage(self) -> int | None:
+        """Get the token usage from the raw response."""
+        if self._raw_response is None:
+            return None
+
+        return {
+            "prompt": self._raw_response.usage.prompt_tokens,
+            "completion": self._raw_response.usage.completion_tokens,
+        }
 
     @classmethod
     def fallback(cls) -> "ResponseModel":
@@ -85,6 +99,10 @@ class ResponseModel(BaseModel):
             group = Group(group, Padding(models, 1))
 
         yield Panel(group, title=title, padding=(1, 1), expand=False)
+
+
+def token_usage(responses: Iterable[ResponseModel]) -> DataFrame:
+    return DataFrame([r.token_usage() for r in responses])
 
 
 ResponseClass = type[ResponseModel]
