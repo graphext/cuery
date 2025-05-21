@@ -2,6 +2,7 @@ from functools import partial
 
 from rich import box, panel
 from rich.console import Console, ConsoleOptions, Group, RenderResult
+from rich.logging import RichHandler
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.pretty import Pretty
@@ -33,6 +34,7 @@ __all__ = [
     "Padding",
     "Pretty",
     "RenderResult",
+    "RichHandler",
     "Syntax",
     "Text",
     "Group",

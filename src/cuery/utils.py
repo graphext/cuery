@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from importlib.resources import files
 from inspect import cleandoc
@@ -11,9 +12,14 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 
-from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, Text
+from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, RichHandler, Text
 
 BaseModelClass = type[BaseModel]
+
+LOG = logging.getLogger("cuery")
+LOG.addHandler(RichHandler(markup=False))
+LOG.setLevel(logging.INFO)
+
 
 DEFAULT_PATH = Path().home() / "Development/config/ai-api-keys.json"
 
