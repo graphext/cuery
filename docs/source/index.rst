@@ -1,47 +1,55 @@
+.. cuery documentation master file, created by
+   sphinx-quickstart on Tue May 20 11:25:06 2025.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
 Cuery: A Python Library for LLM Prompt Management
-=================================================
+================================================
 
 Cuery is a Python library for LLM prompt management that extends the capabilities of the Instructor library. It provides a structured approach to working with prompts, contexts, response models, and tasks for effective LLM workflow management.
 
 Key Concepts
-------------
+-----------
 
 1. Prompts
-~~~~~~~~~~
+~~~~~~~~~
 
 In Cuery, prompts are represented as a series of messages with built-in support for:
 
 - **Jinja templating**: Dynamically generate content using template variables
 - **YAML configuration**: Load prompts from YAML files for better organization
-- **Iteration over contexts**: Process multiple contexts (see below) asynchronously or synchronously
-- **Validation**: Ensure that required variables are provided before execution
-- **Pretty printing**: Display prompts in a human-readable format
+- **Iteration over contexts**: Process multiple contexts asynchronously or synchronously
 
 .. code-block:: python
+
+    from cuery.prompt import Prompt, Message
 
     # Create a prompt manually
     prompt = Prompt(
         messages=[
             Message(role="system", content="You are an analyst identifying AI-automatable jobs."),
-            Message(role="user", content="Analyze jobs in {{sector}} focused on {{main_activity}}.")
+            Message(role="user", content="Analyze jobs in {{Division}} focused on {{Actividad_principal}}.")
         ],
-        required=["sector", "main_activity"]
+        required=["Division", "Actividad_principal"]
     )
 
-    # Load prompts from YAML configuration with direct, deep config access
+    # Load prompts from YAML configuration
     from cuery.prompt import Prompt
     prompt = Prompt.from_config("work/prompts.yaml:dirce_jobs")
 
 2. Contexts
-~~~~~~~~~~~
+~~~~~~~~~~
 
-Contexts are collections of named variables (mappings/dicts) used to fill in Jinja templates in prompts. Contexts can be created from various data sources:
+Contexts are collections of named variables used to fill in Jinja templates in prompts. Contexts can be created from various data sources:
 
 - **Pandas DataFrames**: Each row becomes a separate context
 - **Dictionaries of iterables**: Values are aligned to create multiple contexts
 - **Lists of dictionaries**: Each dictionary represents a separate context
 
 .. code-block:: python
+
+    import pandas as pd
+    from cuery.context import contexts_from_dataframe
 
     # Create contexts from a DataFrame with Spanish industry sectors
     df = pd.DataFrame({
@@ -53,7 +61,7 @@ Contexts are collections of named variables (mappings/dicts) used to fill in Jin
     # Each context will be used to analyze AI-automatable jobs in those sectors
 
 3. ResponseModels
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 ResponseModels are Pydantic models that define the structure of LLM outputs, providing:
 
@@ -61,9 +69,11 @@ ResponseModels are Pydantic models that define the structure of LLM outputs, pro
 - **Validation**: Ensure outputs meet expected formats and constraints
 - **Fallback handling**: Gracefully handle parsing errors
 - **YAML configuration**: Load response models from configuration files
-- **Pretty printing**: Display response models in a human-readable format
 
 .. code-block:: python
+
+    from cuery.response import ResponseModel
+    from pydantic import Field
 
     class Job(ResponseModel):
         name: str = Field(
@@ -82,16 +92,16 @@ ResponseModels are Pydantic models that define the structure of LLM outputs, pro
             le=10,
         )
         
-    # Multi-output response model (1 context -> N outputs)
+    # Multi-output response model
     class Jobs(ResponseModel):
         jobs: list[Job]
         
     # Create from configuration
     from cuery.response import ResponseModel
-    response_model = ResponseModel.from_config("work/models.yaml:Job")
+    response_model = ResponseModel.from_config("work/models.yaml", "Job")
 
 4. Tasks
-~~~~~~~~
+~~~~~~~
 
 Tasks combine prompts and response models into reusable units of work, simplifying:
 
@@ -99,14 +109,16 @@ Tasks combine prompts and response models into reusable units of work, simplifyi
 - **Batch processing**: Handle multiple contexts efficiently
 - **Concurrency control**: Process requests in parallel with customizable limits
 - **Response post-processing**: Transform and normalize structured outputs
-- **Error handling**: Manage exceptions and fallback scenarios
-- **Pretty printing**: Display task details in a human-readable format
 
 .. code-block:: python
 
+    from cuery.task import Task
+    from openai import AsyncOpenAI
+    import instructor
+
     # Create a task for finding automatable jobs in Spanish industry sectors
     client = instructor.from_openai(AsyncOpenAI())
-    task = Task(
+    dirce_jobs_task = Task(
         prompt=Prompt.from_config("work/prompts.yaml:dirce_jobs"),
         response=Jobs,
         client=client,
@@ -114,13 +126,13 @@ Tasks combine prompts and response models into reusable units of work, simplifyi
     )
 
     # Execute with single context
-    result = await task({
+    result = await dirce_jobs_task({
         "Division": "Actividades informáticas", 
         "Actividad_principal": "Programación y desarrollo"
     })
 
     # Execute with multiple contexts (automatic mode selection)
-    results = await task(
+    results = await dirce_jobs_task(
         context=df,  # DataFrame with industry sectors
         n_concurrent=5  # Process 5 requests concurrently
     )
@@ -129,7 +141,7 @@ Tasks combine prompts and response models into reusable units of work, simplifyi
     flattened_df = dirce_jobs_task.explode_responses(results, df)
 
 Getting Started
----------------
+-------------
 
 .. code-block:: python
 
@@ -140,25 +152,29 @@ Getting Started
     from pydantic import Field
     from cuery.work.tasks import Jobs, Job
 
+    # Set up client
     client = instructor.from_openai(AsyncOpenAI())
 
+    # Create prompt for job automation analysis
     prompt = Prompt(
         messages=[
             {"role": "system", "content": "Identify jobs automatable by AI in this sector."},
-            {"role": "user", "content": "Sector: {{ sector }}\nActivity: {{ activity }}"}
+            {"role": "user", "content": "Sector: {{ Division }}\nActivity: {{ Actividad_principal }}"}
         ],
-        required=["sector", "activity"]
+        required=["Division", "Actividad_principal"]
     )
 
+    # Create task
     job_analyzer = Task(prompt=prompt, response=Jobs, client=client)
 
+    # Execute task
     result = await job_analyzer({
         "Division": "Actividades financieras", 
         "Actividad_principal": "Contabilidad y auditoría"
     })
 
 Building on Instructor
-----------------------
+--------------------
 
 Cuery extends the Instructor library with higher-level abstractions for managing prompts and responses in a structured way, with particular emphasis on:
 
@@ -170,7 +186,7 @@ Cuery extends the Instructor library with higher-level abstractions for managing
 By providing these abstractions, Cuery aims to simplify the development of complex LLM workflows while maintaining the type safety and structured outputs that Instructor provides.
 
 Documentation
--------------
+-----------
 
 Cuery uses `Sphinx <https://sphinx-autoapi.readthedocs.io/en/latest/>`_ with the `AutoApi extension <https://sphinx-autoapi.readthedocs.io/en/latest/index.html>`_ and the `PyData theme <https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html>`_.
 
@@ -184,3 +200,4 @@ To build and render:
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
