@@ -1,10 +1,15 @@
 from pathlib import Path
-from typing import get_origin
+from typing import get_args, get_origin
 
 import pydantic
 from pydantic import BaseModel, Field
+from rich import box
+from rich.console import Console, ConsoleOptions, Group, RenderResult
+from rich.padding import Padding
+from rich.panel import Panel
+from rich.text import Text
 
-from .utils import get_config
+from .utils import get_config, pretty_field_info
 
 TYPES = {
     "str": str,
@@ -59,6 +64,31 @@ class ResponseModel(BaseModel):
         """Create an instance of the model from a configuration dictionary."""
         config = get_config(source, *keys)
         return ResponseModel.from_dict(keys[-1], config)
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        cls = self.__class__
+        title = Text(f"RESPONSE: {cls.__name__}", style="bold")
+
+        field_panels = []
+        nested_models = []
+
+        for name, field in cls.model_fields.items():
+            field_panels.append(pretty_field_info(name, field))
+            typ = field.annotation
+            if issubclass(typ, ResponseModel):
+                nested_models.append(typ.fallback())
+            elif typ_args := get_args(typ):
+                for typ_arg in typ_args:
+                    if issubclass(typ_arg, ResponseModel):
+                        nested_models.append(typ_arg.fallback())
+
+        group = Group(*field_panels)
+
+        if nested_models:
+            models = Group(*nested_models)
+            group = Group(group, Padding(models, 1))
+
+        yield Panel(group, title=title, padding=(1, 1), expand=False)
 
 
 ResponseClass = type[ResponseModel]

@@ -2,7 +2,7 @@ dirce_jobs:
   required: ["Division", "Actividad_principal"]
   messages:
     - role: system
-      content: |-
+      content: >-
         You're an analyst at the Spanish 'Instituo Nacional de Estadística' (INE) analyzing
         data from its 'Directorio Central de Empresas' (DIRCE). Your objective is to analyze
         groups of companies, identified by a sector ('Division') and a corresponding main activity
@@ -12,22 +12,27 @@ dirce_jobs:
         Only consider jobs that are computer- or paper-based and can be automated by AI using software
         (don't include jobs automatable by robots or other physical means).
     - role: user
-      content: |-
+      content: >-
         Please analyze the following jobs sector and identify jobs that are automatable by AI software.
+        
         Division: {{Division}}
+        
         Actividad principal: {{Actividad_principal}}
 dirce_tasks:
   required: ["Division", "Actividad_principal", "job"]
   messages:
     - role: system
-      content: |-
+      content: >-
         Your objective is to analyze job roles within specific sectors and to identify repetitive tasks within those
         jobs automatable by AI software. Always respond in English. Only consider tasks that are computer-
         or paper-based and can be automated by AI using software (don't include tasks automatable by robots
         or other physical means).
     - role: user
-      content: |-
+      content: >-
         Please analyze the following job role and identify tasks that are automatable by AI software.
+        
         Sector: {{Division}}
+        
         Sector's main activity: {{Actividad_principal}}
+        
         Job role: {{job}}

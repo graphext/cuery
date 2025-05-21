@@ -6,6 +6,13 @@ from pathlib import Path
 from instructor.client import Instructor
 from pandas import DataFrame
 from pydantic import BaseModel, Field
+from rich import box
+from rich.console import Console, ConsoleOptions, Group, RenderResult
+from rich.padding import Padding
+from rich.panel import Panel
+from rich.pretty import Pretty
+from rich.syntax import Syntax
+from rich.text import Text
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
 
@@ -13,13 +20,37 @@ from .context import check_context_iterable
 from .response import ResponseModel
 from .utils import get_config
 
+ROLE_STYLES = {
+    "system": "bold cyan",
+    "user": "bold green",
+    "assistant": "bold yellow",
+    "function": "bold magenta",
+}
+
 
 class Message(BaseModel):
+    """Message class for chat completions."""
+
     role: str
     content: str
 
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        style = ROLE_STYLES.get(self.role, "bold")
+        text = Syntax(
+            self.content,
+            "django",
+            # code_width=84,
+            word_wrap=True,
+            theme="friendly",
+            padding=1,
+        )
+        title = f"[{style}]{self.role.upper()}"
+        yield Panel(text, title=title, expand=True)
+
 
 class Prompt(BaseModel):
+    """Prompt class for chat completions."""
+
     messages: list[Message] = Field(min_items=1)
     required: list[str] = Field(default_factory=list)
 
@@ -27,9 +58,27 @@ class Prompt(BaseModel):
         yield from (dict(message) for message in self.messages)
 
     @classmethod
-    def from_config(cls, source: str | Path | dict, *keys: list) -> "Prompt":
-        config = get_config(source, *keys)
+    def from_config(cls, source: str | Path | dict) -> "Prompt":
+        config = get_config(source)
         return cls(**config)
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        group = []
+        if self.required:
+            group.append(
+                Padding(
+                    Group(
+                        Text("Required: ", end=""),
+                        Pretty(self.required),
+                    ),
+                    1,
+                )
+            )
+
+        for message in self.messages:
+            group.append(message)
+
+        yield Panel(Group(*group), title="Prompt", expand=False)
 
 
 async def call(

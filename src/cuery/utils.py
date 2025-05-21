@@ -1,11 +1,39 @@
 import json
 import os
+from functools import partial
 from importlib.resources import files
 from inspect import cleandoc
 from pathlib import Path
+from typing import get_args
 
 import yaml
+from glom import glom
 from pydantic import BaseModel
+from pydantic.fields import FieldInfo
+from pydantic_core import PydanticUndefinedType
+from rich import box, panel
+from rich.console import Group
+from rich.padding import Padding
+from rich.panel import Panel
+from rich.pretty import Pretty
+from rich.text import Text
+
+NO_BOTTOM_BOX = box.Box(
+    "╭─┬╮\n"  # top
+    "│ ││\n"  # head
+    "├─┼┤\n"  # headrow
+    "│ ││\n"  # mid
+    "├─┼┤\n"  # row
+    "├─┼┤\n"  # foot row
+    "│ ││\n"  # foot
+    # "╰─┴╯\n"  # bottom
+    "    \n"  # bottom
+)
+
+DEFAULT_BOX = box.ROUNDED
+
+panel.Panel = partial(Panel, box=DEFAULT_BOX)
+
 
 BaseModelClass = type[BaseModel]
 
@@ -76,8 +104,39 @@ def get(dct, *keys, on_error="raise"):
     return dct
 
 
-def get_config(source: str | Path | dict, *keys: list, on_error="raise"):
+def get_config(source: str | Path | dict):
+    """Load a (subset) of configuration from a local file.
+
+    Supports glom-style dot and bracket notation to access nested keys/objects.
+    """
     if isinstance(source, str | Path):
+        if ":" in source:
+            source, spec = str(source).split(":")
+        else:
+            spec = None
+
         source = load_yaml(source)
 
-    return get(source, *keys, on_error=on_error)
+    return glom(source, spec) if spec else source
+
+
+def pretty_field_info(name: str, field: FieldInfo):
+    group = []
+    if desc := field.description:
+        group.append(Padding(Text(desc), (0, 0, 1, 0)))
+
+    info = {
+        "required": field.is_required(),
+    }
+    for k in ("metadata", "examples", "json_schema_extra"):
+        if v := getattr(field, k):
+            info[k] = v
+
+    if not isinstance((default := field.get_default()), PydanticUndefinedType):
+        info["default"] = default
+
+    group.append(Pretty(info))
+
+    typ = field.annotation if get_args(field.annotation) else field.annotation.__name__
+    title = Text(f"{name}: {typ}", style="bold")
+    return Panel(Padding(Group(*group), 1), title=title, title_align="left", box=DEFAULT_BOX)

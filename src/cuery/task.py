@@ -6,8 +6,9 @@ from instructor import Instructor
 from openai import AsyncOpenAI
 from pandas import DataFrame
 from pydantic import BaseModel
+from rich.console import Console, ConsoleOptions, RenderResult
 
-from . import prompt, utils
+from . import prompt
 from .prompt import Prompt
 from .response import ResponseClass
 
@@ -39,7 +40,7 @@ class ErrorCounter:
 class Task:
     def __init__(
         self,
-        prompt: Prompt,
+        prompt: str | Path | Prompt,
         response: ResponseClass,
         client: str | None = None,
         model: str | None = None,
@@ -48,6 +49,9 @@ class Task:
         self.response = response
         self.client = client
         self.model = model
+
+        if isinstance(prompt, str | Path):
+            self.prompt = Prompt.from_config(prompt)
 
         if self.client is None:
             self.client = instructor.from_openai(AsyncOpenAI())
@@ -179,3 +183,16 @@ class Task:
         prompt = Prompt.from_config(prompt)
         response = ResponseClass.from_config(response)
         return Task(prompt=prompt, response=response)
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        """Rich console representation of the task."""
+        from rich.text import Text
+        from rich.panel import Panel
+        from rich.console import Group
+        from rich.padding import Padding
+
+        group = [
+            Padding(self.prompt, (1, 0, 0, 0)),
+            Padding(self.response.fallback(), (1, 0, 0, 0)),
+        ]
+        yield Panel(Group(*group), title="Task")
