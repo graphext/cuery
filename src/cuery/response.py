@@ -2,8 +2,10 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, get_args, get_origin
 
+import pandas as pd
 import pydantic
-from pandas import DataFrame
+from instructor.cli.usage import calculate_cost
+from pandas import DataFrame, Series
 from pydantic import BaseModel, Field
 
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
@@ -103,6 +105,16 @@ class ResponseModel(BaseModel):
 
 def token_usage(responses: Iterable[ResponseModel]) -> DataFrame:
     return DataFrame([r.token_usage() for r in responses])
+
+
+def with_cost(usage: DataFrame, model: str) -> DataFrame:
+    cost = Series(
+        [
+            calculate_cost(model, prompt, compl)
+            for prompt, compl in zip(usage.prompt, usage.completion, strict=True)
+        ]
+    )
+    return pd.concat([usage, cost.rename("cost")], axis=1)
 
 
 ResponseClass = type[ResponseModel]
