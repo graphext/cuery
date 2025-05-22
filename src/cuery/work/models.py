@@ -1,7 +1,32 @@
 from pydantic import Field
 
 from ..response import ResponseModel
-from ..task import Task
+
+
+class Sector(ResponseModel):
+    sector: str = Field(
+        description="Human-readable title(!) of the industrical sector (in NAICS taxonomy)",
+        min_length=10,
+        max_length=150,
+    )
+    subsector: str = Field(
+        description="Human-readable title(!) of the industrial subsector (in NAICS taxonomy)",
+        min_length=5,
+        max_length=150,
+    )
+    sector_automation_potential: int = Field(
+        description="A score from 1 to 10 indicating the sector's potential for automation",
+        ge=0,
+        le=10,
+    )
+
+
+class Sectors(ResponseModel):
+    sectors: list[Sector] = Field(
+        description="A list of 5 NAIC industrial sectors with their AI automation potential",
+        min_items=5,
+        max_items=5,
+    )
 
 
 class Job(ResponseModel):

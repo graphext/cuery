@@ -8,26 +8,13 @@ from pandas import DataFrame
 from pydantic import BaseModel
 
 from . import prompt
+from .context import AnyContext, context_is_iterable, iter_context
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult
 from .prompt import Prompt
 from .response import ResponseClass
 from .utils import LOG
 
 AnyCfg = str | Path | dict
-
-
-def is_iterable(obj):
-    return isinstance(obj, Iterable) and not isinstance(obj, str)
-
-
-def context_is_iterable(context: dict | list[dict] | DataFrame) -> bool:
-    """Check if context is iterable."""
-    if isinstance(context, DataFrame):
-        return True
-    if isinstance(context, dict):
-        return all(is_iterable(v) for v in context.values())
-
-    return isinstance(context, list) and all(isinstance(d, dict) for d in context)
 
 
 class ErrorCounter:
@@ -62,7 +49,7 @@ class Task:
 
     async def call(
         self,
-        context: dict | list[dict] | DataFrame,
+        context: AnyContext | None = None,
         client: Instructor | None = None,
         model: str | None = None,
         **kwds,
@@ -80,7 +67,7 @@ class Task:
 
     async def iter(
         self,
-        context: dict | list[dict] | DataFrame,
+        context: AnyContext | None = None,
         client: Instructor | None = None,
         model: str | None = None,
         **kwds,
@@ -107,7 +94,7 @@ class Task:
 
     async def gather(
         self,
-        context: dict | list[dict] | DataFrame,
+        context: AnyContext | None = None,
         client: Instructor | None = None,
         model: str | None = None,
         n_concurrent: int = 1,
@@ -136,7 +123,7 @@ class Task:
 
     async def __call__(
         self,
-        context: dict | list[dict] | DataFrame,
+        context: AnyContext | None = None,
         client: Instructor | None = None,
         model: str | None = None,
         n_concurrent: int = 1,
@@ -166,39 +153,37 @@ class Task:
         ]
         yield Panel(Group(*group), title="Task")
 
-    def explode_responses(
+    def to_pandas(
         self,
-        responses: Iterable[BaseModel],
-        context_df: DataFrame,
+        responses: BaseModel | Iterable[BaseModel],
+        context: AnyContext | None = None,
         to_pandas: bool = True,
+        explode: bool = True,
     ) -> list[dict] | DataFrame:
-        """Flatten a list of pydantic models containing lists into a flat list of records."""
+        """Output as DataFrame, optionally with original context merged in"""
+        if isinstance(responses, BaseModel):
+            responses = [responses]
+
+        if isinstance(context, dict):
+            context = [context]
+
+        if context is not None:
+            contexts, _ = iter_context(context, self.prompt.required)
+        else:
+            contexts = ({} for _ in responses)
+
         is_multi, field = self.response.is_multi_output()
-        if not is_multi:
-            raise ValueError(
-                "Responses don't seem to be multi-output "
-                "(1:N or having a single list/array field)."
-            )
 
         records = []
-        for i, response in enumerate(responses):
-            context = context_df.iloc[i].to_dict()
-            for item in getattr(response, field):
-                rec = context | dict(item)
-                records.append(rec)
+        if is_multi and explode:
+            for ctx, response in zip(contexts, responses, strict=True):
+                for item in getattr(response, field):
+                    records.append(ctx | dict(item))
+        else:
+            for ctx, response in zip(contexts, responses, strict=True):
+                records.append(ctx | dict(response))
 
-        if to_pandas:
-            return DataFrame.from_records(records)
-
-        return records
-
-    def to_pandas(self, responses: Iterable[BaseModel], context_df: DataFrame) -> DataFrame:
-        """Convert a list of pydantic models to a pandas DataFrame."""
-        if self.response.is_multi_output():
-            return self.explode_responses(responses, context_df)
-
-        records = (dict(r) for r in responses)
-        return DataFrame.from_records(records)
+        return DataFrame.from_records(records) if to_pandas else records
 
 
 class Chain:
@@ -211,7 +196,7 @@ class Chain:
     def __init__(self, *tasks: list[Task]):
         self.tasks = tasks
 
-    async def __call__(self, context: dict | list[dict] | DataFrame, **kwds) -> DataFrame:
+    async def __call__(self, context: AnyContext | None = None, **kwds) -> DataFrame:
         n = len(self.tasks)
         for i, task in enumerate(self.tasks):
             LOG.info(f"[{i + 1}/{n}] Running task '{task.response.__name__}'")

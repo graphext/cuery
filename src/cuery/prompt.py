@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
 
-from .context import check_context_iterable
+from .context import iter_context
 from .pretty import (
     Console,
     ConsoleOptions,
@@ -135,7 +135,7 @@ async def iter_calls(
 ) -> list[BaseModel]:
     """Sequential iteration of prompt over iterable contexts."""
 
-    context, total = check_context_iterable(context, prompt.required)
+    context, total = iter_context(context, prompt.required)
 
     results = []
     with tqdm(desc="Iterating context", total=total) as pbar:
@@ -170,7 +170,7 @@ async def gather_calls(
 ) -> list[BaseModel]:
     """Async iteration of prompt over iterable contexts."""
     sem = Semaphore(max_concurrent)
-    context, _ = check_context_iterable(context, prompt.required)
+    context, _ = iter_context(context, prompt.required)
     func = partial(
         rate_limited,
         func=call,

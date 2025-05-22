@@ -3,6 +3,12 @@ from warnings import warn
 
 from pandas import DataFrame
 
+AnyContext = dict | list[dict] | DataFrame
+
+
+def is_iterable(obj):
+    return isinstance(obj, Iterable) and not isinstance(obj, str)
+
 
 def iterrecords(df: DataFrame, index: bool = False):
     """Iterate over rows of a DataFrame as dictionaries."""
@@ -72,8 +78,8 @@ def contexts_from_iterable(
         yield {k: v for k, v in item.items() if k in required}
 
 
-def check_context_iterable(
-    context: dict | list[dict] | DataFrame | None,
+def iter_context(
+    context: AnyContext | None,
     required: list[str] | None,
 ) -> tuple[Iterable[dict], int | None]:
     """Ensure context is an iterable of dicts."""
@@ -87,9 +93,21 @@ def check_context_iterable(
         return contexts_from_dict(context, required)
 
     if isinstance(context, list) and isinstance(context[0], dict):
-        return contexts_from_iterable, len(context)
+        return contexts_from_iterable(context, required), len(context)
 
     raise ValueError(
         "Context must be a DataFrame, a dictionary of iterables, or a list of dictionaries. "
         f"Got:\n {context}"
     )
+
+
+def context_is_iterable(context: AnyContext | None) -> bool:
+    """Check if context is iterable."""
+    if context is None:
+        return False
+    if isinstance(context, DataFrame):
+        return True
+    if isinstance(context, dict):
+        return all(is_iterable(v) for v in context.values())
+
+    return isinstance(context, list) and all(isinstance(d, dict) for d in context)
