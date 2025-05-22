@@ -109,10 +109,11 @@ Tasks combine prompts and response models into reusable units of work, simplifyi
 - **Batch processing**: Handle multiple contexts efficiently
 - **Concurrency control**: Process requests in parallel with customizable limits
 - **Response post-processing**: Transform and normalize structured outputs
+- **Task chaining**: Link multiple tasks together to create workflows
 
 .. code-block:: python
 
-    from cuery.task import Task
+    from cuery.task import Task, Chain
     from openai import AsyncOpenAI
     import instructor
 
@@ -139,6 +140,11 @@ Tasks combine prompts and response models into reusable units of work, simplifyi
 
     # Post-process multi-output responses
     flattened_df = dirce_jobs_task.explode_responses(results, df)
+    
+    # Chain multiple tasks together
+    # First task identifies jobs, second task identifies automatable tasks within each job
+    job_analysis_chain = Chain(dirce_jobs_task, dirce_tasks_task)
+    final_results = await job_analysis_chain(df, model="gpt-4-turbo", n_concurrent=5)
 
 Getting Started
 -------------

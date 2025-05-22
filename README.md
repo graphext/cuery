@@ -106,9 +106,10 @@ Tasks combine prompts and response models into reusable units of work, simplifyi
 - **Batch processing**: Handle multiple contexts efficiently
 - **Concurrency control**: Process requests in parallel with customizable limits
 - **Response post-processing**: Transform and normalize structured outputs
+- **Task chaining**: Link multiple tasks together to create workflows
 
 ```python
-from cuery.task import Task
+from cuery.task import Task, Chain
 from openai import AsyncOpenAI
 import instructor
 
@@ -133,9 +134,13 @@ results = await movie_task(
 
 # Post-process multi-output responses (1:N relationships)
 flattened_df = movie_task.explode_responses(results, df)
+
+# Chain multiple tasks together
+movie_chain = Chain(movie_task, other_task)
+final_results = await movie_chain(df, model="gpt-4-turbo", n_concurrent=5)
 ```
 
-Tasks automatically select the appropriate execution mode (single, sequential, or parallel) based on the context type.
+Tasks automatically select the appropriate execution mode (single, sequential, or parallel) based on the context type, and can be chained together to create multi-step workflows.
 
 ## Getting Started
 
