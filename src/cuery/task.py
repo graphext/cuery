@@ -154,12 +154,24 @@ class Task:
 
         return await self.call(context, client, model)
 
+    def from_config(prompt: AnyCfg, response: AnyCfg) -> "Task":
+        prompt = Prompt.from_config(prompt)
+        response = ResponseClass.from_config(response)
+        return Task(prompt=prompt, response=response)
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        group = [
+            Padding(self.prompt, (1, 0, 0, 0)),
+            Padding(self.response.fallback(), (1, 0, 0, 0)),
+        ]
+        yield Panel(Group(*group), title="Task")
+
     def explode_responses(
         self,
         responses: Iterable[BaseModel],
         context_df: DataFrame,
         to_pandas: bool = True,
-    ):
+    ) -> list[dict] | DataFrame:
         """Flatten a list of pydantic models containing lists into a flat list of records."""
         is_multi, field = self.response.is_multi_output()
         if not is_multi:
@@ -180,14 +192,30 @@ class Task:
 
         return records
 
-    def from_config(prompt: AnyCfg, response: AnyCfg) -> "Task":
-        prompt = Prompt.from_config(prompt)
-        response = ResponseClass.from_config(response)
-        return Task(prompt=prompt, response=response)
+    def to_pandas(self, responses: Iterable[BaseModel], context_df: DataFrame) -> DataFrame:
+        """Convert a list of pydantic models to a pandas DataFrame."""
+        if self.response.is_multi_output():
+            return self.explode_responses(responses, context_df)
 
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        group = [
-            Padding(self.prompt, (1, 0, 0, 0)),
-            Padding(self.response.fallback(), (1, 0, 0, 0)),
-        ]
-        yield Panel(Group(*group), title="Task")
+        records = (dict(r) for r in responses)
+        return DataFrame.from_records(records)
+
+
+class Chain:
+    """Chain multiple tasks together.
+
+    The output of each task is auto-converted to a DataFrame and passed to the next task as
+    input context.
+    """
+
+    def __init__(self, *tasks: list[Task]):
+        self.tasks = tasks
+
+    async def __call__(self, context: dict | list[dict] | DataFrame, **kwds) -> DataFrame:
+        n = len(self.tasks)
+        for i, task in enumerate(self.tasks):
+            LOG.info(f"[{i + 1}/{n}] Running task '{task.response.__name__}'")
+            result = await task(context, **kwds)
+            context = task.to_pandas(result, context)
+
+        return context

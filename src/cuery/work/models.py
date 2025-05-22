@@ -5,22 +5,22 @@ from ..task import Task
 
 
 class Job(ResponseModel):
-    name: str = Field(
+    job_role: str = Field(
         description="Name of the job role (job title, less than 50 characters)",
         min_length=5,
         max_length=50,
     )
-    description: str = Field(
+    job_description: str = Field(
         description="A short description of the job role (less than 200 characters)",
         min_length=20,
         max_length=200,
     )
-    automation_potential: int = Field(
+    job_automation_potential: int = Field(
         description="A score from 1 to 10 indicating the job's potential for automation",
         ge=0,
         le=10,
     )
-    reason: str = Field(
+    job_automation_reason: str = Field(
         description=(
             "A short explanation of no more than 10 words, of why the job "
             "is likely to be automatable with the given potential score."
@@ -40,17 +40,17 @@ class Jobs(ResponseModel):
 
 
 class JobTask(ResponseModel):
-    name: str = Field(
+    task: str = Field(
         description="Name of the task automatable with AI (less than 50 characters)",
         min_length=5,
         max_length=50,
     )
-    description: str = Field(
+    task_description: str = Field(
         description="A short description of the task (less than 200 characters)",
         min_length=20,
         max_length=200,
     )
-    automation_potential: int = Field(
+    task_automation_potential: int = Field(
         description="A score from 1 to 10 indicating the task's potential for automation",
         ge=0,
         le=10,
@@ -102,7 +102,3 @@ class JobTasks(ResponseModel):
         min_items=3,
         max_items=10,
     )
-
-
-DirceJobs = Task(prompt="work/prompts.yaml:dirce_jobs", response=Jobs)
-DirceTasks = Task(prompt="work/prompts.yaml:dirce_tasks", response=JobTasks)

@@ -19,7 +19,7 @@ dirce_jobs:
         
         Actividad principal: {{Actividad_principal}}
 dirce_tasks:
-  required: ["Division", "Actividad_principal", "job"]
+  required: ["Division", "Actividad_principal", "job_role"]
   messages:
     - role: system
       content: >-
@@ -35,4 +35,4 @@ dirce_tasks:
         
         Sector's main activity: {{Actividad_principal}}
         
-        Job role: {{job}}
+        Job role: {{job_role}}
