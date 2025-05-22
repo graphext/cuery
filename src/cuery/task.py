@@ -1,17 +1,16 @@
-from collections.abc import Iterable
 from pathlib import Path
 
 import instructor
+import pandas as pd
 from instructor import Instructor
 from openai import AsyncOpenAI
 from pandas import DataFrame
-from pydantic import BaseModel
 
-from . import prompt
-from .context import AnyContext, context_is_iterable, iter_context
+from . import call
+from .context import AnyContext, context_is_iterable
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult
 from .prompt import Prompt
-from .response import ResponseClass
+from .response import ResponseClass, ResponseModel, ResponseSet
 from .utils import LOG
 
 AnyCfg = str | Path | dict
@@ -30,13 +29,13 @@ class Task:
         self,
         prompt: str | Path | Prompt,
         response: ResponseClass,
-        client: str | None = None,
+        client: Instructor | None = None,
         model: str | None = None,
     ):
-        self.prompt = prompt
         self.response = response
         self.client = client
         self.model = model
+        self.prompt = prompt
 
         if isinstance(prompt, str | Path):
             self.prompt = Prompt.from_config(prompt)
@@ -53,17 +52,23 @@ class Task:
         client: Instructor | None = None,
         model: str | None = None,
         **kwds,
-    ) -> list[BaseModel]:
+    ) -> ResponseSet:
         client = client or self.client
         model = model or self.model
-        return await prompt.call(
+
+        if client is None:
+            raise ValueError("Client cannot be None")
+
+        response = await call.call(
             client=client,
             model=model,
-            prompt=self.prompt,
-            context=context,
+            prompt=self.prompt,  # type: ignore
+            context=context,  # type: ignore
             response_model=self.response,
             **kwds,
         )
+
+        return ResponseSet(response, context, self.prompt.required)  # type: ignore
 
     async def iter(
         self,
@@ -71,18 +76,21 @@ class Task:
         client: Instructor | None = None,
         model: str | None = None,
         **kwds,
-    ) -> list[BaseModel]:
+    ) -> ResponseSet:
         client = client or self.client
         model = model or self.model
+
+        if client is None:
+            raise ValueError("Client cannot be None")
 
         self.error_counter = ErrorCounter()
         client.on("parse:error", self.error_counter.count_error)
 
-        result = await prompt.iter_calls(
+        responses = await call.iter_calls(
             client=client,
             model=model,
-            prompt=self.prompt,
-            context=context,
+            prompt=self.prompt,  # type: ignore
+            context=context,  # type: ignore
             response_model=self.response,
             **kwds,
         )
@@ -90,7 +98,7 @@ class Task:
         if self.error_counter.count > 0:
             LOG.warning(f"Encountered: {self.error_counter.count} response parsing errors!")
 
-        return result
+        return ResponseSet(responses, context, self.prompt.required)  # type: ignore
 
     async def gather(
         self,
@@ -99,18 +107,21 @@ class Task:
         model: str | None = None,
         n_concurrent: int = 1,
         **kwds,
-    ) -> list[BaseModel]:
+    ) -> ResponseSet:
         client = client or self.client
         model = model or self.model
+
+        if client is None:
+            raise ValueError("Client cannot be None")
 
         self.error_counter = ErrorCounter()
         client.on("parse:error", self.error_counter.count_error)
 
-        result = await prompt.gather_calls(
+        responses = await call.gather_calls(
             client=client,
             model=model,
-            prompt=self.prompt,
-            context=context,
+            prompt=self.prompt,  # type: ignore
+            context=context,  # type: ignore
             response_model=self.response,
             max_concurrent=n_concurrent,
             **kwds,
@@ -119,7 +130,7 @@ class Task:
         if self.error_counter.count > 0:
             LOG.warning(f"Encountered: {self.error_counter.count} response parsing errors!")
 
-        return result
+        return ResponseSet(responses, context, self.prompt.required)  # type: ignore
 
     async def __call__(
         self,
@@ -128,7 +139,7 @@ class Task:
         model: str | None = None,
         n_concurrent: int = 1,
         **kwds,
-    ) -> BaseModel | list[BaseModel]:
+    ) -> ResponseSet:
         """Auto-dispatch to the appropriate method based on context type."""
         client = client or self.client
         model = model or self.model
@@ -141,49 +152,18 @@ class Task:
 
         return await self.call(context, client, model)
 
-    def from_config(prompt: AnyCfg, response: AnyCfg) -> "Task":
-        prompt = Prompt.from_config(prompt)
-        response = ResponseClass.from_config(response)
-        return Task(prompt=prompt, response=response)
+    @classmethod
+    def from_config(cls, prompt: AnyCfg, response: AnyCfg) -> "Task":
+        prompt = Prompt.from_config(prompt)  # type: ignore
+        response = ResponseModel.from_config(response)  # type: ignore
+        return Task(prompt=prompt, response=response)  # type: ignore
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         group = [
-            Padding(self.prompt, (1, 0, 0, 0)),
+            Padding(self.prompt, (1, 0, 0, 0)),  # type: ignore
             Padding(self.response.fallback(), (1, 0, 0, 0)),
         ]
         yield Panel(Group(*group), title="Task")
-
-    def to_pandas(
-        self,
-        responses: BaseModel | Iterable[BaseModel],
-        context: AnyContext | None = None,
-        to_pandas: bool = True,
-        explode: bool = True,
-    ) -> list[dict] | DataFrame:
-        """Output as DataFrame, optionally with original context merged in"""
-        if isinstance(responses, BaseModel):
-            responses = [responses]
-
-        if isinstance(context, dict):
-            context = [context]
-
-        if context is not None:
-            contexts, _ = iter_context(context, self.prompt.required)
-        else:
-            contexts = ({} for _ in responses)
-
-        is_multi, field = self.response.is_multi_output()
-
-        records = []
-        if is_multi and explode:
-            for ctx, response in zip(contexts, responses, strict=True):
-                for item in getattr(response, field):
-                    records.append(ctx | dict(item))
-        else:
-            for ctx, response in zip(contexts, responses, strict=True):
-                records.append(ctx | dict(response))
-
-        return DataFrame.from_records(records) if to_pandas else records
 
 
 class Chain:
@@ -198,9 +178,18 @@ class Chain:
 
     async def __call__(self, context: AnyContext | None = None, **kwds) -> DataFrame:
         n = len(self.tasks)
+        self._responses = []
         for i, task in enumerate(self.tasks):
-            LOG.info(f"[{i + 1}/{n}] Running task '{task.response.__name__}'")
-            result = await task(context, **kwds)
-            context = task.to_pandas(result, context)
+            LOG.info(f"[{i + 1}/{n}] Running task '{task.response.__name__}'")  # type: ignore
+            response = await task(context, **kwds)  # type: ignore
+            context = response.to_pandas()  # type: ignore
+            self._responses.append(response)
 
-        return context
+        usages = [response.usage() for response in self._responses]
+        task_names = [task.response.__name__ for task in self.tasks]  # type: ignore
+        for i, usage in enumerate(usages):
+            usage["task_index"] = i
+            usage["task"] = task_names[i]
+
+        self._usage = pd.concat(usages, axis=0)
+        return context  # type: ignore

@@ -24,8 +24,8 @@ class Sector(ResponseModel):
 class Sectors(ResponseModel):
     sectors: list[Sector] = Field(
         description="A list of 5 NAIC industrial sectors with their AI automation potential",
-        min_items=5,
-        max_items=5,
+        min_length=5,
+        max_length=5,
     )
 
 
@@ -60,7 +60,7 @@ class Jobs(ResponseModel):
         description=(
             "A list of jobs with their AI automation potential and reasons for that potential"
         ),
-        min_items=3,
+        min_length=3,
     )
 
 
@@ -116,14 +116,14 @@ class JobTask(ResponseModel):
             "(products or services) to automate the task, less than 10 words each, less than 50 "
             "characters each), ideally just the name and url."
         ),
-        min_items=1,
-        max_items=5,
+        min_length=1,
+        max_length=5,
     )
 
 
 class JobTasks(ResponseModel):
     tasks: list[JobTask] = Field(
         description="A list of tasks automatable with AI software.",
-        min_items=3,
-        max_items=10,
+        min_length=3,
+        max_length=10,
     )

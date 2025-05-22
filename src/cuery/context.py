@@ -13,10 +13,13 @@ def is_iterable(obj):
 def iterrecords(df: DataFrame, index: bool = False):
     """Iterate over rows of a DataFrame as dictionaries."""
     for row in df.itertuples(index=index):
-        yield row._asdict()
+        yield row._asdict()  # type: ignore
 
 
-def contexts_from_dataframe(df: DataFrame, required: list[str] | None) -> Iterable[dict] | None:
+def contexts_from_dataframe(
+    df: DataFrame,
+    required: list[str] | None,
+) -> tuple[Iterable[dict] | None, int]:
     """Convert a DataFrame to an interable of dictionaries with variables needed by prompt only."""
     if not required:
         warn(
@@ -32,14 +35,17 @@ def contexts_from_dataframe(df: DataFrame, required: list[str] | None) -> Iterab
     return iterrecords(df[required]), len(df)
 
 
-def contexts_from_dict(context: dict, required: list[str] | None) -> Iterable[dict] | None:
+def contexts_from_dict(
+    context: dict,
+    required: list[str] | None,
+) -> tuple[Iterable[dict] | None, int]:
     """Convert a dict of iterables to an iterable of dicts with keys needed by prompt only."""
     if not required:
         warn(
             "Prompt doesn't require context, but it was provided. Ignoring context.",
             stacklevel=2,
         )
-        return None
+        return None, 0
 
     missing = [k for k in required if k not in context]
     if missing:
@@ -52,7 +58,7 @@ def contexts_from_dict(context: dict, required: list[str] | None) -> Iterable[di
     if len(set(lengths)) != 1:
         raise ValueError("All lists must have the same length.")
 
-    context = ({k: v[i] for k, v in zip(keys, values, strict=True)} for i in range(lengths[0]))
+    context = ({k: v[i] for k, v in zip(keys, values, strict=True)} for i in range(lengths[0]))  # type: ignore
     return context, lengths[0]
 
 
@@ -81,7 +87,7 @@ def contexts_from_iterable(
 def iter_context(
     context: AnyContext | None,
     required: list[str] | None,
-) -> tuple[Iterable[dict], int | None]:
+) -> tuple[Iterable[dict] | None, int]:
     """Ensure context is an iterable of dicts."""
     if required and context is None:
         raise ValueError("Context is required for prompt but wasn't provided!")

@@ -8,8 +8,9 @@ from instructor.cli.usage import calculate_cost
 from pandas import DataFrame, Series
 from pydantic import BaseModel, Field
 
+from .context import AnyContext, iter_context
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
-from .utils import get_config, pretty_field_info
+from .utils import LOG, get_config, pretty_field_info
 
 TYPES = {
     "str": str,
@@ -33,7 +34,7 @@ class ResponseModel(BaseModel):
 
     _raw_response: Any | None = None
 
-    def token_usage(self) -> int | None:
+    def token_usage(self) -> dict | None:
         """Get the token usage from the raw response."""
         if self._raw_response is None:
             return None
@@ -48,34 +49,39 @@ class ResponseModel(BaseModel):
         return cls.model_construct(**dict.fromkeys(cls.model_fields, None))
 
     @classmethod
-    def is_multi_output(cls) -> tuple[bool, str | None]:
+    def iterfield(cls) -> str | None:
         """Check if a pydantic model has a single field that is a list."""
         fields = cls.model_fields
         if len(fields) != 1:
-            return False, None
+            return None
 
         name = next(iter(fields.keys()))
         field = fields[name]
         if get_origin(field.annotation) is list:
-            return True, name
+            return name
 
-        return False, None
+        return None
+
+    @classmethod
+    def is_multivalued(cls) -> bool:
+        """Check if a pydantic model has a single field that is a list."""
+        return cls.iterfield() is not None
 
     @staticmethod
-    def from_dict(name: str, fields: dict) -> "ResponseModel":
+    def from_dict(name: str, fields: dict) -> "ResponseClass":
         """Create an instance of the model from a dictionary."""
         fields = fields.copy()
         for field_name, field_params in fields.items():
             field_type = TYPES[field_params.pop("type")]
             fields[field_name] = (field_type, Field(..., **field_params))
 
-        return pydantic.create_model(name, **fields)
+        return pydantic.create_model(name, __base__=ResponseModel, **fields)
 
     @classmethod
-    def from_config(cls, source: str | Path | dict, *keys: list) -> "ResponseModel":
+    def from_config(cls, source: str | Path | dict, *keys: list) -> "ResponseClass":
         """Create an instance of the model from a configuration dictionary."""
         config = get_config(source, *keys)
-        return ResponseModel.from_dict(keys[-1], config)
+        return ResponseModel.from_dict(keys[-1], config)  # type: ignore
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         cls = self.__class__
@@ -87,7 +93,7 @@ class ResponseModel(BaseModel):
         for name, field in cls.model_fields.items():
             field_panels.append(pretty_field_info(name, field))
             typ = field.annotation
-            if issubclass(typ, ResponseModel):
+            if typ is not None and issubclass(typ, ResponseModel):
                 nested_models.append(typ.fallback())
             elif typ_args := get_args(typ):
                 for typ_arg in typ_args:
@@ -110,7 +116,7 @@ def token_usage(responses: Iterable[ResponseModel]) -> DataFrame:
 def with_cost(usage: DataFrame, model: str) -> DataFrame:
     cost = Series(
         [
-            calculate_cost(model, prompt, compl)
+            calculate_cost(model, prompt, compl)  # type: ignore
             for prompt, compl in zip(usage.prompt, usage.completion, strict=True)
         ]
     )
@@ -118,3 +124,67 @@ def with_cost(usage: DataFrame, model: str) -> DataFrame:
 
 
 ResponseClass = type[ResponseModel]
+
+
+class ResponseSet:
+    """A set of responses."""
+
+    def __init__(
+        self,
+        responses: ResponseModel | list[ResponseModel],
+        context: AnyContext | None,
+        required: list[str] | None,
+    ):
+        self.responses = [responses] if isinstance(responses, ResponseModel) else responses
+        self.context = [context] if isinstance(context, dict) else context
+        self.required = required
+        self.iterfield = self.responses[0].iterfield()
+
+    def __iter__(self):
+        return iter(self.responses)
+
+    def __len__(self):
+        return len(self.responses)
+
+    def __getitem__(self, index: int) -> ResponseModel:
+        return self.responses[index]
+
+    def to_records(self, explode: bool = True) -> list[dict] | DataFrame:
+        """Convert to list of dicts, optionally with original context merged in."""
+        context, responses = self.context, self.responses
+
+        if context is not None:
+            contexts, _ = iter_context(context, self.required)
+        else:
+            contexts = ({} for _ in responses)
+
+        records = []
+        if explode and self.iterfield is not None:
+            for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
+                for item in getattr(response, self.iterfield):
+                    records.append(ctx | dict(item))
+        else:
+            for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
+                records.append(ctx | dict(response))
+
+        return records
+
+    def to_pandas(self, explode: bool = True) -> DataFrame:
+        """Convert list of responses to DataFrame."""
+        return DataFrame.from_records(self.to_records(explode=explode))
+
+    def usage(self) -> DataFrame:
+        """Get the token usage for all responses."""
+        usage = token_usage(self.responses)
+        try:
+            usage = with_cost(usage, self.responses[0]._raw_response.model)  # type: ignore
+        except Exception as exc:
+            LOG.error(f"Failed to calculate cost: {exc}")
+
+        return usage
+
+    def __str__(self) -> str:
+        return self.responses.__str__()
+
+    def __repr__(self) -> str:
+        return self.responses.__repr__()
