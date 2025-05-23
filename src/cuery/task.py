@@ -25,13 +25,17 @@ class ErrorCounter:
 
 
 class Task:
+    registry: dict[str, "Task"] = {}
+
     def __init__(
         self,
+        name: str,
         prompt: str | Path | Prompt,
         response: ResponseClass,
         client: Instructor | None = None,
         model: str | None = None,
     ):
+        self.name = name
         self.response = response
         self.client = client
         self.model = model
@@ -45,6 +49,8 @@ class Task:
 
         if self.model is None:
             self.model = "gpt-3.5-turbo"
+
+        Task.registry[name] = self
 
     async def call(
         self,
