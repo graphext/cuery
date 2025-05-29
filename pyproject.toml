@@ -32,6 +32,8 @@ build-backend = "hatchling.build"
 target-version = "py311"
 line-length = 99
 
+ignore = ["PD901"]
+
 select = [
     "E",    # Pycodestyle errors
     "W",    # Pycodestyle warnings

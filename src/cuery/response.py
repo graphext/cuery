@@ -162,7 +162,10 @@ class ResponseSet:
         if explode and self.iterfield is not None:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
                 for item in getattr(response, self.iterfield):
-                    records.append(ctx | dict(item))
+                    if isinstance(item, ResponseModel):
+                        records.append(ctx | dict(item))
+                    else:
+                        records.append(ctx | {self.iterfield: item})
         else:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
                 records.append(ctx | dict(response))

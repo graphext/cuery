@@ -10,7 +10,7 @@ class Sector(ResponseModel):
         max_length=150,
     )
     subsector: str = Field(
-        description="Human-readable title(!) of the industrial subsector (in NAICS taxonomy)",
+        description="Human-readable title(!) of the industrial SUBsector (in NAICS taxonomy)",
         min_length=5,
         max_length=150,
     )

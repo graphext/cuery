@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import pandas as pd
@@ -27,15 +28,16 @@ def list_tasks():
 
 
 @app.command("run")
-def run_task(task: str, csv: Path, output: Path):
+def run_task(task_name: str, csv: Path, output: Path):
     """Execute a Task instance by id with a CSV file as input."""
-    task = Task.registry.get(task)  # type: ignore
+    task = Task.registry.get(task_name)  # type: ignore
     if not task:
-        typer.echo(f"No Task found with name {task}")
+        typer.echo(f"No Task found with name {task_name}")
         raise typer.Exit(1)
 
-    df = pd.read_csv(csv)
-    result = task(df).to_pandas()
+    df = pd.read_csv(csv)  # noqa: PD901
+    result = asyncio.run(task(df))
+    result = result.to_pandas()
     result.to_csv(output, index=False)
 
 
