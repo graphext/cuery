@@ -26,8 +26,8 @@ ROLE_STYLES = {
 class Message(BaseModel):
     """Message class for chat completions."""
 
-    role: str
     content: str
+    role: str = "user"
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         style = ROLE_STYLES.get(self.role, "bold")
