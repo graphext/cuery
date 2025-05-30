@@ -13,7 +13,7 @@ from .pretty import (
     Syntax,
     Text,
 )
-from .utils import get_config
+from .utils import get_config, jinja_vars
 
 ROLE_STYLES = {
     "system": "bold cyan",
@@ -56,6 +56,13 @@ class Prompt(BaseModel):
     def from_config(cls, source: str | Path | dict) -> "Prompt":
         config = get_config(source)
         return cls(**config)
+
+    @classmethod
+    def from_string(cls, p: str) -> "Prompt":
+        """Create a Prompt from a string."""
+        messages = [Message(content=p)]
+        required = jinja_vars(p)
+        return cls(messages=messages, required=required)
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         group = []

@@ -8,6 +8,7 @@ from typing import get_args
 
 import yaml
 from glom import glom
+from jinja2 import Environment, meta
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
@@ -124,3 +125,9 @@ def pretty_field_info(name: str, field: FieldInfo):
     typ = field.annotation if get_args(field.annotation) else field.annotation.__name__
     title = Text(f"{name}: {typ}", style="bold")
     return Panel(Padding(Group(*group), 1), title=title, title_align="left", box=DEFAULT_BOX)
+
+
+def jinja_vars(template: str) -> list[str]:
+    """Find undeclared Jinja variables in a template file."""
+    parsed = Environment(autoescape=True).parse(template)
+    return list(meta.find_undeclared_variables(parsed))
