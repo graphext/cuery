@@ -138,11 +138,46 @@ DIRCE_JOBS_PROMPT = Prompt(
 )
 
 # ============================
+# Task Definition
+# ============================
+
+# Create the DirceJobs task locally
+DirceJobs = task.Task(
+    name="DirceJobs", 
+    prompt=DIRCE_JOBS_PROMPT, 
+    response=Jobs
+)
+
+# ============================
 # Configuration
 # ============================
 
 # Configuration variables for easy testing
-MODEL_NAME = "anthropic/claude-3-haiku-20240307"  # Options: "openai/gpt-4o", "openai/gpt-4o-mini", "openai/gpt-3.5-turbo", "anthropic/claude-3-sonnet-20240229", "anthropic/claude-3-haiku-20240307", "google/gemini-2.0-flash"
+
+# https://lmarena.ai/leaderboard
+# https://aistudio.google.com/app/prompts/new_chat?model=gemini-2.5-pro-preview-05-06
+
+
+# MODEL_NAME Options by LMArena Ranking: 
+
+# "google/gemini-2.5-pro-preview-05-06"
+# "openai/o3-2025-04-16"
+# "openai/chatgpt-4o-latest-20250326"
+# "google/gemini-2.5-flash-preview-05-20"
+# "openai/gpt-4.1" 
+# "anthropic/claude-opus-4-20250514"  
+# "anthropic/claude-sonnet-4-20250514"
+# "openai/o4-mini-2025-04-16" 
+
+#Other Models:
+
+# "openai/gpt-4o-mini"
+# "openai/gpt-o3-mini"
+# "openai/gpt-o4-mini"
+# "openai/gpt-4.1-mini"
+# "openai/gpt-4.1-nano"
+
+MODEL_NAME = "google/gemini-2.5-flash-preview-05-20" 
 TEST_SAMPLE_SIZE = 1        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
 
 def is_openai_model(model_name: str) -> bool:
@@ -160,17 +195,6 @@ CLIENT = instructor.from_provider(MODEL_NAME, async_client=True)
 
 print(f"Using model: {MODEL_NAME}")
 print(f"Cost tracking: {'Available' if is_openai_model(MODEL_NAME) else 'Not available (OpenAI models only)'}")
-
-# ============================
-# Task Definition
-# ============================
-
-# Create the DirceJobs task locally
-DirceJobs = task.Task(
-    name="DirceJobs", 
-    prompt=DIRCE_JOBS_PROMPT, 
-    response=Jobs
-)
 
 # ============================
 # Job Generator Class
