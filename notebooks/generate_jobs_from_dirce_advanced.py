@@ -17,9 +17,12 @@ import argparse
 from tqdm import tqdm
 
 # Cuery imports
+import instructor
 from cuery import task
 from cuery.response import ResponseModel
 from cuery.prompt import Prompt
+from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 from pydantic import Field
 
 # Set up paths
@@ -81,8 +84,8 @@ class Jobs(ResponseModel):
     """List of occupations for a sector/subsector."""
     occupations: list[Occupation] = Field(
         description="List of all occupations/job roles in this sector/subsector",
-        min_length=2,
-        max_length=15,
+        min_length=1,
+        max_length=30,
     )
 
 # ============================
@@ -133,6 +136,37 @@ DIRCE_JOBS_PROMPT = Prompt(
 )
 
 # ============================
+# Configuration
+# ============================
+
+# Configuration variables for easy testing
+MODEL_NAME = "claude-3-haiku-20240307"  # Options: "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
+TEST_SAMPLE_SIZE = 1        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
+
+def is_openai_model(model_name: str) -> bool:
+    """Check if the model is from OpenAI (cost tracking supported)."""
+    openai_prefixes = ["gpt-", "text-", "davinci", "curie", "babbage", "ada"]
+    return any(model_name.startswith(prefix) for prefix in openai_prefixes)
+
+def get_client_for_model(model_name: str):
+    """Get the appropriate client for the model."""
+    if is_openai_model(model_name):
+        from openai import AsyncOpenAI
+        return instructor.from_openai(AsyncOpenAI())
+    elif model_name.startswith("claude-"):
+        return instructor.from_anthropic(AsyncAnthropic())
+    else:
+        # Default to OpenAI
+        from openai import AsyncOpenAI
+        return instructor.from_openai(AsyncOpenAI())
+
+# Get client based on model
+CLIENT = get_client_for_model(MODEL_NAME)
+
+print(f"Using model: {MODEL_NAME}")
+print(f"Cost tracking: {'Available' if is_openai_model(MODEL_NAME) else 'Not available (OpenAI models only)'}")
+
+# ============================
 # Task Definition
 # ============================
 
@@ -147,9 +181,6 @@ DirceJobs = task.Task(
 # Job Generator Class
 # ============================
 
-# Configuration variables for easy testing
-MODEL_NAME = "gpt-4.1"  # Options: "gpt-4.1" "o3" "o3-mini" "o4-mini" ""gpt-4o-mini" "gpt-4o-search-preview",  "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
-TEST_SAMPLE_SIZE = 1        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
 
 class JobGenerator:
     """Class to handle job generation with progress tracking and resume capability."""
@@ -192,34 +223,38 @@ class JobGenerator:
             # Run DirceJobs task
             jobs_result = await DirceJobs(
                 context=batch_df,
+                client=CLIENT,
                 model=MODEL_NAME,
                 n_concurrent=self.n_concurrent
             )
             
-            # Track cost if available
+            # Track cost if available (only for OpenAI models)
             batch_cost = 0.0
-            try:
-                # Try different possible cost attributes
-                if hasattr(jobs_result, 'cost'):
-                    batch_cost = jobs_result.cost
-                elif hasattr(jobs_result, 'total_cost'):
-                    batch_cost = jobs_result.total_cost
-                elif hasattr(jobs_result, 'usage'):
-                    # Call usage as a method - returns a DataFrame
-                    usage_df = jobs_result.usage()
+            if is_openai_model(MODEL_NAME):
+                try:
+                    # Try different possible cost attributes
+                    if hasattr(jobs_result, 'cost'):
+                        batch_cost = jobs_result.cost
+                    elif hasattr(jobs_result, 'total_cost'):
+                        batch_cost = jobs_result.total_cost
+                    elif hasattr(jobs_result, 'usage'):
+                        # Call usage as a method - returns a DataFrame
+                        usage_df = jobs_result.usage()
+                        
+                        if not usage_df.empty and 'cost' in usage_df.columns:
+                            batch_cost = usage_df['cost'].sum()
+                            total_prompt_tokens = usage_df['prompt'].sum() if 'prompt' in usage_df.columns else 0
+                            total_completion_tokens = usage_df['completion'].sum() if 'completion' in usage_df.columns else 0
+                            print(f"Tokens used: {total_prompt_tokens:,} prompt + {total_completion_tokens:,} completion = {total_prompt_tokens + total_completion_tokens:,} total")
                     
-                    if not usage_df.empty and 'cost' in usage_df.columns:
-                        batch_cost = usage_df['cost'].sum()
-                        total_prompt_tokens = usage_df['prompt'].sum() if 'prompt' in usage_df.columns else 0
-                        total_completion_tokens = usage_df['completion'].sum() if 'completion' in usage_df.columns else 0
-                        print(f"Tokens used: {total_prompt_tokens:,} prompt + {total_completion_tokens:,} completion = {total_prompt_tokens + total_completion_tokens:,} total")
-                
-                if batch_cost > 0:
-                    self.total_cost += batch_cost
-                    print(f"Batch cost: ${batch_cost:.4f} | Total cost so far: ${self.total_cost:.4f}")
-                    
-            except Exception as e:
-                print(f"Note: Could not retrieve cost information: {e}")
+                    if batch_cost > 0:
+                        self.total_cost += batch_cost
+                        print(f"Batch cost: ${batch_cost:.4f} | Total cost so far: ${self.total_cost:.4f}")
+                        
+                except Exception as e:
+                    print(f"Note: Could not retrieve cost information: {e}")
+            else:
+                print(f"Cost tracking not available for {MODEL_NAME} (only supported for OpenAI models)")
             
             # Convert to DataFrame and handle nested structure
             # The structure is already partially flattened: each row is an occupation with tasks
@@ -314,6 +349,8 @@ class JobGenerator:
                 print(f"Resuming from previous run. Already processed: {len(self.processed_indices)} sectors")
                 if self.total_cost > 0:
                     print(f"Previous total cost: ${self.total_cost:.4f}")
+                elif not is_openai_model(MODEL_NAME):
+                    print("Cost tracking not available for this model")
                 results_file = progress["results_file"]
                 results_file = str(OUTPUT_DIR / f"dirce_generated_tasks_{timestamp}.csv")
         else:
@@ -393,6 +430,10 @@ class JobGenerator:
                 print(f"Total cost: ${self.total_cost:.4f}")
                 print(f"Average cost per sector: ${self.total_cost / len(self.processed_indices):.4f}")
                 print(f"Average cost per task: ${self.total_cost / len(final_df):.4f}")
+            elif not is_openai_model(MODEL_NAME):
+                print(f"\n=== Cost Information ===")
+                print(f"Cost tracking not available for {MODEL_NAME}")
+                print("Cost tracking is currently only supported for OpenAI models (gpt-4o, gpt-4o-mini, gpt-3.5-turbo, etc.)")
             
             print(f"\nTask automation potential distribution:")
             print(final_df['task_automation_potential'].value_counts().sort_index())
