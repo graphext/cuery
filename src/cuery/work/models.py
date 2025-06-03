@@ -125,5 +125,5 @@ class JobTasks(ResponseModel):
     tasks: list[JobTask] = Field(
         description="A list of tasks automatable with AI software.",
         min_length=3,
-        max_length=10,
+        max_length=20,
     )

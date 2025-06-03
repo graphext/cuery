@@ -37,6 +37,7 @@ dirce_jobs:
     - role: user
       content: >-
         Please analyze the following jobs sector and identify jobs that are automatable by AI software.
+        Return at least 10 jobs, but more if possible unless the subsector really has fewer AI-automatable jobs.
         
         Sector: {{sector}}
         
@@ -52,7 +53,8 @@ dirce_tasks:
         or other physical means).
     - role: user
       content: >-
-        Please analyze the following job role and identify tasks that are automatable by AI software.
+        Please analyze the following job role and identify tasks that are automatable by AI software. Try to identify
+        at least 10 tasks, but more if possible unless the job really has fewer AI-automatable tasks (maximum 20).
         
         Sector: {{sector}}
         
