@@ -21,8 +21,6 @@ import instructor
 from cuery import task
 from cuery.response import ResponseModel
 from cuery.prompt import Prompt
-from anthropic import AsyncAnthropic
-from openai import AsyncOpenAI
 from pydantic import Field
 
 # Set up paths
@@ -50,8 +48,9 @@ class Task(ResponseModel):
 
     current_products: list[str] = Field(
         description="List of current software products/tools used to perform this task",
-        min_length=1,
+        min_length=0,
         max_length=8,
+        default=[],
     )
 
     task_description: str = Field(
@@ -63,7 +62,7 @@ class Task(ResponseModel):
     task_automation_reason: str = Field(
         description="A short explanation of why this task is automatable with the given score",
         min_length=20,
-        max_length=200,
+        max_length=300,
     )
 
 class Occupation(ResponseModel):
@@ -116,17 +115,20 @@ DIRCE_JOBS_PROMPT = Prompt(
                 "2. For EACH occupation, provide specific automatable tasks they perform\n\n"
                 "Structure your response hierarchically:\n"
                 "- Occupation 1: [name]\n"
-                "  - Task: [task details, automation score, current tools]\n"
-                "  - Task: [task details, automation score, current tools]\n"
-                "  - Task: [task details, automation score, current tools]\n"
+                "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
+                "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
+                "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
                 "  - ... (as many tasks as relevant for this occupation)\n"
                 "- Occupation 2: [name]\n"
-                "  - Task: [task details, automation score, current tools]\n"
-                "  - Task: [task details, automation score, current tools]\n"
+                "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
+                "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
                 "  - ... (as many tasks as relevant for this occupation)\n"
                 "- ... (continue for all relevant occupations)\n\n"
                 "Generate as many occupations and tasks as you consider relevant for the sector.\n"
-                "For each task, include automation potential (1-10) and current products/tools used.\n\n"
+                "IMPORTANT: For each task, you MUST include:\n"
+                "1. Automation potential score (1-10)\n"
+                "2. Current software products/tools used to perform the task\n"
+                "3. Explanation of why it can be automated\n\n"
                 "Sector: {{sector}}\n\n"
                 "Subsector: {{subsector}}"
             )
@@ -140,28 +142,21 @@ DIRCE_JOBS_PROMPT = Prompt(
 # ============================
 
 # Configuration variables for easy testing
-MODEL_NAME = "claude-3-haiku-20240307"  # Options: "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
+MODEL_NAME = "anthropic/claude-3-haiku-20240307"  # Options: "openai/gpt-4o", "openai/gpt-4o-mini", "openai/gpt-3.5-turbo", "anthropic/claude-3-sonnet-20240229", "anthropic/claude-3-haiku-20240307", "google/gemini-2.0-flash"
 TEST_SAMPLE_SIZE = 1        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
 
 def is_openai_model(model_name: str) -> bool:
     """Check if the model is from OpenAI (cost tracking supported)."""
-    openai_prefixes = ["gpt-", "text-", "davinci", "curie", "babbage", "ada"]
-    return any(model_name.startswith(prefix) for prefix in openai_prefixes)
+    return model_name.startswith("openai/")
 
-def get_client_for_model(model_name: str):
-    """Get the appropriate client for the model."""
-    if is_openai_model(model_name):
-        from openai import AsyncOpenAI
-        return instructor.from_openai(AsyncOpenAI())
-    elif model_name.startswith("claude-"):
-        return instructor.from_anthropic(AsyncAnthropic())
-    else:
-        # Default to OpenAI
-        from openai import AsyncOpenAI
-        return instructor.from_openai(AsyncOpenAI())
+def get_model_name(provider_model: str) -> str:
+    """Extract model name from provider/model string."""
+    if "/" in provider_model:
+        return provider_model.split("/", 1)[1]
+    return provider_model
 
-# Get client based on model
-CLIENT = get_client_for_model(MODEL_NAME)
+# Create client using instructor's unified provider interface
+CLIENT = instructor.from_provider(MODEL_NAME, async_client=True)
 
 print(f"Using model: {MODEL_NAME}")
 print(f"Cost tracking: {'Available' if is_openai_model(MODEL_NAME) else 'Not available (OpenAI models only)'}")
@@ -224,7 +219,7 @@ class JobGenerator:
             jobs_result = await DirceJobs(
                 context=batch_df,
                 client=CLIENT,
-                model=MODEL_NAME,
+                model=get_model_name(MODEL_NAME),
                 n_concurrent=self.n_concurrent
             )
             
