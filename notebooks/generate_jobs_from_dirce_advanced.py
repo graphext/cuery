@@ -32,13 +32,7 @@ OUTPUT_DIR = GDRIVE / "Research/future_of_work/outputs"
 # ============================
 
 class Task(ResponseModel):
-    """Individual task/job within an occupation."""
-    occupation: str = Field(
-        description="Name of the occupation/job role this task belongs to (less than 60 characters)",
-        min_length=5,
-        max_length=60,
-    )
-
+    """Individual task within an occupation."""
     task_name: str = Field(
         description="Name of the specific task or job to be done (less than 80 characters)",
         min_length=10,
@@ -69,12 +63,25 @@ class Task(ResponseModel):
         max_length=200,
     )
 
+class Occupation(ResponseModel):
+    """An occupation/job role with its associated tasks."""
+    occupation_name: str = Field(
+        description="Name of the occupation/job role (less than 60 characters)",
+        min_length=5,
+        max_length=60,
+    )
+
+    tasks: list[Task] = Field(
+        description="List of specific tasks performed in this occupation",
+        min_length=3,
+        max_length=10,
+    )
 
 class Jobs(ResponseModel):
-    """List of tasks across different occupations."""
-    tasks: list[Task] = Field(
-        description="A list of specific tasks with each occupation having multiple tasks (2-4 tasks per occupation)",
-        min_length=8,
+    """List of occupations for a sector/subsector."""
+    occupations: list[Occupation] = Field(
+        description="List of all occupations/job roles in this sector/subsector",
+        min_length=2,
         max_length=15,
     )
 
@@ -90,7 +97,7 @@ DIRCE_JOBS_PROMPT = Prompt(
                 "You're an analyst at the Spanish 'Instituto Nacional de Estadística' (INE) analyzing "
                 "data from its 'Directorio Central de Empresas' (DIRCE). Your objective is to analyze "
                 "groups of companies, identified by a sector ('Sector') and a corresponding main activity "
-                "('Subsector') in order to identify specific automatable tasks within different occupations. "
+                "('Subsector') in order to identify relevant occupations and their specific automatable tasks. "
                 "Both 'Sector' and 'Subsector' are provided in Spanish and may "
                 "include numeric IDs that you can ignore if you don't understand them. Always respond in English. "
                 "Only consider tasks that are computer- or paper-based and can be automated by AI using software "
@@ -101,17 +108,22 @@ DIRCE_JOBS_PROMPT = Prompt(
         {
             "role": "user",
             "content": (
-                "Please analyze the following sector and identify 2-4 key occupations, then provide 2-4 specific automatable tasks for EACH occupation.\n\n"
-                "Structure your response so that each occupation has multiple tasks. For example:\n"
-                "- Data Analyst: Data Cleaning, Report Generation, Statistical Analysis\n"
-                "- Administrative Assistant: Email Management, Document Filing, Calendar Scheduling\n\n"
-                "For each task, include:\n"
-                "- The occupation it belongs to (repeat the same occupation name for multiple tasks)\n"
-                "- A description of the occupation\n"
-                "- The specific task name and description\n"
-                "- Automation potential (1-10)\n"
-                "- Current products/tools used\n\n"
-                "Provide 8-15 tasks total across 2-4 different occupations, with each occupation having 2-4 tasks.\n\n"
+                "Please analyze the following sector:\n\n"
+                "1. First, identify relevant occupations/job roles that would typically exist in this sector/subsector\n"
+                "2. For EACH occupation, provide specific automatable tasks they perform\n\n"
+                "Structure your response hierarchically:\n"
+                "- Occupation 1: [name]\n"
+                "  - Task: [task details, automation score, current tools]\n"
+                "  - Task: [task details, automation score, current tools]\n"
+                "  - Task: [task details, automation score, current tools]\n"
+                "  - ... (as many tasks as relevant for this occupation)\n"
+                "- Occupation 2: [name]\n"
+                "  - Task: [task details, automation score, current tools]\n"
+                "  - Task: [task details, automation score, current tools]\n"
+                "  - ... (as many tasks as relevant for this occupation)\n"
+                "- ... (continue for all relevant occupations)\n\n"
+                "Generate as many occupations and tasks as you consider relevant for the sector.\n"
+                "For each task, include automation potential (1-10) and current products/tools used.\n\n"
                 "Sector: {{sector}}\n\n"
                 "Subsector: {{subsector}}"
             )
@@ -136,8 +148,8 @@ DirceJobs = task.Task(
 # ============================
 
 # Configuration variables for easy testing
-MODEL_NAME = "gpt-4o-mini"  # Options: "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
-TEST_SAMPLE_SIZE = 2        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
+MODEL_NAME = "gpt-4.1"  # Options: "gpt-4.1" "o3" "o3-mini" "o4-mini" ""gpt-4o-mini" "gpt-4o-search-preview",  "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
+TEST_SAMPLE_SIZE = 1        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
 
 class JobGenerator:
     """Class to handle job generation with progress tracking and resume capability."""
@@ -150,19 +162,25 @@ class JobGenerator:
         self.progress_file = OUTPUT_DIR / "dirce_jobs_progress.json"
         self.results = []
         self.processed_indices = set()
+        self.total_cost = 0.0  # Track total cost across all batches
         
     def load_progress(self) -> dict:
         """Load progress from file if exists."""
         if self.progress_file.exists():
             with open(self.progress_file, 'r') as f:
-                return json.load(f)
-        return {"processed_indices": [], "results_file": None}
+                progress_data = json.load(f)
+                # Load previous cost if available
+                if 'total_cost' in progress_data:
+                    self.total_cost = progress_data['total_cost']
+                return progress_data
+        return {"processed_indices": [], "results_file": None, "total_cost": 0.0}
     
     def save_progress(self, results_file: str):
         """Save current progress to file."""
         progress = {
             "processed_indices": list(self.processed_indices),
             "results_file": results_file,
+            "total_cost": self.total_cost,
             "timestamp": datetime.now().isoformat()
         }
         with open(self.progress_file, 'w') as f:
@@ -178,18 +196,69 @@ class JobGenerator:
                 n_concurrent=self.n_concurrent
             )
             
-            # Convert to DataFrame and explode nested structure
-            # First explode occupations, then explode tasks within each occupation
-            jobs_df = jobs_result.to_pandas(explode=True)
+            # Track cost if available
+            batch_cost = 0.0
+            try:
+                # Try different possible cost attributes
+                if hasattr(jobs_result, 'cost'):
+                    batch_cost = jobs_result.cost
+                elif hasattr(jobs_result, 'total_cost'):
+                    batch_cost = jobs_result.total_cost
+                elif hasattr(jobs_result, 'usage'):
+                    # Call usage as a method - returns a DataFrame
+                    usage_df = jobs_result.usage()
+                    
+                    if not usage_df.empty and 'cost' in usage_df.columns:
+                        batch_cost = usage_df['cost'].sum()
+                        total_prompt_tokens = usage_df['prompt'].sum() if 'prompt' in usage_df.columns else 0
+                        total_completion_tokens = usage_df['completion'].sum() if 'completion' in usage_df.columns else 0
+                        print(f"Tokens used: {total_prompt_tokens:,} prompt + {total_completion_tokens:,} completion = {total_prompt_tokens + total_completion_tokens:,} total")
+                
+                if batch_cost > 0:
+                    self.total_cost += batch_cost
+                    print(f"Batch cost: ${batch_cost:.4f} | Total cost so far: ${self.total_cost:.4f}")
+                    
+            except Exception as e:
+                print(f"Note: Could not retrieve cost information: {e}")
             
-            # The data should now have individual rows for each task
+            # Convert to DataFrame and handle nested structure
+            # The structure is already partially flattened: each row is an occupation with tasks
+            jobs_df = jobs_result.to_pandas()
+            
+            # Now we need to flatten the tasks within each occupation
+            all_tasks = []
+            
+            for _, row in jobs_df.iterrows():
+                sector = row['sector']
+                subsector = row['subsector']
+                occupation_name = row['occupation_name']
+                
+                # Iterate through tasks in this occupation
+                for task in row['tasks']:
+                    task_row = {
+                        'sector': sector,
+                        'subsector': subsector,
+                        'occupation': occupation_name,
+                        'task_name': task.task_name,
+                        'task_description': task.task_description,
+                        'task_automation_potential': task.task_automation_potential,
+                        'task_automation_reason': task.task_automation_reason,
+                        'current_products': task.current_products
+                    }
+                    all_tasks.append(task_row)
+            
+            # Create flattened DataFrame
+            flattened_df = pd.DataFrame(all_tasks)
+            
             # Mark these indices as processed
             self.processed_indices.update(batch_indices)
             
-            return jobs_df
+            return flattened_df
             
         except Exception as e:
             print(f"\nError processing batch: {e}")
+            import traceback
+            traceback.print_exc()
             # Return empty DataFrame on error
             return pd.DataFrame()
     
@@ -243,7 +312,8 @@ class JobGenerator:
                 existing_df = pd.read_csv(progress["results_file"])
                 self.results.append(existing_df)
                 print(f"Resuming from previous run. Already processed: {len(self.processed_indices)} sectors")
-                results_file = progress["results_file"]
+                if self.total_cost > 0:
+                    print(f"Previous total cost: ${self.total_cost:.4f}")
                 results_file = progress["results_file"]
                 results_file = str(OUTPUT_DIR / f"dirce_generated_tasks_{timestamp}.csv")
         else:
@@ -308,15 +378,24 @@ class JobGenerator:
             print("\n=== Summary Statistics ===")
             print(f"Total tasks generated: {len(final_df)}")
             print(f"Total sectors processed: {len(self.processed_indices)}")
-            print(f"Average tasks per sector: {len(final_df) / len(self.processed_indices):.1f}")
-            print(f"\nTask automation potential distribution:")
-            print(final_df['task_automation_potential'].value_counts().sort_index())
             
             # Count unique occupations
             if 'occupation' in final_df.columns:
                 unique_occupations = final_df['occupation'].nunique()
                 print(f"Total unique occupations: {unique_occupations}")
+                print(f"Average occupations per sector: {unique_occupations / len(self.processed_indices):.1f}")
                 print(f"Average tasks per occupation: {len(final_df) / unique_occupations:.1f}")
+                print(f"Average tasks per sector: {len(final_df) / len(self.processed_indices):.1f}")
+            
+            # Cost information
+            if self.total_cost > 0:
+                print(f"\n=== Cost Information ===")
+                print(f"Total cost: ${self.total_cost:.4f}")
+                print(f"Average cost per sector: ${self.total_cost / len(self.processed_indices):.4f}")
+                print(f"Average cost per task: ${self.total_cost / len(final_df):.4f}")
+            
+            print(f"\nTask automation potential distribution:")
+            print(final_df['task_automation_potential'].value_counts().sort_index())
             
             print(f"\nResults saved to:")
             
