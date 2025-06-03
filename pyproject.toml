@@ -7,11 +7,14 @@ authors = [{ name = "Thomas Buhrmann", email = "thomas@graphext.com" }]
 requires-python = ">=3.11"
 dependencies = [
     "glom>=24.11.0",
+    "google-genai>=1.18.0",
     "instructor[anthropic,google-generativeai,litellm]>=1.8.1",
     "ipykernel>=6.29.5",
     "jupyter>=1.1.1",
     "litellm>=1.69.1",
     "pandas>=2.2.3",
+    "polars>=1.30.0",
+    "pyarrow>=20.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
     "ruff>=0.11.9",
