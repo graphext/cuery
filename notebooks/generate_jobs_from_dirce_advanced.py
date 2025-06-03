@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Advanced script to generate jobs for each sector/subsector combination from DIRCE data.
+Advanced script to generate specific automatable tasks across occupations from DIRCE data.
+For each sector/subsector, generates multiple tasks with occupation info, automation scores, and current tools.
 Features: batch processing, progress tracking, resume capability, and error handling.
 Now self-contained with all models and prompts included.
 """
@@ -30,40 +31,51 @@ OUTPUT_DIR = GDRIVE / "Research/future_of_work/outputs"
 # Response Models
 # ============================
 
-class Job(ResponseModel):
-    """Individual job with automation potential."""
-    job_role: str = Field(
-        description="Name of the job role (job title, less than 50 characters)",
+class Task(ResponseModel):
+    """Individual task/job within an occupation."""
+    occupation: str = Field(
+        description="Name of the occupation/job role this task belongs to (less than 60 characters)",
         min_length=5,
-        max_length=50,
+        max_length=60,
     )
-    job_description: str = Field(
-        description="A short description of the job role (less than 200 characters)",
-        min_length=20,
-        max_length=200,
+
+    task_name: str = Field(
+        description="Name of the specific task or job to be done (less than 80 characters)",
+        min_length=10,
+        max_length=80,
     )
-    job_automation_potential: int = Field(
-        description="A score from 1 to 10 indicating the job's potential for automation",
+
+    task_automation_potential: int = Field(
+        description="A score from 1 to 10 indicating this specific task's potential for automation",
         ge=0,
         le=10,
     )
-    job_automation_reason: str = Field(
-        description=(
-            "A short explanation of no more than 10 words, of why the job "
-            "is likely to be automatable with the given potential score."
-        ),
+
+    current_products: list[str] = Field(
+        description="List of current software products/tools used to perform this task",
+        min_length=1,
+        max_length=8,
+    )
+
+    task_description: str = Field(
+        description="Detailed description of what this task involves (less than 300 characters)",
         min_length=30,
         max_length=300,
     )
 
+    task_automation_reason: str = Field(
+        description="A short explanation of why this task is automatable with the given score",
+        min_length=20,
+        max_length=200,
+    )
+
 
 class Jobs(ResponseModel):
-    """List of jobs for a sector/subsector combination."""
-    jobs: list[Job] = Field(
-        description=(
-            "A list of jobs with their AI automation potential and reasons for that potential"
-        ),
-        min_length=0,
+    """List of tasks across different occupations."""
+    tasks: list[Task] = Field(
+        description="A list of specific tasks with each occupation having multiple tasks (2-4 tasks per occupation)",
+        min_length=8,
+        max_length=15,
     )
 
 # ============================
@@ -75,20 +87,31 @@ DIRCE_JOBS_PROMPT = Prompt(
         {
             "role": "system",
             "content": (
-                "You're an analyst at the Spanish 'Instituo Nacional de Estadística' (INE) analyzing "
+                "You're an analyst at the Spanish 'Instituto Nacional de Estadística' (INE) analyzing "
                 "data from its 'Directorio Central de Empresas' (DIRCE). Your objective is to analyze "
                 "groups of companies, identified by a sector ('Sector') and a corresponding main activity "
-                "('Subsector') in order to identify jobs within those companies that are likely to "
-                "be automatable by AI. Both 'Sector' and 'Subsector' are provided in Spanish and may "
+                "('Subsector') in order to identify specific automatable tasks within different occupations. "
+                "Both 'Sector' and 'Subsector' are provided in Spanish and may "
                 "include numeric IDs that you can ignore if you don't understand them. Always respond in English. "
-                "Only consider jobs that are computer- or paper-based and can be automated by AI using software "
-                "(don't include jobs automatable by robots or other physical means)."
+                "Only consider tasks that are computer- or paper-based and can be automated by AI using software "
+                "(don't include tasks automatable by robots or other physical means). For each task, also identify "
+                "the current software products or tools commonly used to perform that task."
             )
         },
         {
             "role": "user",
             "content": (
-                "Please analyze the following jobs sector and identify jobs that are automatable by AI software.\n\n"
+                "Please analyze the following sector and identify 2-4 key occupations, then provide 2-4 specific automatable tasks for EACH occupation.\n\n"
+                "Structure your response so that each occupation has multiple tasks. For example:\n"
+                "- Data Analyst: Data Cleaning, Report Generation, Statistical Analysis\n"
+                "- Administrative Assistant: Email Management, Document Filing, Calendar Scheduling\n\n"
+                "For each task, include:\n"
+                "- The occupation it belongs to (repeat the same occupation name for multiple tasks)\n"
+                "- A description of the occupation\n"
+                "- The specific task name and description\n"
+                "- Automation potential (1-10)\n"
+                "- Current products/tools used\n\n"
+                "Provide 8-15 tasks total across 2-4 different occupations, with each occupation having 2-4 tasks.\n\n"
                 "Sector: {{sector}}\n\n"
                 "Subsector: {{subsector}}"
             )
@@ -155,9 +178,11 @@ class JobGenerator:
                 n_concurrent=self.n_concurrent
             )
             
-            # Convert to DataFrame and add batch indices
+            # Convert to DataFrame and explode nested structure
+            # First explode occupations, then explode tasks within each occupation
             jobs_df = jobs_result.to_pandas(explode=True)
             
+            # The data should now have individual rows for each task
             # Mark these indices as processed
             self.processed_indices.update(batch_indices)
             
@@ -219,10 +244,10 @@ class JobGenerator:
                 self.results.append(existing_df)
                 print(f"Resuming from previous run. Already processed: {len(self.processed_indices)} sectors")
                 results_file = progress["results_file"]
-            else:
-                results_file = str(OUTPUT_DIR / f"dirce_generated_jobs_{timestamp}.csv")
+                results_file = progress["results_file"]
+                results_file = str(OUTPUT_DIR / f"dirce_generated_tasks_{timestamp}.csv")
         else:
-            results_file = str(OUTPUT_DIR / f"dirce_generated_jobs_{timestamp}.csv")
+            results_file = str(OUTPUT_DIR / f"dirce_generated_tasks_{timestamp}.csv")
         
         # Process in batches
         total_batches = (len(context_df) + self.batch_size - 1) // self.batch_size
@@ -281,11 +306,17 @@ class JobGenerator:
             
             # Print summary
             print("\n=== Summary Statistics ===")
-            print(f"Total jobs generated: {len(final_df)}")
+            print(f"Total tasks generated: {len(final_df)}")
             print(f"Total sectors processed: {len(self.processed_indices)}")
-            print(f"Average jobs per sector: {len(final_df) / len(self.processed_indices):.1f}")
-            print(f"\nJob automation potential distribution:")
-            print(final_df['job_automation_potential'].value_counts().sort_index())
+            print(f"Average tasks per sector: {len(final_df) / len(self.processed_indices):.1f}")
+            print(f"\nTask automation potential distribution:")
+            print(final_df['task_automation_potential'].value_counts().sort_index())
+            
+            # Count unique occupations
+            if 'occupation' in final_df.columns:
+                unique_occupations = final_df['occupation'].nunique()
+                print(f"Total unique occupations: {unique_occupations}")
+                print(f"Average tasks per occupation: {len(final_df) / unique_occupations:.1f}")
             
             print(f"\nResults saved to:")
             
@@ -296,7 +327,7 @@ class JobGenerator:
 
 async def main():
     """Main function with argument parsing."""
-    parser = argparse.ArgumentParser(description="Generate jobs from DIRCE data")
+    parser = argparse.ArgumentParser(description="Generate automatable tasks from DIRCE data")
     parser.add_argument("--batch-size", type=int, default=25, 
                         help="Number of sectors to process in each batch (default: 25)")
     parser.add_argument("--concurrent", type=int, default=10,

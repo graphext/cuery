@@ -1,6 +1,6 @@
-# DIRCE Job Generation Script
+# DIRCE Task Generation Script
 
-This script generates job roles from DIRCE (Directorio Central de Empresas) data using AI.
+This script generates specific automatable tasks across occupations from DIRCE (Directorio Central de Empresas) data using AI.
 
 ## Overview
 
@@ -156,13 +156,27 @@ Output files (based on `--format` option):
 
 ## Generated Data Structure
 
-For each sector/subsector combination, the AI generates multiple job roles with:
+For each sector/subsector combination, the AI generates multiple specific tasks across different occupations with:
 - `sector`: Original sector name from DIRCE
 - `subsector`: Original subsector name from DIRCE  
-- `job_role`: Name of the job (e.g., "Data Entry Clerk")
-- `job_description`: Brief description of the role
-- `job_automation_potential`: Score from 0-10 indicating automation potential
-- `job_automation_reason`: Explanation for the automation potential score
+- `occupation`: Name of the occupation this task belongs to
+- `occupation_description`: General description of the occupation
+- `task_name`: Name of the specific task/job to be done
+- `task_description`: Detailed description of what this task involves
+- `task_automation_potential`: Score from 0-10 indicating this specific task's automation potential
+- `task_automation_reason`: Explanation for the automation potential score
+- `current_products`: Array of current software products/tools used to perform this task
+
+## Output Structure
+
+The script now generates **multiple tasks for each occupation**, providing granular insight into automatable work. Each row represents a specific task that can be automated, with details about:
+
+- **Which occupation** it belongs to
+- **What tools** are currently used
+- **How automatable** it is (0-10 scale)
+- **Why** it can be automated
+
+This gives you actionable data about specific work that can be automated rather than just general job categories.
 
 ## Resume Capability
 
