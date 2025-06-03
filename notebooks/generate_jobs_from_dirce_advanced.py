@@ -74,7 +74,7 @@ class Occupation(ResponseModel):
 
     tasks: list[Task] = Field(
         description="List of specific tasks performed in this occupation",
-        min_length=3,
+        min_length=6,
         max_length=10,
     )
 
@@ -82,8 +82,8 @@ class Jobs(ResponseModel):
     """List of occupations for a sector/subsector."""
     occupations: list[Occupation] = Field(
         description="List of all occupations/job roles in this sector/subsector",
-        min_length=1,
-        max_length=30,
+        min_length=7,
+        max_length=20,
     )
 
 # ============================
@@ -110,24 +110,27 @@ DIRCE_JOBS_PROMPT = Prompt(
             "role": "user",
             "content": (
                 "Please analyze the following sector:\n\n"
-                "1. First, identify relevant occupations/job roles that would typically exist in this sector/subsector\n"
-                "2. For EACH occupation, provide specific automatable tasks they perform\n\n"
+                "1. First, identify 7-20 relevant occupations/job roles that would typically exist in this sector/subsector (aim for at least 10)\n"
+                "2. For EACH occupation, provide 6-10 specific automatable tasks they perform (aim for at least 7-8 tasks)\n\n"
                 "Structure your response hierarchically:\n"
                 "- Occupation 1: [name]\n"
                 "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
                 "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
                 "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
-                "  - ... (as many tasks as relevant for this occupation)\n"
+                "  - ... (continue for 6-10 tasks total for this occupation)\n"
                 "- Occupation 2: [name]\n"
                 "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
                 "  - Task: [task name, description, automation score 1-10, automation reason, current tools/products used]\n"
-                "  - ... (as many tasks as relevant for this occupation)\n"
-                "- ... (continue for all relevant occupations)\n\n"
-                "Generate as many occupations and tasks as you consider relevant for the sector.\n"
-                "IMPORTANT: For each task, you MUST include:\n"
-                "1. Automation potential score (1-10)\n"
-                "2. Current software products/tools used to perform the task\n"
-                "3. Explanation of why it can be automated\n\n"
+                "  - ... (continue for 6-10 tasks total for this occupation)\n"
+                "- ... (continue for all 7-20 occupations)\n\n"
+                "IMPORTANT: \n"
+                "1. You MUST identify between 7-20 occupations (preferably 10+)\n"
+                "2. Each occupation MUST have between 6-10 tasks (preferably 7-8)\n"
+                "3. For each task, you MUST include:\n"
+                "   - Automation potential score (1-10)\n"
+                "   - Current software products/tools used to perform the task\n"
+                "   - Explanation of why it can be automated\n"
+                "4. Think broadly about all roles in the sector - from entry-level to senior positions\n\n"
                 "Sector: {{sector}}\n\n"
                 "Subsector: {{subsector}}"
             )
@@ -164,7 +167,7 @@ DIRCE_JOBS_PROMPT = Prompt(
 # "openai/gpt-4.1-mini"
 # "openai/gpt-4.1-nano"
 
-MODEL_NAME = "google/gemini-2.5-flash-preview-05-20" 
+MODEL_NAME = "google/gemini-2.5-pro-preview-05-06" 
 TEST_SAMPLE_SIZE = 1        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
 
 def is_openai_model(model_name: str) -> bool:
