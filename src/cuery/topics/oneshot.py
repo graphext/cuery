@@ -30,25 +30,22 @@ class Topics(ResponseModel):
 ExtractTopics = Task(prompt=PROMPT, response=Topics)
 
 
-def topics_from_markdown(markdown: str) -> dict:
+def parse_markdown_topics(markdown: str) -> dict:
     """Converts a two-level nested markdown list of topics into a dictionary."""
     lines = markdown.strip().split("\n")
     topics = {}
     current_topic = None
 
     for line in lines:
-        stripped_line = line.strip()
-        if not stripped_line:
+        if not line.strip():
             continue
 
-        if stripped_line.startswith("- "):
-            # This is a top-level topic
-            current_topic = stripped_line[2:].strip()
+        if line.startswith("- "):
+            current_topic = line[2:].strip()
             topics[current_topic] = []
-        elif stripped_line.startswith("  - "):
-            # This is a subtopic
+        elif line.startswith("  - "):
             if current_topic is not None:
-                subtopic = stripped_line[4:].strip()
+                subtopic = line[4:].strip()
                 topics[current_topic].append(subtopic)
 
     return topics
@@ -62,7 +59,16 @@ async def extract_topics(
     max_tokens: float | None = None,
 ) -> dict:
     """Extracts a two-level topic hierarchy from a list of texts."""
-    text = utils.concat_up_to(texts, model=model, max_dollars=max_dollars, max_tokens=max_tokens)
+    if "openai" not in model.lower():
+        raise ValueError(
+            f"Model {model} is not supported. Only OpenAI models are supported for this task."
+        )
+
+    model_name = model.split("/")[-1]
+
+    text = utils.concat_up_to(
+        texts, model=model_name, max_dollars=max_dollars, max_tokens=max_tokens
+    )
     context = {"texts": text, "meta_topic": domain}
     response = await ExtractTopics.call(context=context, model=model)
-    return topics_from_markdown(response.markdown)  # type: ignore
+    return parse_markdown_topics(response[0].markdown)  # type: ignore
