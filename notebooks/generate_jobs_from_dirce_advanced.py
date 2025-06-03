@@ -112,6 +112,10 @@ DirceJobs = task.Task(
 # Job Generator Class
 # ============================
 
+# Configuration variables for easy testing
+MODEL_NAME = "gpt-4o-mini"  # Options: "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
+TEST_SAMPLE_SIZE = 2        # Number of sectors to process in test mode (can be changed to 10, 20, etc.)
+
 class JobGenerator:
     """Class to handle job generation with progress tracking and resume capability."""
     
@@ -147,7 +151,7 @@ class JobGenerator:
             # Run DirceJobs task
             jobs_result = await DirceJobs(
                 context=batch_df,
-                model="gpt-4o-mini",
+                model=MODEL_NAME,
                 n_concurrent=self.n_concurrent
             )
             
@@ -192,12 +196,12 @@ class JobGenerator:
         
         # Limit data in test mode (now gets the largest sectors)
         if self.test_mode:
-            context_df_top5 = context_df.head(5)
-            print("TEST MODE: Processing top 5 sectors by employee count")
-            print("Top 5 sectors:")
-            for i, row in context_df_top5.iterrows():
+            context_df_top = context_df.head(TEST_SAMPLE_SIZE)
+            print(f"TEST MODE: Processing top {TEST_SAMPLE_SIZE} sectors by employee count")
+            print(f"Top {TEST_SAMPLE_SIZE} sectors:")
+            for i, row in context_df_top.iterrows():
                 print(f"  {i+1}. {row['sector']} / {row['subsector']} ({row['Estimated_Employees_2024']:,.0f} employees)")
-            context_df = context_df_top5
+            context_df = context_df_top
         
         # Remove employee count column (keep only sector and subsector for processing)
         context_df = context_df[["sector", "subsector"]].copy()
@@ -300,7 +304,7 @@ async def main():
     parser.add_argument("--resume", action="store_true",
                         help="Resume from previous run if interrupted")
     parser.add_argument("--test", action="store_true",
-                        help="Test mode: process only first 5 sectors")
+                        help=f"Test mode: process top {TEST_SAMPLE_SIZE} sectors by employee count")
     parser.add_argument("--format", type=str, default='csv', choices=['csv', 'parquet', 'both'],
                         help="Format for saving results (default: csv)")
     
@@ -311,8 +315,8 @@ async def main():
     
     # Adjust for test mode
     if args.test:
-        args.batch_size = 5
-        print("Running in TEST mode - processing top 5 sectors by employee count")
+        args.batch_size = TEST_SAMPLE_SIZE
+        print(f"Running in TEST mode - processing top {TEST_SAMPLE_SIZE} sectors by employee count")
     
     # Create generator and run
     generator = JobGenerator(

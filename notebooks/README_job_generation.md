@@ -38,6 +38,26 @@ The DirceJobs task combines the prompt and response models, configured to use th
 
 Since all components are now in the script, you can easily customize:
 
+### Configuration Variables (Quick Setup)
+At the top of the script, you'll find easy-to-modify variables:
+
+```python
+MODEL_NAME = "gpt-4o-mini"  # Change model here
+TEST_SAMPLE_SIZE = 5        # Change test sample size here
+```
+
+**Model Options:**
+- `"gpt-4o"` - Highest quality, slower, more expensive
+- `"gpt-4o-mini"` - Good balance (default)
+- `"gpt-3.5-turbo"` - Fastest, cheapest
+- `"claude-3-sonnet-20240229"` - Anthropic's balanced model
+- `"claude-3-haiku-20240307"` - Anthropic's fast model
+
+**Sample Size Examples:**
+- `TEST_SAMPLE_SIZE = 3` - Quick test with top 3 sectors
+- `TEST_SAMPLE_SIZE = 10` - More comprehensive test
+- `TEST_SAMPLE_SIZE = 20` - Broader analysis
+
 ### 1. Modify the Prompt
 Find the `DIRCE_JOBS_PROMPT` variable and adjust:
 - The system message to change the AI's role or perspective
@@ -56,10 +76,8 @@ The `job_automation_potential` field currently uses 0-10. You can:
 - Add categories instead of numbers
 - Include multiple scoring dimensions
 
-### 4. Model Selection
-Change the model in line 149 (`model="gpt-4o-mini"`) to:
-- `gpt-4o` for higher quality but slower/more expensive
-- `gpt-3.5-turbo` for faster/cheaper but potentially lower quality
+### 4. Advanced Customization
+For more complex changes, you can modify the response models, add new fields, or change validation rules directly in the code.
 
 ## Quick Start - Test with Top 5 Sectors by Employment
 
