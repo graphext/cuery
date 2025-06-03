@@ -21,7 +21,6 @@ async def call(
     prompt: Prompt,
     context: dict | None,
     response_model: ResponseClass,
-    model: str | None = None,
     fallback: bool = True,
     log_prompt: bool = False,
     log_response: bool = False,
@@ -36,9 +35,6 @@ async def call(
             raise ValueError(
                 f"Missing required keys in context: {', '.join(missing)}\nContext:\n{context}"
             )
-
-    if model is not None:
-        kwds["model"] = model
 
     if log_prompt:
         pprint(prompt)
@@ -70,7 +66,6 @@ async def iter_calls(
     prompt: Prompt,
     context: dict | list[dict] | DataFrame,
     response_model: ResponseClass,
-    model: str | None = None,
     callback: Callable[[ResponseModel, Prompt, dict], None] | None = None,
     **kwds,
 ) -> list[ResponseModel]:
@@ -83,7 +78,6 @@ async def iter_calls(
         for c in context:
             result = await call(
                 client,
-                model=model,
                 prompt=prompt,
                 context=c,  # type: ignore
                 response_model=response_model,
@@ -109,7 +103,6 @@ async def gather_calls(
     prompt: Prompt,
     context: dict | list[dict] | DataFrame,
     response_model: ResponseClass,
-    model: str | None = None,
     max_concurrent: int = 2,
     **kwds,
 ) -> list[ResponseModel]:
@@ -121,7 +114,6 @@ async def gather_calls(
         func=call,
         sem=sem,
         client=client,
-        model=model,
         prompt=prompt,
         response_model=response_model,
         **kwds,

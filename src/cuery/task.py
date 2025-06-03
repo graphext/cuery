@@ -4,9 +4,7 @@ from pathlib import Path
 import instructor
 import pandas as pd
 from instructor import Instructor
-from openai import AsyncOpenAI
 from pandas import DataFrame
-from rich import print as pprint
 
 from . import call
 from .context import AnyContext, context_is_iterable
@@ -16,6 +14,14 @@ from .response import ResponseClass, ResponseModel, ResponseSet
 from .utils import LOG
 
 AnyCfg = str | Path | dict
+
+
+def check_model_name(model: str) -> None:
+    """Check if the model name is valid."""
+    if "/" not in model:
+        raise ValueError(
+            f"Invalid model name: {model}. It should be in the format 'provider/model'."
+        )
 
 
 class ErrorLogger:
@@ -43,15 +49,12 @@ class Task:
         prompt: str | Path | Prompt,
         response: ResponseClass,
         name: str | None = None,
-        client: Instructor | None = None,
         model: str | None = None,
         log_prompt: bool = False,
         log_response: bool = False,
     ):
         self.name = name
         self.response = response
-        self.client = client
-        self.model = model
         self.prompt = prompt
         self.log_prompt = log_prompt
         self.log_response = log_response
@@ -59,31 +62,32 @@ class Task:
         if isinstance(prompt, str | Path):
             self.prompt = Prompt.from_config(prompt)
 
-        if self.client is None:
-            self.client = instructor.from_openai(AsyncOpenAI())
-
-        if self.model is None:
-            self.model = "gpt-3.5-turbo"
+        if model is None:
+            self.client = instructor.from_provider("openai/gpt-3.5-turbo", async_client=True)
+        else:
+            check_model_name(model)
+            self.client = instructor.from_provider(model, async_client=True)
 
         if name:
             Task.registry[name] = self
 
+    def _select_client(self, model: str | None = None) -> Instructor:
+        if model is None:
+            return self.client
+
+        check_model_name(model)
+        return instructor.from_provider(model, async_client=True) or self.client
+
     async def call(
         self,
         context: AnyContext | None = None,
-        client: Instructor | None = None,
         model: str | None = None,
         **kwds,
     ) -> ResponseSet:
-        client = client or self.client
-        model = model or self.model
-
-        if client is None:
-            raise ValueError("Client cannot be None")
+        client = self._select_client(model)
 
         response = await call.call(
             client=client,
-            model=model,
             prompt=self.prompt,  # type: ignore
             context=context,  # type: ignore
             response_model=self.response,
@@ -97,16 +101,11 @@ class Task:
     async def iter(
         self,
         context: AnyContext | None = None,
-        client: Instructor | None = None,
         model: str | None = None,
         callback: Callable[[ResponseModel, Prompt, dict], None] | None = None,
         **kwds,
     ) -> ResponseSet:
-        client = client or self.client
-        model = model or self.model
-
-        if client is None:
-            raise ValueError("Client cannot be None")
+        client = self._select_client(model)
 
         self.error_log = ErrorLogger()
         self.query_log = QueryLogger()
@@ -115,7 +114,6 @@ class Task:
 
         responses = await call.iter_calls(
             client=client,
-            model=model,
             prompt=self.prompt,  # type: ignore
             context=context,  # type: ignore
             response_model=self.response,
@@ -133,16 +131,11 @@ class Task:
     async def gather(
         self,
         context: AnyContext | None = None,
-        client: Instructor | None = None,
         model: str | None = None,
         n_concurrent: int = 1,
         **kwds,
     ) -> ResponseSet:
-        client = client or self.client
-        model = model or self.model
-
-        if client is None:
-            raise ValueError("Client cannot be None")
+        client = self._select_client(model)
 
         self.error_log = ErrorLogger()
         self.query_log = QueryLogger()
@@ -151,7 +144,6 @@ class Task:
 
         responses = await call.gather_calls(
             client=client,
-            model=model,
             prompt=self.prompt,  # type: ignore
             context=context,  # type: ignore
             response_model=self.response,
@@ -169,22 +161,18 @@ class Task:
     async def __call__(
         self,
         context: AnyContext | None = None,
-        client: Instructor | None = None,
         model: str | None = None,
         n_concurrent: int = 1,
         **kwds,
     ) -> ResponseSet:
         """Auto-dispatch to the appropriate method based on context type."""
-        client = client or self.client
-        model = model or self.model
-
         if context_is_iterable(context):
             if n_concurrent > 1:
-                return await self.gather(context, client, model, n_concurrent, **kwds)
+                return await self.gather(context, model, n_concurrent, **kwds)
 
-            return await self.iter(context, client, model, **kwds)
+            return await self.iter(context, model, **kwds)
 
-        return await self.call(context, client, model)
+        return await self.call(context, model)
 
     @classmethod
     def from_config(cls, prompt: AnyCfg, response: AnyCfg) -> "Task":
