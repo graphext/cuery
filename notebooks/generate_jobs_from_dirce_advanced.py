@@ -17,7 +17,6 @@ import argparse
 from tqdm import tqdm
 
 # Cuery imports
-import instructor
 from cuery import task
 from cuery.response import ResponseModel
 from cuery.prompt import Prompt
@@ -138,17 +137,6 @@ DIRCE_JOBS_PROMPT = Prompt(
 )
 
 # ============================
-# Task Definition
-# ============================
-
-# Create the DirceJobs task locally
-DirceJobs = task.Task(
-    name="DirceJobs", 
-    prompt=DIRCE_JOBS_PROMPT, 
-    response=Jobs
-)
-
-# ============================
 # Configuration
 # ============================
 
@@ -156,7 +144,6 @@ DirceJobs = task.Task(
 
 # https://lmarena.ai/leaderboard
 # https://aistudio.google.com/app/prompts/new_chat?model=gemini-2.5-pro-preview-05-06
-
 
 # MODEL_NAME Options by LMArena Ranking: 
 
@@ -169,7 +156,7 @@ DirceJobs = task.Task(
 # "anthropic/claude-sonnet-4-20250514"
 # "openai/o4-mini-2025-04-16" 
 
-#Other Models:
+# Other Models:
 
 # "openai/gpt-4o-mini"
 # "openai/gpt-o3-mini"
@@ -184,14 +171,17 @@ def is_openai_model(model_name: str) -> bool:
     """Check if the model is from OpenAI (cost tracking supported)."""
     return model_name.startswith("openai/")
 
-def get_model_name(provider_model: str) -> str:
-    """Extract model name from provider/model string."""
-    if "/" in provider_model:
-        return provider_model.split("/", 1)[1]
-    return provider_model
+# ============================
+# Task Definition
+# ============================
 
-# Create client using instructor's unified provider interface
-CLIENT = instructor.from_provider(MODEL_NAME, async_client=True)
+# Create the DirceJobs task locally with the model specified
+DirceJobs = task.Task(
+    name="DirceJobs", 
+    prompt=DIRCE_JOBS_PROMPT, 
+    response=Jobs,
+    model=MODEL_NAME
+)
 
 print(f"Using model: {MODEL_NAME}")
 print(f"Cost tracking: {'Available' if is_openai_model(MODEL_NAME) else 'Not available (OpenAI models only)'}")
@@ -239,11 +229,10 @@ class JobGenerator:
     async def process_batch(self, batch_df: pd.DataFrame, batch_indices: list) -> pd.DataFrame:
         """Process a single batch of sector/subsector combinations."""
         try:
-            # Run DirceJobs task
+            # Run DirceJobs task - no need to pass client anymore
             jobs_result = await DirceJobs(
                 context=batch_df,
-                client=CLIENT,
-                model=get_model_name(MODEL_NAME),
+                model=MODEL_NAME,  # Pass the full model name with provider
                 n_concurrent=self.n_concurrent
             )
             
