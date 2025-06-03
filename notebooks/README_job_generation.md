@@ -8,16 +8,62 @@ The script reads the DIRCE aggregated activity data and uses AI (via the cuery l
 
 ## Script: `generate_jobs_from_dirce_advanced.py`
 
-Advanced script with features:
+**Self-contained script** with all models, prompts, and task definitions included for easy customization.
+
+Features:
 - Batch processing to handle large datasets
 - Progress tracking and resume capability
 - Better error handling
 - Command-line arguments
 - Test mode for quick sampling
+- **All models and prompts included in the file for easy editing**
 
-## Quick Start - Test with Top 5 Rows
+## Key Components (Now Included in Script)
 
-To run a quick test with just the first 5 sectors from your input file:
+### Response Models
+- **Job**: Individual job with automation potential (fields: job_role, job_description, job_automation_potential, job_automation_reason)
+- **Jobs**: Container for multiple jobs per sector/subsector
+
+### Prompt
+The prompt instructs the AI to analyze Spanish sectors/subsectors and identify computer/paper-based jobs that can be automated by AI software. You can easily modify the prompt directly in the script to:
+- Change the analysis criteria
+- Adjust the language or tone
+- Add or remove constraints
+- Modify the scoring system
+
+### Task
+The DirceJobs task combines the prompt and response models, configured to use the Jobs response model.
+
+## Customization Guide
+
+Since all components are now in the script, you can easily customize:
+
+### 1. Modify the Prompt
+Find the `DIRCE_JOBS_PROMPT` variable and adjust:
+- The system message to change the AI's role or perspective
+- The user message template to request different information
+- Add more context or examples
+
+### 2. Adjust Response Models
+Modify the `Job` class to:
+- Change field names or descriptions
+- Add new fields (e.g., required_skills, tools_used)
+- Adjust validation rules (min/max lengths, score ranges)
+
+### 3. Change Scoring
+The `job_automation_potential` field currently uses 0-10. You can:
+- Change the range (e.g., 1-5 or 0-100)
+- Add categories instead of numbers
+- Include multiple scoring dimensions
+
+### 4. Model Selection
+Change the model in line 149 (`model="gpt-4o-mini"`) to:
+- `gpt-4o` for higher quality but slower/more expensive
+- `gpt-3.5-turbo` for faster/cheaper but potentially lower quality
+
+## Quick Start - Test with Top 5 Sectors by Employment
+
+To run a quick test with the 5 largest sectors by employee count from your input file:
 
 ```bash
 cd notebooks
@@ -25,8 +71,9 @@ uv run python generate_jobs_from_dirce_advanced.py --test
 ```
 
 This will:
-- Process only the first 5 rows of the DIRCE data
-- Generate jobs for those 5 sector/subsector combinations
+- Sort all sectors by `Estimated_Employees_2024` in descending order
+- Process only the top 5 sectors with the most employees
+- Generate jobs for those 5 largest sector/subsector combinations
 - Save results to the output directory
 - Complete in under a minute
 
@@ -35,7 +82,7 @@ This will:
 ```bash
 cd notebooks
 
-# Test mode (process only first 5 sectors) - RECOMMENDED FIRST RUN
+# Test mode (process top 5 sectors by employment) - RECOMMENDED FIRST RUN
 uv run python generate_jobs_from_dirce_advanced.py --test
 
 # Test mode with different output formats
@@ -55,7 +102,7 @@ uv run python generate_jobs_from_dirce_advanced.py --resume
 
 ## Command-line Arguments
 
-- `--test`: **Test mode - process only first 5 sectors (RECOMMENDED FOR FIRST RUN)**
+- `--test`: **Test mode - process top 5 sectors by employment (RECOMMENDED FOR FIRST RUN)**
 - `--format`: Output format - `csv` (default), `parquet`, or `both`
 - `--batch-size`: Number of sectors to process in each batch (default: 25)
 - `--concurrent`: Number of concurrent API requests (default: 10)

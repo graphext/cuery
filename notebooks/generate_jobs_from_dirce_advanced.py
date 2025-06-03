@@ -2,6 +2,7 @@
 """
 Advanced script to generate jobs for each sector/subsector combination from DIRCE data.
 Features: batch processing, progress tracking, resume capability, and error handling.
+Now self-contained with all models and prompts included.
 """
 
 import asyncio
@@ -12,15 +13,104 @@ from datetime import datetime
 import json
 from typing import Optional
 import argparse
-
-from cuery import task
-from cuery.work import DirceJobs
 from tqdm import tqdm
+
+# Cuery imports
+from cuery import task
+from cuery.response import ResponseModel
+from cuery.prompt import Prompt
+from pydantic import Field
 
 # Set up paths
 GDRIVE = Path("~/Library/CloudStorage/GoogleDrive-victoriano@graphext.com/Shared drives/Solutions").expanduser()
 DATA_DIR = GDRIVE / "Research/future_of_work/inputs/ine_dirce_aggregated_by_activity.parquet"
 OUTPUT_DIR = GDRIVE / "Research/future_of_work/outputs"
+
+# ============================
+# Response Models
+# ============================
+
+class Job(ResponseModel):
+    """Individual job with automation potential."""
+    job_role: str = Field(
+        description="Name of the job role (job title, less than 50 characters)",
+        min_length=5,
+        max_length=50,
+    )
+    job_description: str = Field(
+        description="A short description of the job role (less than 200 characters)",
+        min_length=20,
+        max_length=200,
+    )
+    job_automation_potential: int = Field(
+        description="A score from 1 to 10 indicating the job's potential for automation",
+        ge=0,
+        le=10,
+    )
+    job_automation_reason: str = Field(
+        description=(
+            "A short explanation of no more than 10 words, of why the job "
+            "is likely to be automatable with the given potential score."
+        ),
+        min_length=30,
+        max_length=300,
+    )
+
+
+class Jobs(ResponseModel):
+    """List of jobs for a sector/subsector combination."""
+    jobs: list[Job] = Field(
+        description=(
+            "A list of jobs with their AI automation potential and reasons for that potential"
+        ),
+        min_length=0,
+    )
+
+# ============================
+# Prompt Definition
+# ============================
+
+DIRCE_JOBS_PROMPT = Prompt(
+    messages=[
+        {
+            "role": "system",
+            "content": (
+                "You're an analyst at the Spanish 'Instituo Nacional de Estadística' (INE) analyzing "
+                "data from its 'Directorio Central de Empresas' (DIRCE). Your objective is to analyze "
+                "groups of companies, identified by a sector ('Sector') and a corresponding main activity "
+                "('Subsector') in order to identify jobs within those companies that are likely to "
+                "be automatable by AI. Both 'Sector' and 'Subsector' are provided in Spanish and may "
+                "include numeric IDs that you can ignore if you don't understand them. Always respond in English. "
+                "Only consider jobs that are computer- or paper-based and can be automated by AI using software "
+                "(don't include jobs automatable by robots or other physical means)."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                "Please analyze the following jobs sector and identify jobs that are automatable by AI software.\n\n"
+                "Sector: {{sector}}\n\n"
+                "Subsector: {{subsector}}"
+            )
+        }
+    ],
+    required=["sector", "subsector"]
+)
+
+# ============================
+# Task Definition
+# ============================
+
+# Create the DirceJobs task locally
+DirceJobs = task.Task(
+    name="DirceJobs", 
+    prompt=DIRCE_JOBS_PROMPT, 
+    response=Jobs
+)
+
+# ============================
+# Job Generator Class
+# ============================
 
 class JobGenerator:
     """Class to handle job generation with progress tracking and resume capability."""
@@ -93,14 +183,24 @@ class JobGenerator:
             (pl.col("subsector").is_not_null())
         )
         
-        # Convert to pandas
-        context_df = df_filtered.select(["sector", "subsector"]).to_pandas()
+        # Convert to pandas - include employee count for sorting
+        context_df = df_filtered.select(["sector", "subsector", "Estimated_Employees_2024"]).to_pandas()
+        
+        # Sort by employee count in descending order (largest sectors first)
+        context_df = context_df.sort_values("Estimated_Employees_2024", ascending=False)
         context_df.reset_index(drop=True, inplace=True)
         
-        # Limit data in test mode
+        # Limit data in test mode (now gets the largest sectors)
         if self.test_mode:
-            context_df = context_df.head(5)
-            print("TEST MODE: Processing only first 5 sectors")
+            context_df_top5 = context_df.head(5)
+            print("TEST MODE: Processing top 5 sectors by employee count")
+            print("Top 5 sectors:")
+            for i, row in context_df_top5.iterrows():
+                print(f"  {i+1}. {row['sector']} / {row['subsector']} ({row['Estimated_Employees_2024']:,.0f} employees)")
+            context_df = context_df_top5
+        
+        # Remove employee count column (keep only sector and subsector for processing)
+        context_df = context_df[["sector", "subsector"]].copy()
         
         print(f"Total sectors to process: {len(context_df)}")
         
@@ -212,7 +312,7 @@ async def main():
     # Adjust for test mode
     if args.test:
         args.batch_size = 5
-        print("Running in TEST mode - processing only first 5 sectors")
+        print("Running in TEST mode - processing top 5 sectors by employee count")
     
     # Create generator and run
     generator = JobGenerator(
