@@ -37,7 +37,7 @@ class Message(BaseModel):
             code_width=None,
             word_wrap=True,
             theme="friendly",
-            padding=1,
+            padding=0,
         )
         title = f"[{style}]{self.role.upper()}"
         yield Panel(text, title=title, expand=True)

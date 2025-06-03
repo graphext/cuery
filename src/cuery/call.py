@@ -6,6 +6,7 @@ from functools import partial
 
 from instructor.client import Instructor
 from pandas import DataFrame
+from rich import print as pprint
 from tqdm.asyncio import tqdm as async_tqdm
 from tqdm.auto import tqdm
 
@@ -22,6 +23,8 @@ async def call(
     response_model: ResponseClass,
     model: str | None = None,
     fallback: bool = True,
+    log_prompt: bool = False,
+    log_response: bool = False,
     **kwds,
 ) -> ResponseModel:
     """Prompt once with the given context (validated)."""
@@ -37,6 +40,9 @@ async def call(
     if model is not None:
         kwds["model"] = model
 
+    if log_prompt:
+        pprint(prompt)
+
     try:
         response, completion = await client.chat.completions.create_with_completion(
             messages=list(prompt),  # type: ignore
@@ -45,14 +51,18 @@ async def call(
             **kwds,
         )
         response._raw_response = completion
-        return response
     except Exception as exception:
         if not fallback:
             raise
 
         LOG.error(f"{exception}")
         LOG.error("Falling back to default response.")
-        return response_model.fallback()
+        response = response_model.fallback()
+
+    if log_response:
+        pprint(response.to_dict())
+
+    return response
 
 
 async def iter_calls(
@@ -61,6 +71,7 @@ async def iter_calls(
     context: dict | list[dict] | DataFrame,
     response_model: ResponseClass,
     model: str | None = None,
+    callback: Callable[[ResponseModel, Prompt, dict], None] | None = None,
     **kwds,
 ) -> list[ResponseModel]:
     """Sequential iteration of prompt over iterable contexts."""
@@ -79,6 +90,10 @@ async def iter_calls(
                 **kwds,
             )
             results.append(result)
+
+            if callback is not None:
+                callback(result, prompt, c)  # type: ignore
+
             pbar.update(1)
 
     return results

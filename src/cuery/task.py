@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import instructor
@@ -5,6 +6,7 @@ import pandas as pd
 from instructor import Instructor
 from openai import AsyncOpenAI
 from pandas import DataFrame
+from rich import print as pprint
 
 from . import call
 from .context import AnyContext, context_is_iterable
@@ -16,12 +18,21 @@ from .utils import LOG
 AnyCfg = str | Path | dict
 
 
-class ErrorCounter:
+class ErrorLogger:
     def __init__(self) -> None:
         self.count = 0
 
-    def count_error(self, error: Exception) -> None:
+    def log(self, error: Exception) -> None:
         self.count += 1
+
+
+class QueryLogger:
+    def __init__(self) -> None:
+        self.queries = []
+
+    def log(self, *args, **kwargs) -> None:
+        """Log a query to the internal list."""
+        self.queries.append(kwargs)
 
 
 class Task:
@@ -29,17 +40,21 @@ class Task:
 
     def __init__(
         self,
-        name: str,
         prompt: str | Path | Prompt,
         response: ResponseClass,
+        name: str | None = None,
         client: Instructor | None = None,
         model: str | None = None,
+        log_prompt: bool = False,
+        log_response: bool = False,
     ):
         self.name = name
         self.response = response
         self.client = client
         self.model = model
         self.prompt = prompt
+        self.log_prompt = log_prompt
+        self.log_response = log_response
 
         if isinstance(prompt, str | Path):
             self.prompt = Prompt.from_config(prompt)
@@ -50,7 +65,8 @@ class Task:
         if self.model is None:
             self.model = "gpt-3.5-turbo"
 
-        Task.registry[name] = self
+        if name:
+            Task.registry[name] = self
 
     async def call(
         self,
@@ -71,6 +87,8 @@ class Task:
             prompt=self.prompt,  # type: ignore
             context=context,  # type: ignore
             response_model=self.response,
+            log_prompt=self.log_prompt,
+            log_response=self.log_response,
             **kwds,
         )
 
@@ -81,6 +99,7 @@ class Task:
         context: AnyContext | None = None,
         client: Instructor | None = None,
         model: str | None = None,
+        callback: Callable[[ResponseModel, Prompt, dict], None] | None = None,
         **kwds,
     ) -> ResponseSet:
         client = client or self.client
@@ -89,8 +108,10 @@ class Task:
         if client is None:
             raise ValueError("Client cannot be None")
 
-        self.error_counter = ErrorCounter()
-        client.on("parse:error", self.error_counter.count_error)
+        self.error_log = ErrorLogger()
+        self.query_log = QueryLogger()
+        client.on("parse:error", self.error_log.log)
+        client.on("completion:kwargs", self.query_log.log)
 
         responses = await call.iter_calls(
             client=client,
@@ -98,11 +119,14 @@ class Task:
             prompt=self.prompt,  # type: ignore
             context=context,  # type: ignore
             response_model=self.response,
+            callback=callback,
+            log_prompt=self.log_prompt,
+            log_response=self.log_response,
             **kwds,
         )
 
-        if self.error_counter.count > 0:
-            LOG.warning(f"Encountered: {self.error_counter.count} response parsing errors!")
+        if self.error_log.count > 0:
+            LOG.warning(f"Encountered: {self.error_log.count} response parsing errors!")
 
         return ResponseSet(responses, context, self.prompt.required)  # type: ignore
 
@@ -120,8 +144,10 @@ class Task:
         if client is None:
             raise ValueError("Client cannot be None")
 
-        self.error_counter = ErrorCounter()
-        client.on("parse:error", self.error_counter.count_error)
+        self.error_log = ErrorLogger()
+        self.query_log = QueryLogger()
+        client.on("parse:error", self.error_log.log)
+        client.on("completion:kwargs", self.query_log.log)
 
         responses = await call.gather_calls(
             client=client,
@@ -130,11 +156,13 @@ class Task:
             context=context,  # type: ignore
             response_model=self.response,
             max_concurrent=n_concurrent,
+            log_prompt=self.log_prompt,
+            log_response=self.log_response,
             **kwds,
         )
 
-        if self.error_counter.count > 0:
-            LOG.warning(f"Encountered: {self.error_counter.count} response parsing errors!")
+        if self.error_log.count > 0:
+            LOG.warning(f"Encountered: {self.error_log.count} response parsing errors!")
 
         return ResponseSet(responses, context, self.prompt.required)  # type: ignore
 

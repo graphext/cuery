@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, get_args, get_origin
@@ -43,6 +44,10 @@ class ResponseModel(BaseModel):
             "prompt": self._raw_response.usage.prompt_tokens,
             "completion": self._raw_response.usage.completion_tokens,
         }
+
+    def to_dict(self) -> dict:
+        """Convert the model to a dictionary."""
+        return json.loads(self.model_dump_json())
 
     @classmethod
     def fallback(cls) -> "ResponseModel":
