@@ -100,11 +100,11 @@ A `Response` is Pydantic model that defines the structure of a desired LLM outpu
     Retries N times while validation fails providing the LLM with corresponding error messages. If _all_ retries fail, allows specification of a fallback (a `Response`
     will all values set to `None` by default.) to return instead of raising an exception. This allows iterating over hundreds or thousands of inputs without risk of losing all
     responses if only one or a few fail.
-- **YAML configuration**
+- **YAML configuration**  
     Load response models from configuration files (though that excludes the ability to
     write custom python validators).
 - **Caching of _raw_ response**  
-    Cuery automatically saves the raw response from the LLM as an attribute of the (structured) Response. This means one can later inspect the number of tokens used e.g.and calculate it's cost in dollars. 
+    `Cuery` automatically saves the _raw– response from the LLM as an attribute of the (structured) `Response`. This means one can later inspect the number of tokens used e.g., and calculate it's cost in dollars. 
 - **Automatic unwrapping of multivalued responses**  
   We can inspect if a response is defined as having a single field that is a list (i.e. we're asking for a multivalued response). In this case cuery can automatically handle things like unwrapping the list into separate output rows.
 
@@ -113,7 +113,7 @@ A `ResponseSet` further encapsulates a number of individual `Response` objects. 
 ```python
 from cuery import Field, Prompt, Response, Task
 
-
+# Simple response model
 class MovieRecommendation(Response):
     title: str
     year: int = Field(gt=1900, lt=2030)
@@ -132,7 +132,7 @@ context = [
     {"topic": "Computer Vision", "audience": "researchers"},
 ]
 
-task = Task(prompt=prompt, response=MovieRecommendation)
+task = Task(prompt=prompt, response=MovieRecommendations)
 result = await task(context)
 print(result)
 print(result.to_pandas())
@@ -140,21 +140,93 @@ print(result.to_pandas())
 
 ```
 [
-    MovieRecommendation(title='The Imitation Game', year=2014, genre=['Biography', 'Drama', 'Thriller'], rating=8.0),
-    MovieRecommendation(title='Blade Runner', year=1982, genre=['Sci-Fi', 'Thriller'], rating=8.2)
-]
+    MovieRecommendations(recommendations=[MovieRecommendation(title='The Matrix', year=1999, genre=['Action', 'Sci-Fi'], rating=8.7), MovieRecommendation(title='Ex Machina', year=2014, genre=['Drama', 'Sci-Fi'], rating=7.7), MovieRecommendation(title='Her', year=2013, genre=['Drama', 'Romance', 'Sci-Fi'], rating=8.0)]),
+    MovieRecommendations(recommendations=[MovieRecommendation(title='Blade Runner 2049', year=2017, genre=['Sci-Fi', 'Thriller'], rating=8.0), MovieRecommendation(title='Ex Machina', year=2014, genre=['Drama', 'Sci-Fi'], rating=7.7), MovieRecommendation(title='Her', year=2013, genre=['Drama', 'Romance', 'Sci-Fi'], rating=8.0)])]
 
 
-              topic     audience               title  year  \
-0  Machine Learning    beginners  The Imitation Game  2014   
-1   Computer Vision  researchers        Blade Runner  1982   
+              topic     audience              title  year  \
+0  Machine Learning    beginners         The Matrix  1999   
+1  Machine Learning    beginners         Ex Machina  2014   
+2  Machine Learning    beginners                Her  2013   
+3   Computer Vision  researchers  Blade Runner 2049  2017   
+4   Computer Vision  researchers         Ex Machina  2014   
+5   Computer Vision  researchers                Her  2013   
 
-                          genre  rating  
-0  [Biography, Drama, Thriller]     8.0  
-1            [Sci-Fi, Thriller]     8.2  
+                      genre  rating  
+0          [Action, Sci-Fi]     8.7  
+1           [Drama, Sci-Fi]     7.7  
+2  [Drama, Romance, Sci-Fi]     8.0  
+3        [Sci-Fi, Thriller]     8.0  
+4           [Drama, Sci-Fi]     7.7  
+5  [Drama, Romance, Sci-Fi]     8.0 
 ```
 
-Note how the input variables that have results in each response (`topic`, `audience`) are automatically included in the DataFrame representation. This can be useful to join the responses back to an original DataFrame that had more columns then were necessary for the prompt.
+Note how the input variables that have results in each response (`topic`, `audience`) are automatically included in the DataFrame representation. This makes it easy to see what the LLM extracted for each input, and can be useful to join the responses back to an original DataFrame that had more columns then were necessary for the prompt. Also, by default, multivalued responses are "exploded" into separate rows, but this can be controlled via `result.to_pandas(explode=False)`.
+
+``` python
+print(result.usage())
+```
+This returns a DataFrame with the number of tokens used by the prompt and the completion, and if per-token costs are known by `cuery`, the responding amount in dollars:
+```
+   prompt  completion      cost
+0     131          31  0.000112
+1     131          26  0.000104
+```
+
+Finally we can inspect the structure of responses with built-in pretty printing:
+
+```
+from cuery import pprint
+
+pprint(result[0])
+```
+
+```
+╭───────────── RESPONSE: MovieRecommendations ─────────────╮
+│                                                          │
+│ ╭─ recommendations: list[__main__.MovieRecommendation]─╮ │
+│ │                                                      │ │
+│ │  {'required': True}                                  │ │
+│ │                                                      │ │
+│ ╰──────────────────────────────────────────────────────╯ │
+│                                                          │
+│  ╭───────── RESPONSE: MovieRecommendation ──────────╮    │
+│  │                                                  │    │
+│  │ ╭─ title: str ─────────────────────────────────╮ │    │
+│  │ │                                              │ │    │
+│  │ │  {'required': True}                          │ │    │
+│  │ │                                              │ │    │
+│  │ ╰──────────────────────────────────────────────╯ │    │
+│  │ ╭─ year: int ──────────────────────────────────╮ │    │
+│  │ │                                              │ │    │
+│  │ │  {                                           │ │    │
+│  │ │      'required': True,                       │ │    │
+│  │ │      'metadata': [                           │ │    │
+│  │ │          Gt(gt=1900),                        │ │    │
+│  │ │          Lt(lt=2030)                         │ │    │
+│  │ │      ]                                       │ │    │
+│  │ │  }                                           │ │    │
+│  │ │                                              │ │    │
+│  │ ╰──────────────────────────────────────────────╯ │    │
+│  │ ╭─ genre: list[str] ───────────────────────────╮ │    │
+│  │ │                                              │ │    │
+│  │ │  {'required': True}                          │ │    │
+│  │ │                                              │ │    │
+│  │ ╰──────────────────────────────────────────────╯ │    │
+│  │ ╭─ rating: float ──────────────────────────────╮ │    │
+│  │ │                                              │ │    │
+│  │ │  {                                           │ │    │
+│  │ │      'required': True,                       │ │    │
+│  │ │      'metadata': [Ge(ge=0), Le(le=10)]       │ │    │
+│  │ │  }                                           │ │    │
+│  │ │                                              │ │    │
+│  │ ╰──────────────────────────────────────────────╯ │    │
+│  │                                                  │    │
+│  ╰──────────────────────────────────────────────────╯    │
+│                                                          │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+```
 
 ### 4. Tasks
 
