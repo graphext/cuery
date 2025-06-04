@@ -27,9 +27,9 @@ In Cuery, a `Prompt` is a class encapsulating a series of messages (user, system
     Uses Rich to create pretty representations of prompts
 
 ```python
-from cuery.prompt import Prompt, pprint
+from cuery import Prompt, pprint
 
-# Load prompts from YAML configuration
+# Load prompts from nested YAML configuration
 prompt = Prompt.from_config("work/config.yaml:prompts[0]")
 
 # Create prompt from string
@@ -57,7 +57,7 @@ prompt = Prompt(
 ╰──────────────────────────────────────────────────────────╯
 ```
 
-### 2. Contexts
+### Contexts
 
 `Contexts` are collections of named variables used to render Jinja templates in prompts. There is not specific class for contexts, but where they are expected, they can be provided in various forms:
 
@@ -90,35 +90,71 @@ next(contexts)
 
 Cuery validates contexts against the required variables specified in the prompt, ensuring all necessary data is available before execution.
 
-### 3. ResponseModels
+### Responses
 
-ResponseModels are Pydantic models that define the structure of LLM outputs, providing:
+A `Response` is Pydantic model that defines the structure of a desired LLM output, providing:
 
-- **Structured parsing**: Convert LLM text responses to strongly typed objects
-- **Validation**: Ensure outputs meet expected formats and constraints
-- **Fallback handling**: Gracefully handle parsing errors
-- **YAML configuration**: Load response models from configuration files
+- **Structured parsing and validation**  
+    Converts LLM text responses to strongly typed objects, ensuring outputs meet expected formats and constraints
+- **Fallback handling**  
+    Retries N times while validation fails providing the LLM with corresponding error messages. If _all_ retries fail, allows specification of a fallback (a `Response`
+    will all values set to `None` by default.) to return instead of raising an exception. This allows iterating over hundreds or thousands of inputs without risk of losing all
+    responses if only one or a few fail.
+- **YAML configuration**
+    Load response models from configuration files (though that excludes the ability to
+    write custom python validators).
+- **Caching of _raw_ response**  
+    Cuery automatically saves the raw response from the LLM as an attribute of the (structured) Response. This means one can later inspect the number of tokens used e.g.and calculate it's cost in dollars. 
+- **Automatic unwrapping of multivalued responses**  
+  We can inspect if a response is defined as having a single field that is a list (i.e. we're asking for a multivalued response). In this case cuery can automatically handle things like unwrapping the list into separate output rows.
+
+A `ResponseSet` further encapsulates a number of individual `Response` objects. This can be used e.g. to automatically convert a list of reponses to a DataFrame, to calculate the overall cost of having iterated a prompt over N inputs etc.
 
 ```python
-from cuery.response import ResponseModel
-from pydantic import Field
+from cuery import Field, Prompt, Response, Task
 
-class MovieRecommendation(ResponseModel):
+
+class MovieRecommendation(Response):
     title: str
     year: int = Field(gt=1900, lt=2030)
     genre: list[str]
     rating: float = Field(ge=0, le=10)
-    
+
+
 # Multi-output response model
-class MovieRecommendations(ResponseModel):
+class MovieRecommendations(Response):
     recommendations: list[MovieRecommendation]
-    
-# Create from configuration
-from cuery.response import ResponseModel
-response_model = ResponseModel.from_config("work/models.yaml", "movie_recommendations")
+
+prompt = Prompt.from_string("Recommend a movie for {{ audience }} interested in {{ topic }}.")
+
+context = [
+    {"topic": "Machine Learning", "audience": "beginners"},
+    {"topic": "Computer Vision", "audience": "researchers"},
+]
+
+task = Task(prompt=prompt, response=MovieRecommendation)
+result = await task(context)
+print(result)
+print(result.to_pandas())
 ```
 
-Cuery extends Instructor's response parsing with additional utilities for response handling, retries, and prompt refinement.
+```
+[
+    MovieRecommendation(title='The Imitation Game', year=2014, genre=['Biography', 'Drama', 'Thriller'], rating=8.0),
+    MovieRecommendation(title='Blade Runner', year=1982, genre=['Sci-Fi', 'Thriller'], rating=8.2)
+]
+
+
+              topic     audience               title  year  \
+0  Machine Learning    beginners  The Imitation Game  2014   
+1   Computer Vision  researchers        Blade Runner  1982   
+
+                          genre  rating  
+0  [Biography, Drama, Thriller]     8.0  
+1            [Sci-Fi, Thriller]     8.2  
+```
+
+Note how the input variables that have results in each response (`topic`, `audience`) are automatically included in the DataFrame representation. This can be useful to join the responses back to an original DataFrame that had more columns then were necessary for the prompt.
 
 ### 4. Tasks
 
