@@ -1,17 +1,11 @@
 # Cuery
 
-Cuery is a Python library for LLM prompt management that extends the capabilities of the Instructor library. It provides a structured approach to working with prompts, contexts, response models, and tasks for effective LLM workflow management.
+Cuery is a Python library for LLM prompting that extends the capabilities of the Instructor library. It provides a structured approach to working with prompts, contexts, response models, and tasks for effective LLM workflow management. It's main motivation is to make it easier to iterate prompts over tabular data (DataFrames).
 
 ## To Do
 - Integrate web search API:
   - Depends on Instructor integration of OpenAI Responses API
   - PR: https://github.com/567-labs/instructor/pull/1520
-- Easier selection of clients:
-  - PR: https://github.com/567-labs/instructor/issues/1534
-- More info about execution:
-  - Cost
-  - Token count
-  - Other errors
 - Seperate retry logic for rate limit errors and structured output validation errors
   - Issue: https://github.com/567-labs/instructor/issues/1503
 - Prompt registry
@@ -19,29 +13,48 @@ Cuery is a Python library for LLM prompt management that extends the capabilitie
 
 ## Key Concepts
 
-### 1. Prompts
+### Prompts
 
-In Cuery, prompts are represented as a series of messages with built-in support for:
+In Cuery, a `Prompt` is a class encapsulating a series of messages (user, system, etc.). Prompt messages support:
 
-- **Jinja templating**: Dynamically generate content using template variables
-- **YAML configuration**: Load prompts from YAML files for better organization
-- **Iteration over contexts**: Process multiple contexts asynchronously or synchronously
+- **Jinja templating**  
+    Dynamically generate content using template variables
+- **Template variable validation**  
+    Detects and validates that contexts used to render the final prompt contain the required variables
+- **YAML configuration**  
+    Load prompts from YAML files for better organization, using [glom](https://glom.readthedocs.io/en/latest/) for path-based access to nested object
+- **Pretty print**
+    Uses Rich to create pretty representations of prompts
 
 ```python
-from cuery.prompt import Prompt, Message
+from cuery.prompt import Prompt, pprint
+
+# Load prompts from YAML configuration
+prompt = Prompt.from_config("work/config.yaml:prompts[0]")
+
+# Create prompt from string
+prompt = Prompt.from_string("Explain {{ topic }} in simple terms.")
+pprint(prompt)
 
 # Create a prompt manually
 prompt = Prompt(
     messages=[
-        Message(role="system", content="You are a helpful assistant."),
-        Message(role="user", content="Explain {{ topic }} in simple terms.")
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Explain {{ topic }} in simple terms."}
     ],
     required=["topic"]
 )
+```
 
-# Load prompts from YAML configuration
-from cuery.prompt import Prompt
-prompt = Prompt.from_config("work/prompts.yaml")
+``` bash
+╭───────────────────────── Prompt ─────────────────────────╮
+│                                                          │
+│  Required: ['topic']                                     │
+│                                                          │
+│ ╭──────────────────────── USER ────────────────────────╮ │
+│ │ Explain {{ topic }} in simple terms.                 │ │
+│ ╰──────────────────────────────────────────────────────╯ │
+╰──────────────────────────────────────────────────────────╯
 ```
 
 ### 2. Contexts

@@ -59,15 +59,19 @@ def resource_path(relpath: str | Path) -> Path:
     return files(dp).joinpath(str(fn))
 
 
-def load_yaml(relpath: str | Path) -> dict:
+def load_yaml(path: str | Path) -> dict:
     """Load a YAML file from a local, relative resource path."""
-    relpath = Path(relpath)
-    if not relpath.suffix:
-        relpath = relpath.with_suffix(".yaml")
+    path = Path(path)
+    if not path.suffix:
+        path = path.with_suffix(".yaml")
 
-    path = resource_path(relpath)
-    with open(path) as f:
-        return yaml.safe_load(f)
+    try:
+        with open(path) as fp:
+            return yaml.safe_load(fp)
+    except FileNotFoundError:
+        path = resource_path(path)
+        with open(path) as f:
+            return yaml.safe_load(f)
 
 
 def dedent(text):
@@ -208,9 +212,6 @@ def concat_up_to(
         total_tokens += n_tokens
         total_cost += n_dollars
 
-    LOG.info(
-        f"Concatenated {total_texts:,} texts with {total_tokens:,} tokens "
-        f"and total cost of ${total_cost:.5f}"
-    )
+    LOG.info(f"Concatenated {total_texts:,} texts with {total_tokens:,} tokens and total cost of ${total_cost:.5f}")
 
     return separator.join(result)
