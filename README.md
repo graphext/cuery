@@ -2,14 +2,61 @@
 
 Cuery is a Python library for LLM prompting that extends the capabilities of the Instructor library. It provides a structured approach to working with prompts, contexts, response models, and tasks for effective LLM workflow management. It's main motivation is to make it easier to iterate prompts over tabular data (DataFrames).
 
-## To Do
-- Integrate web search API:
-  - Depends on Instructor integration of OpenAI Responses API
-  - PR: https://github.com/567-labs/instructor/pull/1520
-- Seperate retry logic for rate limit errors and structured output validation errors
-  - Issue: https://github.com/567-labs/instructor/issues/1503
-- Prompt registry
+## Quick start
 
+```python
+from cuery import Prompt, Response, Task
+
+
+# Define response model
+class Entity(Response):
+    name: str
+    type: str
+
+
+class NamedEntities(Response):
+    entities: list[Entity]
+
+
+context = pd.DataFrame({
+    "text": [
+        "Apple is headquartered in Cupertino, California."
+        "Barack Obama was the 44th President of the United States.",
+        "The Eiffel Tower is located in Paris, France.",
+    ]}
+)
+
+prompt = Prompt.from_string("Extract named entities from the following text: {{text}}")
+task = Task(prompt=prompt, response=NamedEntities)
+result = await task(context, model="openai/gpt-3.5-turbo", n_concurrent=10)
+print(result.to_pandas(explode=True))
+```
+
+```
+Gathering responses: 100%|██████████| 3/3 [00:01<00:00,  2.15it/s]
+
+                                                text           name  \
+0   Apple is headquartered in Cupertino, California.          Apple   
+1   Apple is headquartered in Cupertino, California.      Cupertino   
+2   Apple is headquartered in Cupertino, California.     California   
+3  Barack Obama was the 44th President of the Uni...   Barack Obama   
+4  Barack Obama was the 44th President of the Uni...           44th   
+5  Barack Obama was the 44th President of the Uni...  United States   
+6      The Eiffel Tower is located in Paris, France.   Eiffel Tower   
+7      The Eiffel Tower is located in Paris, France.          Paris   
+8      The Eiffel Tower is located in Paris, France.         France   
+
+           type  
+0  Organization  
+1      Location  
+2      Location  
+3        Person  
+4       Ordinal  
+5      Location  
+6      Location  
+7      Location  
+8      Location  
+```
 
 ## Key Concepts
 
@@ -104,7 +151,7 @@ A `Response` is Pydantic model that defines the structure of a desired LLM outpu
     Load response models from configuration files (though that excludes the ability to
     write custom python validators).
 - **Caching of _raw_ response**  
-    `Cuery` automatically saves the _raw– response from the LLM as an attribute of the (structured) `Response`. This means one can later inspect the number of tokens used e.g., and calculate it's cost in dollars. 
+    `Cuery` automatically saves the _raw_ response from the LLM as an attribute of the (structured) `Response`. This means one can later inspect the number of tokens used e.g., and calculate it's cost in dollars. 
 - **Automatic unwrapping of multivalued responses**  
   We can inspect if a response is defined as having a single field that is a list (i.e. we're asking for a multivalued response). In this case cuery can automatically handle things like unwrapping the list into separate output rows.
 
@@ -141,7 +188,8 @@ print(result.to_pandas())
 ```
 [
     MovieRecommendations(recommendations=[MovieRecommendation(title='The Matrix', year=1999, genre=['Action', 'Sci-Fi'], rating=8.7), MovieRecommendation(title='Ex Machina', year=2014, genre=['Drama', 'Sci-Fi'], rating=7.7), MovieRecommendation(title='Her', year=2013, genre=['Drama', 'Romance', 'Sci-Fi'], rating=8.0)]),
-    MovieRecommendations(recommendations=[MovieRecommendation(title='Blade Runner 2049', year=2017, genre=['Sci-Fi', 'Thriller'], rating=8.0), MovieRecommendation(title='Ex Machina', year=2014, genre=['Drama', 'Sci-Fi'], rating=7.7), MovieRecommendation(title='Her', year=2013, genre=['Drama', 'Romance', 'Sci-Fi'], rating=8.0)])]
+    MovieRecommendations(recommendations=[MovieRecommendation(title='Blade Runner 2049', year=2017, genre=['Sci-Fi', 'Thriller'], rating=8.0), MovieRecommendation(title='Ex Machina', year=2014, genre=['Drama', 'Sci-Fi'], rating=7.7), MovieRecommendation(title='Her', year=2013, genre=['Drama', 'Romance', 'Sci-Fi'], rating=8.0)])
+]
 
 
               topic     audience              title  year  \
@@ -161,16 +209,35 @@ print(result.to_pandas())
 5  [Drama, Romance, Sci-Fi]     8.0 
 ```
 
-Note how the input variables that have results in each response (`topic`, `audience`) are automatically included in the DataFrame representation. This makes it easy to see what the LLM extracted for each input, and can be useful to join the responses back to an original DataFrame that had more columns then were necessary for the prompt. Also, by default, multivalued responses are "exploded" into separate rows, but this can be controlled via `result.to_pandas(explode=False)`.
+Note how the input variables that have resulted in each response (`topic`, `audience`) are automatically included in the DataFrame representation. This makes it easy to see what the LLM extracted for each input, and can be useful to join the responses back to an original DataFrame that had more columns then were necessary for the prompt. Also, by default, multivalued responses are "exploded" into separate rows, but this can be controlled via `result.to_pandas(explode=False)`.
 
 ``` python
 print(result.usage())
 ```
+
 This returns a DataFrame with the number of tokens used by the prompt and the completion, and if per-token costs are known by `cuery`, the responding amount in dollars:
+
 ```
    prompt  completion      cost
 0     131          31  0.000112
 1     131          26  0.000104
+```
+
+We can inspect the _raw_ responses like this:
+
+```
+print(result[0]._raw_response.model)
+>> gpt-3.5-turbo-0125
+
+print(result[0]._raw_response.service_tier)
+>> default
+```
+
+And the _raw_ "query" like this:
+
+```
+print(movie_task.query_log.queries[0]["messages"][0]["content"])
+>> Recommend a movie for beginners interested in Machine Learning.
 ```
 
 Finally we can inspect the structure of responses with built-in pretty printing:
@@ -230,83 +297,74 @@ pprint(result[0])
 
 ### 4. Tasks
 
-Tasks combine prompts and response models into reusable units of work, simplifying:
+A `Task` combines a prompt and a response model into reusable units of work, simplifying:
 
-- **Execution across LLM providers**: Run the same task on different LLM backends
-- **Batch processing**: Handle multiple contexts efficiently
+- **Execution across LLM providers and models**: Run the same task on different LLM backends
 - **Concurrency control**: Process requests in parallel with customizable limits
-- **Response post-processing**: Transform and normalize structured outputs
 - **Task chaining**: Link multiple tasks together to create workflows
 
+E.g. given the movie task above:
+
 ```python
-from cuery.task import Task, Chain
-from openai import AsyncOpenAI
-import instructor
+from typing import Literal
+from cuery import Task, Chain
 
-# Create a task
-client = instructor.from_openai(AsyncOpenAI())
-movie_task = Task(
-    prompt=prompt,
-    response=MovieRecommendations,
-    client=client,
-    model="gpt-4-turbo"
-)
+# Reuse example from above
+movie_task = Task(prompt=movie_prompt, response=MovieRecommendations)
 
-# Execute with different modes based on context type
-# Single context
-result = await movie_task({"genre": "sci-fi", "mood": "thoughtful"})
+# Add PG rating
+class Rating(Response):
+    pg_category: Literal["G", "PG", "PG-13", "R", "NC-17"] = Field(..., description="PG rating of the movie.")
+    pg_reason: str = Field(..., description="Reason for the rating.")
 
-# Multiple contexts (automatic mode selection)
-results = await movie_task(
-    context=df,  # DataFrame or list of contexts
-    n_concurrent=5  # Process 5 requests concurrently
-)
 
-# Post-process multi-output responses (1:N relationships)
-flattened_df = movie_task.explode_responses(results, df)
+rating_prompt = Prompt.from_string("What is the PG rating for {{ title }}?")
+rating_task = Task(prompt=rating_prompt, response=Rating)
 
-# Chain multiple tasks together
-movie_chain = Chain(movie_task, other_task)
-final_results = await movie_chain(df, model="gpt-4-turbo", n_concurrent=5)
+# Create a chain of tasks, execute with "provider/modelname"
+chain = Chain(movie_task, rating_task)
+result = await chain(context, model="openai/gpt-3.5-turbo", n_concurrent=20)
+print(result)
 ```
 
-Tasks automatically select the appropriate execution mode (single, sequential, or parallel) based on the context type, and can be chained together to create multi-step workflows.
+The return value of the chain is the result of successively joining each task's output DataFrame with the previous one, using the corresponding prompt's variables as the keys:
 
-## Getting Started
+```
+              topic     audience         title  year  \
+0  Machine Learning    beginners    The Matrix  1999   
+1  Machine Learning    beginners    Ex Machina  2014   
+2  Machine Learning    beginners    Ex Machina  2014   
+3  Machine Learning    beginners           Her  2013   
+4  Machine Learning    beginners           Her  2013   
+5   Computer Vision  researchers  Blade Runner  1982   
+6   Computer Vision  researchers           Her  2013   
+7   Computer Vision  researchers           Her  2013   
+8   Computer Vision  researchers    Ex Machina  2014   
+9   Computer Vision  researchers    Ex Machina  2014   
 
-```python
-import instructor
-from openai import AsyncOpenAI
-from cuery.task import Task
-from cuery.prompt import Prompt
-from cuery.response import ResponseModel
-from pydantic import Field
+                       genre  rating pg_category  \
+0           [Action, Sci-Fi]     8.7           R   
+1            [Drama, Sci-Fi]     7.7           R   
+2            [Drama, Sci-Fi]     7.7           R   
+3   [Drama, Romance, Sci-Fi]     8.0           R   
+4   [Drama, Romance, Sci-Fi]     8.0           R   
+5         [Sci-Fi, Thriller]     8.1           R   
+6   [Drama, Romance, Sci-Fi]     8.0           R   
+7   [Drama, Romance, Sci-Fi]     8.0           R   
+8  [Drama, Sci-Fi, Thriller]     7.7           R   
+9  [Drama, Sci-Fi, Thriller]     7.7           R   
 
-# Set up client
-client = instructor.from_openai(AsyncOpenAI())
-
-# Define response model
-class Entity(ResponseModel):
-    name: str
-    type: str
-    
-class NamedEntities(ResponseModel):
-    entities: list[Entity]
-
-# Create prompt
-prompt = Prompt(
-    messages=[
-        {"role": "system", "content": "Extract named entities from the text."},
-        {"role": "user", "content": "Text: {{ text }}"}
-    ],
-    required=["text"]
-)
-
-# Create task
-entity_extractor = Task(prompt=prompt, response=NamedEntities, client=client)
-
-# Execute task
-result = await entity_extractor({"text": "Apple is headquartered in Cupertino, California."})
+                                           pg_reason  
+0                              Violence and language  
+1  Strong language, graphic nudity, and sexual co...  
+2  Rated R for graphic nudity, language, sexual r...  
+3  Brief graphic nudity, Sexual content and language  
+4  Language, sexual content and brief graphic nudity  
+5          Violence, some language, and brief nudity  
+6  Brief graphic nudity, Sexual content and language  
+7  Language, sexual content and brief graphic nudity  
+8  Strong language, graphic nudity, and sexual co...  
+9  Rated R for graphic nudity, language, sexual r... 
 ```
 
 ## Building on Instructor
@@ -330,3 +388,11 @@ To build and render:
 (cd docs && uv run make clean html)
 (cd docs/build/html && uv run python -m http.server)
 ```
+
+
+# To Do
+- Integrate web search API:
+  - Depends on Instructor integration of OpenAI Responses API
+  - PR: https://github.com/567-labs/instructor/pull/1520
+- Seperate retry logic for rate limit errors and structured output validation errors
+  - Issue: https://github.com/567-labs/instructor/issues/1503

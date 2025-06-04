@@ -200,18 +200,27 @@ class Chain:
 
     async def __call__(self, context: AnyContext | None = None, **kwds) -> DataFrame:
         n = len(self.tasks)
-        self._responses = []
+        self.responses = []
         for i, task in enumerate(self.tasks):
             LOG.info(f"[{i + 1}/{n}] Running task '{task.response.__name__}'")  # type: ignore
             response = await task(context, **kwds)  # type: ignore
             context = response.to_pandas()  # type: ignore
-            self._responses.append(response)
+            self.responses.append(response)
 
-        usages = [response.usage() for response in self._responses]
+        usages = [response.usage() for response in self.responses]
         task_names = [task.response.__name__ for task in self.tasks]  # type: ignore
         for i, usage in enumerate(usages):
             usage["task_index"] = i
             usage["task"] = task_names[i]
 
         self._usage = pd.concat(usages, axis=0)
-        return context  # type: ignore
+
+        joined = self.responses[0].to_pandas()
+        for i in range(1, len(self.responses)):
+            task = self.tasks[i]
+            keys = task.prompt.required  # type: ignore
+            response = self.responses[i].to_pandas()
+            if keys:
+                joined = joined.merge(response, left_on=keys, right_on=keys)
+
+        return joined
