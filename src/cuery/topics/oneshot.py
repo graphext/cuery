@@ -2,7 +2,7 @@ from collections.abc import Iterable
 
 from .. import utils
 from ..prompt import Prompt
-from ..response import Field, ResponseModel
+from ..response import Field, Response
 from ..task import Task
 
 PROMPT_TEXT = """
@@ -23,7 +23,7 @@ two spaces and a dash ("  -").
 PROMPT = Prompt.from_string(utils.dedent(PROMPT_TEXT))
 
 
-class Topics(ResponseModel):
+class Topics(Response):
     markdown: str = Field(..., description="A two-level nested markdown list of topics.")
 
 

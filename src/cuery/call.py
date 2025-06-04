@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 from .context import iter_context
 from .prompt import Prompt
-from .response import ResponseClass, ResponseModel
+from .response import Response, ResponseClass
 from .utils import LOG
 
 
@@ -25,7 +25,7 @@ async def call(
     log_prompt: bool = False,
     log_response: bool = False,
     **kwds,
-) -> ResponseModel:
+) -> Response:
     """Prompt once with the given context (validated)."""
     if prompt.required:
         if not context:
@@ -66,9 +66,9 @@ async def iter_calls(
     prompt: Prompt,
     context: dict | list[dict] | DataFrame,
     response_model: ResponseClass,
-    callback: Callable[[ResponseModel, Prompt, dict], None] | None = None,
+    callback: Callable[[Response, Prompt, dict], None] | None = None,
     **kwds,
-) -> list[ResponseModel]:
+) -> list[Response]:
     """Sequential iteration of prompt over iterable contexts."""
 
     context, total = iter_context(context, prompt.required)  # type: ignore
@@ -105,7 +105,7 @@ async def gather_calls(
     response_model: ResponseClass,
     max_concurrent: int = 2,
     **kwds,
-) -> list[ResponseModel]:
+) -> list[Response]:
     """Async iteration of prompt over iterable contexts."""
     sem = Semaphore(max_concurrent)
     context, _ = iter_context(context, prompt.required)  # type: ignore

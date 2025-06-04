@@ -108,6 +108,7 @@ def get_config(source: str | Path | dict):
     Supports glom-style dot and bracket notation to access nested keys/objects.
     """
     if isinstance(source, str | Path):
+        source = str(source).strip()
         if ":" in source:
             source, spec = str(source).split(":")
         else:
@@ -194,7 +195,7 @@ def concat_up_to(
 
         try:
             tokens = enc.encode(text)
-        except Exception as e:
+        except Exception:
             LOG.error(f"Error encoding text '{text}' with model {model}.")
             raise
 
@@ -212,6 +213,9 @@ def concat_up_to(
         total_tokens += n_tokens
         total_cost += n_dollars
 
-    LOG.info(f"Concatenated {total_texts:,} texts with {total_tokens:,} tokens and total cost of ${total_cost:.5f}")
+    LOG.info(
+        f"Concatenated {total_texts:,} texts with {total_tokens:,} tokens "
+        f"and total cost of ${total_cost:.5f}"
+    )
 
     return separator.join(result)

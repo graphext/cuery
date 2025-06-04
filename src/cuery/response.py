@@ -30,7 +30,7 @@ TYPES = {
 }
 
 
-class ResponseModel(BaseModel):
+class Response(BaseModel):
     """Base class for all response models."""
 
     _raw_response: Any | None = None
@@ -50,7 +50,7 @@ class ResponseModel(BaseModel):
         return json.loads(self.model_dump_json())
 
     @classmethod
-    def fallback(cls) -> "ResponseModel":
+    def fallback(cls) -> "Response":
         return cls.model_construct(**dict.fromkeys(cls.model_fields, None))
 
     @classmethod
@@ -80,13 +80,13 @@ class ResponseModel(BaseModel):
             field_type = TYPES[field_params.pop("type")]
             fields[field_name] = (field_type, Field(..., **field_params))
 
-        return pydantic.create_model(name, __base__=ResponseModel, **fields)
+        return pydantic.create_model(name, __base__=Response, **fields)
 
     @classmethod
     def from_config(cls, source: str | Path | dict, *keys: list) -> "ResponseClass":
         """Create an instance of the model from a configuration dictionary."""
         config = get_config(source, *keys)
-        return ResponseModel.from_dict(keys[-1], config)  # type: ignore
+        return Response.from_dict(keys[-1], config)  # type: ignore
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         cls = self.__class__
@@ -98,11 +98,11 @@ class ResponseModel(BaseModel):
         for name, field in cls.model_fields.items():
             field_panels.append(pretty_field_info(name, field))
             typ = field.annotation
-            if typ is not None and issubclass(typ, ResponseModel):
+            if typ is not None and issubclass(typ, Response):
                 nested_models.append(typ.fallback())
             elif typ_args := get_args(typ):
                 for typ_arg in typ_args:
-                    if issubclass(typ_arg, ResponseModel):
+                    if issubclass(typ_arg, Response):
                         nested_models.append(typ_arg.fallback())
 
         group = Group(*field_panels)
@@ -114,7 +114,7 @@ class ResponseModel(BaseModel):
         yield Panel(group, title=title, padding=(1, 1), expand=False)
 
 
-def token_usage(responses: Iterable[ResponseModel]) -> DataFrame:
+def token_usage(responses: Iterable[Response]) -> DataFrame:
     return DataFrame([r.token_usage() for r in responses])
 
 
@@ -128,7 +128,7 @@ def with_cost(usage: DataFrame, model: str) -> DataFrame:
     return pd.concat([usage, cost.rename("cost")], axis=1)
 
 
-ResponseClass = type[ResponseModel]
+ResponseClass = type[Response]
 
 
 class ResponseSet:
@@ -136,11 +136,11 @@ class ResponseSet:
 
     def __init__(
         self,
-        responses: ResponseModel | list[ResponseModel],
+        responses: Response | list[Response],
         context: AnyContext | None,
         required: list[str] | None,
     ):
-        self.responses = [responses] if isinstance(responses, ResponseModel) else responses
+        self.responses = [responses] if isinstance(responses, Response) else responses
         self.context = [context] if isinstance(context, dict) else context
         self.required = required
         self.iterfield = self.responses[0].iterfield()
@@ -151,7 +151,7 @@ class ResponseSet:
     def __len__(self):
         return len(self.responses)
 
-    def __getitem__(self, index: int) -> ResponseModel:
+    def __getitem__(self, index: int) -> Response:
         return self.responses[index]
 
     def to_records(self, explode: bool = True) -> list[dict] | DataFrame:
@@ -167,7 +167,7 @@ class ResponseSet:
         if explode and self.iterfield is not None:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
                 for item in getattr(response, self.iterfield):
-                    if isinstance(item, ResponseModel):
+                    if isinstance(item, Response):
                         records.append(ctx | dict(item))
                     else:
                         records.append(ctx | {self.iterfield: item})

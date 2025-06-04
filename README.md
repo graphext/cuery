@@ -22,8 +22,8 @@ In Cuery, a `Prompt` is a class encapsulating a series of messages (user, system
 - **Template variable validation**  
     Detects and validates that contexts used to render the final prompt contain the required variables
 - **YAML configuration**  
-    Load prompts from YAML files for better organization, using [glom](https://glom.readthedocs.io/en/latest/) for path-based access to nested object
-- **Pretty print**
+    Load prompts from YAML files for better organization, using [glom](https://glom.readthedocs.io/en/latest/) for path-based access to nested objects
+- **Pretty print**  
     Uses Rich to create pretty representations of prompts
 
 ```python
@@ -46,7 +46,7 @@ prompt = Prompt(
 )
 ```
 
-``` bash
+```
 ╭───────────────────────── Prompt ─────────────────────────╮
 │                                                          │
 │  Required: ['topic']                                     │
@@ -59,24 +59,33 @@ prompt = Prompt(
 
 ### 2. Contexts
 
-Contexts are collections of named variables used to fill in Jinja templates in prompts. Contexts can be created from various data sources:
+`Contexts` are collections of named variables used to render Jinja templates in prompts. There is not specific class for contexts, but where they are expected, they can be provided in various forms:
 
-- **Pandas DataFrames**: Each row becomes a separate context
-- **Dictionaries of iterables**: Values are aligned to create multiple contexts
-- **Lists of dictionaries**: Each dictionary represents a separate context
+- **Pandas DataFrames**  
+    Each column will be associated with a prompt variable, and each row becomes a separate context. Since prompts know which variables are required, extra columns will be
+    ignored automatically. Prompts will be iterated over the rows, and will return one output for each input row.
+- **Dictionaries of iterables**  
+    Each key corresponds to a prompt variable, and the prompt will be iterated over the values (all iterables need to be of same length)
+- **Lists of dictionaries**  
+    Each dictionary in the list represents a separate context. The dictionary keys will
+    be mapped to prompt variables, and the prompt will return one output for each input
+    dict.
 
 ```python
 import pandas as pd
-from cuery.context import contexts_from_dataframe
+from cuery.context import iter_context
 
-# Create contexts from a DataFrame
 df = pd.DataFrame({
     "topic": ["Machine Learning", "Natural Language Processing", "Computer Vision"],
     "audience": ["beginners", "developers", "researchers"]
 })
-contexts, count = contexts_from_dataframe(df, required=["topic", "audience"])
 
-# Each context will be used to fill template variables in your prompt
+contexts, count = iter_context(df, required=["topic", "audience"])
+next(contexts)
+```
+
+```
+>> {'topic': 'Machine Learning', 'audience': 'beginners'}
 ```
 
 Cuery validates contexts against the required variables specified in the prompt, ensuring all necessary data is available before execution.

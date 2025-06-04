@@ -10,7 +10,7 @@ from . import call
 from .context import AnyContext, context_is_iterable
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult
 from .prompt import Prompt
-from .response import ResponseClass, ResponseModel, ResponseSet
+from .response import Response, ResponseClass, ResponseSet
 from .utils import LOG
 
 AnyCfg = str | Path | dict
@@ -102,7 +102,7 @@ class Task:
         self,
         context: AnyContext | None = None,
         model: str | None = None,
-        callback: Callable[[ResponseModel, Prompt, dict], None] | None = None,
+        callback: Callable[[Response, Prompt, dict], None] | None = None,
         **kwds,
     ) -> ResponseSet:
         client = self._select_client(model)
@@ -177,7 +177,7 @@ class Task:
     @classmethod
     def from_config(cls, prompt: AnyCfg, response: AnyCfg) -> "Task":
         prompt = Prompt.from_config(prompt)  # type: ignore
-        response = ResponseModel.from_config(response)  # type: ignore
+        response = Response.from_config(response)  # type: ignore
         return Task(prompt=prompt, response=response)  # type: ignore
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
