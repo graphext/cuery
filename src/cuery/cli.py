@@ -6,7 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from cuery.task import Chain, Task
+from cuery.task import Task
 
 app = typer.Typer()
 
