@@ -398,9 +398,6 @@ uv sync --all-groups
 
 # Set up pre-commit hooks
 pre-commit install
-
-# Run pre-commit checks manually
-pre-commit run --all-files
 ```
 
 # Docs
