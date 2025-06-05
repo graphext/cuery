@@ -1,4 +1,4 @@
-"""Wrappers to call instructor with a prompt and context."""
+"""Wrappers to call instructor with a cuery.Prompt, cuery.Response and context."""
 
 from asyncio import Semaphore
 from collections.abc import Callable

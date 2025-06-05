@@ -1,3 +1,10 @@
+"""Prompt base class.
+
+Encapsulates lists of messages with functionality for loading from configuration files,
+rendering to rich text, handling Jinja templating for dynamic content, and validating
+required variables
+"""
+
 from pathlib import Path
 
 from pydantic import BaseModel, Field

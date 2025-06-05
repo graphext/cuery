@@ -1,3 +1,5 @@
+"""Helpers to convert various input formats to iterables of dictionaries."""
+
 from collections.abc import Iterable
 from warnings import warn
 

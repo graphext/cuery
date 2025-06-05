@@ -1,3 +1,9 @@
+"""Base classes for LLM responses and response sets.
+
+Faciliates conversion of responses to simpler Python objects and DataFrames,
+as well as caching raw API responses for token usage calculation etc.
+"""
+
 import json
 from collections.abc import Iterable
 from pathlib import Path

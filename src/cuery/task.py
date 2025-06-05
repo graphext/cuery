@@ -1,3 +1,5 @@
+"""Task and Chain classes encapsulating the execution of prompts over contexts."""
+
 from collections.abc import Callable
 from pathlib import Path
 

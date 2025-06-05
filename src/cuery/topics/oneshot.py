@@ -1,3 +1,5 @@
+"""Higher-level API for extracting topics from texts using a one-shot prompt."""
+
 from collections.abc import Iterable
 
 from .. import utils
