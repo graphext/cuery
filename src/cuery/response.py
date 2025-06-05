@@ -31,7 +31,17 @@ TYPES = {
 
 
 class Response(BaseModel):
-    """Base class for all response models."""
+    """Base class for all response models.
+
+    Adds functionality to cache the raw response from the API call, calculate token usage,
+    and to create a fallback instance, which by default is an empty model with all fields
+    set to None.
+
+    Also implements rich's console protocol for pretty printing of the model's fields,
+    and allows inspection of the model's fields to determine if it has a single
+    multivalued field (a list) or not (which can be used to automatically "explode"
+    items into DataFrame rows e.g.).
+    """
 
     _raw_response: Any | None = None
 
@@ -132,7 +142,11 @@ ResponseClass = type[Response]
 
 
 class ResponseSet:
-    """A set of responses."""
+    """A collection of responses
+
+    This class is used to manage multiple responses, allowing iteration over them,
+    conversion to records or DataFrame, and calculating token usage across all responses.
+    """
 
     def __init__(
         self,

@@ -26,7 +26,10 @@ async def call(
     log_response: bool = False,
     **kwds,
 ) -> Response:
-    """Prompt once with the given context (validated)."""
+    """Prompt once with the given Prompt and context (validated).
+
+    If fallback is True, will return result of response_model.fallback() if the call fails.
+    """
     if prompt.required:
         if not context:
             raise ValueError("Context is required for prompt but wasn't provided!")

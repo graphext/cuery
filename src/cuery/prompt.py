@@ -44,7 +44,14 @@ class Message(BaseModel):
 
 
 class Prompt(BaseModel):
-    """Prompt class for chat completions."""
+    """Prompt class for chat completions.
+
+    This class represents a chat prompt consisting of multiple messages.
+    Each message can have a role (e.g., user, assistant) and content.
+    It can be constructed manually or from a configuration file or a string. In the
+    latter case, automatically detects the required variables used by
+    the Jinja template, if any.
+    """
 
     messages: list[Message] = Field(min_length=1)
     required: list[str] = Field(default_factory=list)

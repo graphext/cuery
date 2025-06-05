@@ -17,7 +17,7 @@ AnyCfg = str | Path | dict
 
 
 def check_model_name(model: str) -> None:
-    """Check if the model name is valid."""
+    """Check if the model name is valid (provider/model format)."""
     if "/" not in model:
         raise ValueError(
             f"Invalid model name: {model}. It should be in the format 'provider/model'."
@@ -25,6 +25,8 @@ def check_model_name(model: str) -> None:
 
 
 class ErrorLogger:
+    """A simple logger to count parsing errors."""
+
     def __init__(self) -> None:
         self.count = 0
 
@@ -33,6 +35,8 @@ class ErrorLogger:
 
 
 class QueryLogger:
+    """A simple logger to store query parameters."""
+
     def __init__(self) -> None:
         self.queries = []
 
@@ -42,6 +46,13 @@ class QueryLogger:
 
 
 class Task:
+    """A task that can be executed with a prompt and a response model.
+
+    Tasks can be registered by name and can be called with a context to get a response.
+    The output is always ResponseSet that contains one Reponse for each item in the
+    iterable context.
+    """
+
     registry: dict[str, "Task"] = {}
 
     def __init__(
@@ -84,6 +95,7 @@ class Task:
         model: str | None = None,
         **kwds,
     ) -> ResponseSet:
+        """Call the task with a single context item (no iteration)."""
         client = self._select_client(model)
 
         response = await call.call(
@@ -105,6 +117,15 @@ class Task:
         callback: Callable[[Response, Prompt, dict], None] | None = None,
         **kwds,
     ) -> ResponseSet:
+        """Iterate the prompt over items in the context.
+
+        This is useful when subsequent calls depend on the previous response, and you thus
+        cannot parallelize the calls.
+
+        The callback can be used to process each response as it is generated and to
+        perform any additional actions, such as logging or updating the prompt
+        for the next call.
+        """
         client = self._select_client(model)
 
         self.error_log = ErrorLogger()
@@ -135,6 +156,11 @@ class Task:
         n_concurrent: int = 1,
         **kwds,
     ) -> ResponseSet:
+        """Gather multiple calls to the task in parallel.
+
+        This is useful when the calls are independent and can be parallelized.
+        The `n_concurrent` parameter controls how many calls can be made in parallel.
+        """
         client = self._select_client(model)
 
         self.error_log = ErrorLogger()
@@ -165,7 +191,7 @@ class Task:
         n_concurrent: int = 1,
         **kwds,
     ) -> ResponseSet:
-        """Auto-dispatch to the appropriate method based on context type."""
+        """Dispatch to appropriate method (call/iter/gather) based on context and concurrency."""
         if context_is_iterable(context):
             if n_concurrent > 1:
                 return await self.gather(context, model, n_concurrent, **kwds)
@@ -176,11 +202,13 @@ class Task:
 
     @classmethod
     def from_config(cls, prompt: AnyCfg, response: AnyCfg) -> "Task":
+        """Create a Task from configuration."""
         prompt = Prompt.from_config(prompt)  # type: ignore
         response = Response.from_config(response)  # type: ignore
         return Task(prompt=prompt, response=response)  # type: ignore
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        """Render the task as a rich panel."""
         group = [
             Padding(self.prompt, (1, 0, 0, 0)),  # type: ignore
             Padding(self.response.fallback(), (1, 0, 0, 0)),
@@ -193,12 +221,16 @@ class Chain:
 
     The output of each task is auto-converted to a DataFrame and passed to the next task as
     input context.
+
+    The return value of the chain is the result of successively joining each task's output
+    DataFrame with the previous one, using the corresponding prompt's variables as join keys.
     """
 
     def __init__(self, *tasks: list[Task]):
         self.tasks = tasks
 
     async def __call__(self, context: AnyContext | None = None, **kwds) -> DataFrame:
+        """Run the chain of tasks sequentially."""
         n = len(self.tasks)
         self.responses = []
         for i, task in enumerate(self.tasks):

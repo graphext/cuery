@@ -3,7 +3,8 @@ import logging
 import os
 import re
 from collections.abc import Iterable
-from importlib.resources import files
+from importlib.resources import as_file, files
+from importlib.resources.abc import Traversable
 from inspect import cleandoc
 from math import inf as INF
 from pathlib import Path
@@ -13,15 +14,12 @@ import yaml
 from glom import glom
 from jinja2 import Environment, meta
 from pandas import isna
-from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 from tiktoken import encoding_for_model
 
 from .cost import cost_per_token
 from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, RichHandler, Text
-
-BaseModelClass = type[BaseModel]
 
 if not logging.getLogger("cuery").hasHandlers():
     LOG = logging.getLogger("cuery")
@@ -35,6 +33,7 @@ DEFAULT_PATH = Path().home() / "Development/config/ai-api-keys.json"
 
 
 def load_api_keys(path: str | Path | None = DEFAULT_PATH) -> dict:
+    """Load API keys from a JSON configuration file."""
     if path is None:
         path = DEFAULT_PATH
 
@@ -43,6 +42,7 @@ def load_api_keys(path: str | Path | None = DEFAULT_PATH) -> dict:
 
 
 def set_api_keys(keys: dict | str | Path | None = None):
+    """Set API keys as environment variables from a dictionary or file."""
     if not isinstance(keys, dict):
         keys = load_api_keys(keys)
 
@@ -51,7 +51,8 @@ def set_api_keys(keys: dict | str | Path | None = None):
         os.environ[name] = value
 
 
-def resource_path(relpath: str | Path) -> Path:
+def resource_path(relpath: str | Path) -> Traversable:
+    """Get the absolute path to a resource file within the cuery package."""
     relpath = Path(relpath)
     dp, fn = relpath.parent, relpath.name
     dp = Path("cuery") / dp
@@ -69,9 +70,9 @@ def load_yaml(path: str | Path) -> dict:
         with open(path) as fp:
             return yaml.safe_load(fp)
     except FileNotFoundError:
-        path = resource_path(path)
-        with open(path) as f:
-            return yaml.safe_load(f)
+        trv = resource_path(path)
+        with as_file(trv) as f, open(f) as fp:
+            return yaml.safe_load(fp)
 
 
 def dedent(text):
@@ -120,6 +121,7 @@ def get_config(source: str | Path | dict):
 
 
 def pretty_field_info(name: str, field: FieldInfo):
+    """Create a pretty-printed panel displaying field information for Pydantic models."""
     group = []
     if desc := field.description:
         group.append(Padding(Text(desc), (0, 0, 1, 0)))
