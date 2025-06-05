@@ -11,7 +11,6 @@ dependencies = [
     "instructor[anthropic,google-generativeai,litellm]>=1.8.1",
     "litellm>=1.69.1",
     "pandas>=2.2.3",
-    "polars>=1.30.0",
     "pyarrow>=20.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
@@ -23,15 +22,9 @@ dependencies = [
 cuery = "cuery.cli:app"
 
 [dependency-groups]
-dev = [
-    "ipykernel>=6.29.5",
-    "ipython>=9.2.0",
-    "jupyter>=1.1.1",
-    "pydata-sphinx-theme>=0.16.1",
-    "ruff>=0.11.9",
-    "sphinx-autoapi>=3.6.0",
-    "sphinx>=8.2.3",
-]
+dev = ["ipykernel>=6.29.5", "ipython>=9.2.0", "jupyter>=1.1.1", "ruff>=0.11.9"]
+
+docs = ["pydata-sphinx-theme>=0.16.1", "sphinx-autoapi>=3.6.0", "sphinx>=8.2.3"]
 
 [tool.uv]
 python-preference = "managed"

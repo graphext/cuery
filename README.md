@@ -8,7 +8,7 @@ Cuery is a Python library for LLM prompting that extends the capabilities of the
 from cuery import Prompt, Response, Task
 
 
-# Define response model
+# Define the desired structure of LLM responses
 class Entity(Response):
     name: str
     type: str
@@ -18,6 +18,7 @@ class NamedEntities(Response):
     entities: list[Entity]
 
 
+# Data to iterate prompt over (DataFrame, list[dict] or dict[str, list])
 context = pd.DataFrame({
     "text": [
         "Apple is headquartered in Cupertino, California."
@@ -26,9 +27,13 @@ context = pd.DataFrame({
     ]}
 )
 
+# Iterate the prompt over DataFrame rows using n concurrent async tasks
+# and using the specified provider/model
 prompt = Prompt.from_string("Extract named entities from the following text: {{text}}")
 task = Task(prompt=prompt, response=NamedEntities)
 result = await task(context, model="openai/gpt-3.5-turbo", n_concurrent=10)
+
+# Get reuslt back as DataFrame containing both inputs and output columns
 print(result.to_pandas(explode=True))
 ```
 
