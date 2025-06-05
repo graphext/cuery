@@ -11,6 +11,7 @@ dependencies = [
     "instructor[anthropic,google-generativeai,litellm]>=1.8.1",
     "litellm>=1.69.1",
     "pandas>=2.2.3",
+    "pre-commit",
     "pyarrow>=20.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",

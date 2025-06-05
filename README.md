@@ -300,7 +300,7 @@ pprint(result[0])
 ╰──────────────────────────────────────────────────────────╯
 ```
 
-### 4. Tasks
+### Tasks and Chains
 
 A `Task` combines a prompt and a response model into reusable units of work, simplifying:
 
@@ -372,16 +372,36 @@ The return value of the chain is the result of successively joining each task's 
 9  Rated R for graphic nudity, language, sexual r... 
 ```
 
-## Building on Instructor
+# Building on Instructor
 
 Cuery extends the Instructor library with higher-level abstractions for managing prompts and responses in a structured way, with particular emphasis on:
 
-- Batch processing and concurrency management
+- Batch processing (of DataFrames) and concurrency management
 - Context validation and transformation
 - Multi-output response handling and normalization
 - Configuration-based workflow setup
 
 By providing these abstractions, Cuery aims to simplify the development of complex LLM workflows while maintaining the type safety and structured outputs that Instructor provides.
+
+# Development
+
+
+Assuming you have [uv](https://docs.astral.sh/uv/) installed already:
+
+```bash
+# Clone the repository
+git clone https://github.com/graphext/cuery.git
+cd cuery
+
+# Install dependencies
+uv sync --all-groups
+
+# Set up pre-commit hooks
+pre-commit install
+
+# Run pre-commit checks manually
+pre-commit run --all-files
+```
 
 # Docs
 
