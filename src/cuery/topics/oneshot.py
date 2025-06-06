@@ -1,4 +1,16 @@
-"""Higher-level API for extracting topics from texts using a one-shot prompt."""
+"""Higher-level API for extracting topics from texts using a one-shot prompt.
+
+Two-level topic extraction is performed using two steps:
+
+1. Extract a hierarchy of topics and subtopics from a list of texts.
+  - Dynamicaly construct a Pydantic response model with the desired number of topics and subtopics
+  - Use a one-shot prompt to extract the topics and subtopics from a concatenated list of texts
+    limited by a desired token count, dollar cost, or number of texts.
+2. Assign the correct topic and subtopic to each text using the extracted hierarchy
+  - Dynamically construct a Pydantic response model for the topics and subtopics with custom
+    validation to ensure that the subtopic belongs to the topic.
+  - Iterate over the texts and use prompt to assign the correct topic and subtopic
+"""
 
 import json
 from collections.abc import Iterable
