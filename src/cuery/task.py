@@ -31,9 +31,15 @@ class ErrorLogger:
 
     def __init__(self) -> None:
         self.count = 0
+        self.messages = []
 
     def log(self, error: Exception) -> None:
         self.count += 1
+        self.messages.append(str(error))
+
+    def reset(self) -> None:
+        self.count = 0
+        self.messages = []
 
 
 class QueryLogger:
@@ -45,6 +51,9 @@ class QueryLogger:
     def log(self, *args, **kwargs) -> None:
         """Log a query to the internal list."""
         self.queries.append(kwargs)
+
+    def reset(self) -> None:
+        self.queries = []
 
 
 class Task:
@@ -84,12 +93,22 @@ class Task:
         if name:
             Task.registry[name] = self
 
+        self.error_log = ErrorLogger()
+        self.query_log = QueryLogger()
+
     def _select_client(self, model: str | None = None) -> Instructor:
         if model is None:
             return self.client
 
         check_model_name(model)
         return instructor.from_provider(model, async_client=True) or self.client
+
+    def reset_loggers(self, client: Instructor) -> None:
+        """Reset the error and query loggers."""
+        self.error_log.reset()
+        self.query_log.reset()
+        client.on("parse:error", self.error_log.log)
+        client.on("completion:kwargs", self.query_log.log)
 
     async def call(
         self,
@@ -99,6 +118,7 @@ class Task:
     ) -> ResponseSet:
         """Call the task with a single context item (no iteration)."""
         client = self._select_client(model)
+        self.reset_loggers(client)
 
         response = await call.call(
             client=client,
@@ -129,11 +149,7 @@ class Task:
         for the next call.
         """
         client = self._select_client(model)
-
-        self.error_log = ErrorLogger()
-        self.query_log = QueryLogger()
-        client.on("parse:error", self.error_log.log)
-        client.on("completion:kwargs", self.query_log.log)
+        self.reset_loggers(client)
 
         responses = await call.iter_calls(
             client=client,
@@ -164,11 +180,7 @@ class Task:
         The `n_concurrent` parameter controls how many calls can be made in parallel.
         """
         client = self._select_client(model)
-
-        self.error_log = ErrorLogger()
-        self.query_log = QueryLogger()
-        client.on("parse:error", self.error_log.log)
-        client.on("completion:kwargs", self.query_log.log)
+        self.reset_loggers(client)
 
         responses = await call.gather_calls(
             client=client,

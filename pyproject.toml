@@ -1,9 +1,32 @@
 [project]
 name = "cuery"
 version = "0.1.0"
-description = "Add your description here"
+description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Thomas Buhrmann", email = "thomas@graphext.com" }]
+keywords = [
+    "ai",
+    "llm",
+    "structured output",
+    "prompt management",
+    "prompt engineering",
+    "data science",
+    "data analysis",
+    "tabular data",
+    "data processing",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+]
+urls = { Homepage = "https://github.com/graphext/cuery", Documentation = "https://cuery.readthedocs.io/" }
 requires-python = ">=3.11"
 dependencies = [
     "glom>=24.11.0",
