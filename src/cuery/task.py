@@ -10,7 +10,7 @@ from pandas import DataFrame
 
 from . import call
 from .context import AnyContext, context_is_iterable
-from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult
+from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
 from .prompt import Prompt
 from .response import Response, ResponseClass, ResponseSet
 from .utils import LOG
@@ -227,7 +227,8 @@ class Task:
             Padding(self.prompt, (1, 0, 0, 0)),  # type: ignore
             Padding(self.response.fallback(), (1, 0, 0, 0)),
         ]
-        yield Panel(Group(*group), title="Task")
+
+        yield Panel(Group(*group), title=Text("TASK", style="bold"))
 
 
 class Chain:

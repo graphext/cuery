@@ -94,4 +94,4 @@ class Prompt(BaseModel):
         for message in self.messages:
             group.append(message)
 
-        yield Panel(Group(*group), title="Prompt", expand=False)
+        yield Panel(Group(*group), title=Text("PROMPT", style="bold"), expand=False)

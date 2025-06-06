@@ -156,6 +156,7 @@ def concat_up_to(
     model: str,
     max_dollars: float,
     max_tokens: float | None = None,
+    max_texts: float | None = None,
     separator: str = "\n",
 ) -> str:
     """Concatenate texts until the total token count reaches max_tokens."""
@@ -168,6 +169,9 @@ def concat_up_to(
             f"The max_tokens param was not provided. Total length will be limited only by "
             f"a maximum total cost of ${max_dollars:.2f}."
         )
+
+    if max_texts is None:
+        max_texts = INF
 
     try:
         enc = encoding_for_model(model)
@@ -216,6 +220,9 @@ def concat_up_to(
         total_texts += 1
         total_tokens += n_tokens
         total_cost += n_dollars
+
+        if total_texts >= max_texts:
+            break
 
     LOG.info(
         f"Concatenated {total_texts:,} texts with {total_tokens:,} tokens "
