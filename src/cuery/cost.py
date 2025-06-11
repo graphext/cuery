@@ -165,6 +165,13 @@ def cost_per_token(model_name: str, kind: Literal["input", "output", "cached_inp
     if kind not in ("input", "output", "cached_input"):
         raise ValueError("kind must be one of 'input', 'output', or 'cached_input'")
 
+    if "/" in model_name:
+        provider, model_name = model_name.split("/", 1)
+        if provider.lower() != "openai":
+            raise ValueError(f"Provider '{provider}' not yet supported for cost estimation!")
+    else:
+        provider = ""
+
     model = next((m for m in COST if m["model"] == model_name), None)
 
     if not model:
