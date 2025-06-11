@@ -31,7 +31,8 @@ requires-python = ">=3.11"
 dependencies = [
     "glom>=24.11.0",
     "google-genai>=1.18.0",
-    "instructor[anthropic,google-generativeai,litellm]>=1.8.1",
+    "instructor[anthropic,google-generativeai]>=1.8.1",
+    "levenshtein>=0.27.1",
     "litellm>=1.69.1",
     "pandas>=2.2.3",
     "pre-commit",

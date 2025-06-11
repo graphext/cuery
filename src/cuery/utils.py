@@ -18,7 +18,7 @@ from jinja2 import Environment, meta
 from pandas import isna
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
-from tiktoken import encoding_for_model
+from tiktoken import Encoding, encoding_for_model, get_encoding
 
 from .cost import cost_per_token
 from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, RichHandler, Text
@@ -151,42 +151,60 @@ def jinja_vars(template: str) -> list[str]:
     return list(meta.find_undeclared_variables(parsed))
 
 
+def model_encoding(model: str) -> Encoding:
+    """Get the encoding name for a given model."""
+    if "/" in model:
+        provider, model = model.split("/", 1)
+    else:
+        provider = ""
+
+    try:
+        return encoding_for_model(model)
+    except LookupError:
+        if "gpt-4.1" in model.lower():
+            return encoding_for_model("gpt-4o")
+        if model.lower().startswith("o4"):
+            return encoding_for_model("o3")
+        if "google" in provider.lower() or "gemini" in model.lower():
+            LOG.warning(
+                f"Model {model} is not supported by tiktoken. Using cl100k_base encoding as a "
+                "fallback for google/gemini models."
+            )
+            return get_encoding("cl100k_base")
+
+        raise
+
+
 def concat_up_to(
     texts: Iterable[str],
     model: str,
-    max_dollars: float,
+    max_dollars: float | None = None,
     max_tokens: float | None = None,
     max_texts: float | None = None,
     separator: str = "\n",
 ) -> str:
     """Concatenate texts until the total token count reaches max_tokens."""
     if max_dollars is None:
-        raise ValueError("max_dollars must be specified!")
+        max_dollars = INF
 
     if max_tokens is None:
         max_tokens = INF
-        LOG.warning(
-            f"The max_tokens param was not provided. Total length will be limited only by "
-            f"a maximum total cost of ${max_dollars:.2f}."
-        )
 
     if max_texts is None:
         max_texts = INF
 
-    try:
-        enc = encoding_for_model(model)
-    except LookupError:
-        # Known models here: https://github.com/openai/tiktoken/blob/main/tiktoken/model.py
-        if "gpt-4.1" in model.lower():
-            enc = encoding_for_model("gpt-4o")
-        elif model.lower().startswith("o4"):
-            enc = encoding_for_model("o3")
+    enc = model_encoding(model)
 
     try:
         token_cost = cost_per_token(model, "input")
     except ValueError as e:
-        LOG.error(f"Error getting cost per token for model {model}: {e}")
-        raise
+        LOG.warning(f"Can't get cost per token for model {model}: {e}.\n\nWon't limit by cost!")
+        token_cost = 0.0
+
+    if all(limit == INF for limit in (max_tokens, max_dollars, max_texts)):
+        raise ValueError(
+            "Must have one of max_dollars, max_tokens, or max_texts to limit concatenation!"
+        ) from None
 
     total_texts = 0
     total_tokens = 0
@@ -210,10 +228,10 @@ def concat_up_to(
         n_tokens = len(tokens)
         n_dollars = token_cost * n_tokens
 
-        if total_tokens + n_tokens > max_tokens:
+        if (total_tokens + n_tokens) > max_tokens:
             break
 
-        if total_cost + n_dollars > max_dollars:
+        if (total_cost + n_dollars) > max_dollars:
             break
 
         result.append(text)

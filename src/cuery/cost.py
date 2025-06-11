@@ -170,7 +170,7 @@ def cost_per_token(model_name: str, kind: Literal["input", "output", "cached_inp
     if not model:
         models = [m["model"] for m in COST]
         raise ValueError(
-            f"Model {model} not found in cost data. Known models: {', '.join(models)}"
+            f"Model {model_name} not found in cost data. Known models: {', '.join(models)}"
         )
 
     c = model.get(kind)

@@ -16,6 +16,7 @@ import json
 from collections.abc import Iterable
 from typing import ClassVar, Literal, Self
 
+from Levenshtein import distance as ldist
 from pydantic import model_validator
 
 from .. import utils
@@ -32,6 +33,9 @@ should not contain more than <<n_subtopics>> subtopics. The texts come from a da
 '<<domain>>', so the topics should be relevant to that domain. Make sure top-level topics are
 generalizable and not too specific, so they can be used as a hierarchy for the subtopics. Make
 sure also that subtopics are not redundant (no similar ones within the the same top-level topic).
+Create fewer topics and subtopics if needed, i.e. when otherwise top-level categories or subtopics
+would be too similar.
+<<extra>>
 
 # Texts
 
@@ -56,11 +60,19 @@ Assign the correct topic and subtopic to the following text.
 """
 
 
-def format_prompt(prompt: str, n_topics: int, n_subtopics: int, domain: str) -> str:
+def format_prompt(
+    prompt: str,
+    n_topics: int,
+    n_subtopics: int,
+    domain: str,
+    extra: str | None = None,
+) -> str:
     """Format the prompt with the given number of topics and subtopics."""
+    extra = extra or ""
     prompt = prompt.replace("<<n_topics>>", str(n_topics))
     prompt = prompt.replace("<<n_subtopics>>", str(n_subtopics))
     prompt = prompt.replace("<<domain>>", domain)
+    prompt = prompt.replace("<<extra>>", extra)
     return utils.dedent(prompt)
 
 
@@ -72,8 +84,9 @@ class TopicExtractor:
         domain: str,
         n_topics: int = 10,
         n_subtopics: int = 5,
+        extra: str | None = None,
     ):
-        prompt = format_prompt(TOPICS_PROMPT, n_topics, n_subtopics, domain)
+        prompt = format_prompt(TOPICS_PROMPT, n_topics, n_subtopics, domain, extra)
         prompt = Prompt.from_string(prompt)
 
         class Topic(Response):
@@ -83,6 +96,41 @@ class TopicExtractor:
                 description="A list of subtopics under the top-level topic.",
                 max_length=n_subtopics,
             )
+
+            @model_validator(mode="after")
+            def validate_subtopics(self) -> Self:
+                # Topic titles should be at least N character edits apart
+                min_ldist = 2
+
+                subtopics = [st.lower() for st in self.subtopics]
+                errors = []
+
+                sim_err = "Subtopic '{}' too similar to other subtopic '{}'.".format
+                perm_err = "Subtopic '{}' is a duplicate (permutation) of subtopic '{}'.".format
+
+                for i, st in enumerate(subtopics):
+                    # Subtopics should not be too similar to their parent topic
+                    if ldist(st, self.topic.lower()) < min_ldist:
+                        errors.append(
+                            f"Subtopic '{st}' too similar to parent topic '{self.topic}'."
+                        )
+
+                    # Subtopics should not be too similar to each other
+                    for j in range(i + 1, len(subtopics)):
+                        other = subtopics[j]
+
+                        # Check Levenshtein distance for similarity
+                        if ldist(st.replace(" ", ""), other.replace(" ", "")) < min_ldist:
+                            errors.append(sim_err(st, other))
+
+                        # Check for permutations of words
+                        if set(st.split()) == set(other.split()):
+                            errors.append(perm_err(st, other))
+
+                if errors:
+                    raise ValueError("Invalid subtopics:\n" + "\n".join(errors))
+
+                return self
 
         class Topics(Response):
             """A response containing a two-level nested list of topics."""
@@ -99,28 +147,22 @@ class TopicExtractor:
         self,
         texts: Iterable[str],
         model: str,
-        max_dollars: float,
+        max_dollars: float | None = None,
         max_tokens: float | None = None,
         max_texts: float | None = None,
+        **kwds,
     ) -> Response:
         """Extracts a two-level topic hierarchy from a list of texts."""
-        if "openai" not in model.lower():
-            raise ValueError(
-                f"Model {model} is not supported. Only OpenAI models are supported for this task."
-            )
-
-        model_name = model.split("/")[-1]
-
         text = utils.concat_up_to(
             texts,
-            model=model_name,
+            model=model,
             max_dollars=max_dollars,
             max_tokens=max_tokens,
             max_texts=max_texts,
             separator="\n",
         )
         context = {"texts": text}
-        responses = await self.task.call(context=context, model=model)
+        responses = await self.task.call(context=context, model=model, **kwds)
         return responses[0]
 
 
