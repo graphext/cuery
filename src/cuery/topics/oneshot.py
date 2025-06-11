@@ -24,56 +24,41 @@ from ..context import AnyContext
 from ..prompt import Prompt
 from ..response import Field, Response, ResponseSet
 from ..task import Task
+from ..utils import dedent
 
-TOPICS_PROMPT = """
+TOPICS_PROMPT = dedent("""
 From the list of texts below (separated by line breaks), extract a two-level nested list of topics.
 The output should be a JSON object with top-level topics as keys and lists of subtopics as values.
-The top-level should not contain more than <<n_topics>> topics, and each top-level
-should not contain more than <<n_subtopics>> subtopics. The texts come from a dataset of
-'<<domain>>', so the topics should be relevant to that domain. Make sure top-level topics are
+The top-level should not contain more than %(n_topics)s topics, and each top-level
+should not contain more than %(n_subtopics)s subtopics. The texts come from a dataset of
+'%(domain)s', so the topics should be relevant to that domain. Make sure top-level topics are
 generalizable and not too specific, so they can be used as a hierarchy for the subtopics. Make
 sure also that subtopics are not redundant (no similar ones within the the same top-level topic).
 Create fewer topics and subtopics if needed, i.e. when otherwise top-level categories or subtopics
 would be too similar.
-<<extra>>
+%(extra)s
 
 # Texts
 
 {{texts}}
-"""
+""")
 
-ASSIGNMENT_PROMPT_SYSTEM = """
+ASSIGNMENT_PROMPT_SYSTEM = dedent("""
 You're task is to use the following hierarchy of topics and subtopics (in json format),
 to assign the correct topic and subtopic to each text in the input.
 
 # Topics
 
-<<topics>>
-"""
+%(topics)s
+""")
 
-ASSIGNMENT_PROMPT_USER = """
+ASSIGNMENT_PROMPT_USER = dedent("""
 Assign the correct topic and subtopic to the following text.
 
 # Text
 
 {{text}}
-"""
-
-
-def format_prompt(
-    prompt: str,
-    n_topics: int,
-    n_subtopics: int,
-    domain: str,
-    extra: str | None = None,
-) -> str:
-    """Format the prompt with the given number of topics and subtopics."""
-    extra = extra or ""
-    prompt = prompt.replace("<<n_topics>>", str(n_topics))
-    prompt = prompt.replace("<<n_subtopics>>", str(n_subtopics))
-    prompt = prompt.replace("<<domain>>", domain)
-    prompt = prompt.replace("<<extra>>", extra)
-    return utils.dedent(prompt)
+""")
 
 
 class TopicExtractor:
@@ -86,8 +71,13 @@ class TopicExtractor:
         n_subtopics: int = 5,
         extra: str | None = None,
     ):
-        prompt = format_prompt(TOPICS_PROMPT, n_topics, n_subtopics, domain, extra)
-        prompt = Prompt.from_string(prompt)
+        prompt_args = {
+            "n_topics": n_topics,
+            "n_subtopics": n_subtopics,
+            "domain": domain,
+            "extra": extra or "",
+        }
+        prompt = Prompt.from_string(TOPICS_PROMPT % prompt_args)
 
         class Topic(Response):
             topic: str = Field(..., description="The top-level topic.")
@@ -197,12 +187,10 @@ class TopicAssigner:
         topics = hierarchy.to_dict()["topics"]
         topics = {t["topic"]: t["subtopics"] for t in topics}
         topics_json = json.dumps(topics, indent=2)
-        sys_msg = utils.dedent(ASSIGNMENT_PROMPT_SYSTEM).replace("<<topics>>", topics_json)
-        usr_msg = utils.dedent(ASSIGNMENT_PROMPT_USER)
         prompt = Prompt(
             messages=[
-                {"role": "system", "content": sys_msg},
-                {"role": "user", "content": usr_msg},
+                {"role": "system", "content": ASSIGNMENT_PROMPT_SYSTEM % {"topics": topics_json}},
+                {"role": "user", "content": ASSIGNMENT_PROMPT_USER},
             ],  # type: ignore
             required=["text"],
         )
