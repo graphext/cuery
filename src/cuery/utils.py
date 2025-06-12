@@ -16,6 +16,7 @@ import yaml
 from glom import glom
 from jinja2 import Environment, meta
 from pandas import isna
+from pydantic import BaseModel, Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 from tiktoken import Encoding, encoding_for_model, get_encoding
@@ -32,6 +33,8 @@ else:
 
 
 DEFAULT_PATH = Path().home() / "Development/config/ai-api-keys.json"
+
+BaseModelClass = type(BaseModel)
 
 
 def load_api_keys(path: str | Path | None = DEFAULT_PATH) -> dict:
@@ -248,3 +251,16 @@ def concat_up_to(
     )
 
     return separator.join(result)
+
+
+def customize_fields(model: BaseModelClass, class_name: str, **fields) -> BaseModelClass:
+    """Create a subclass of pydantic model changing field parameters."""
+    if not fields:
+        return model
+
+    field_args = {}
+    for field_name, new_args in fields.items():
+        args = model.model_fields[field_name]._attributes_set | new_args
+        field_args[field_name] = (args.pop("annotation"), Field(**args))
+
+    return create_model(class_name, **field_args, __base__=model)
