@@ -1,6 +1,5 @@
-from typing import Any
-
 from fastapi import FastAPI
+from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel, Field
 
 from cuery.topics.oneshot import TopicAssigner, TopicAssignment, TopicExtractor, Topics
@@ -47,7 +46,7 @@ class AssignTopicsRequest(BaseModel):
     )
 
 
-@app.post("/extract_topics")
+@app.post("/extract_topics", operation_id="extract_topics")
 async def extract_topics(request: ExtractTopicsRequest) -> Topics:
     """Extracts a topic hierarchy from a list of texts."""
     extractor = TopicExtractor(
@@ -66,7 +65,7 @@ async def extract_topics(request: ExtractTopicsRequest) -> Topics:
     )
 
 
-@app.post("/assign_topics")
+@app.post("/assign_topics", operation_id="assign_topics")
 async def assign_topics(request: AssignTopicsRequest) -> list[TopicAssignment]:
     """
     Assigns topics and subtopics to a list of texts using a predefined topic hierarchy.
@@ -75,6 +74,9 @@ async def assign_topics(request: AssignTopicsRequest) -> list[TopicAssignment]:
     responses = await assigner(texts={"text": request.texts}, model=request.model, n_concurrent=20)
     return list(responses)  # type: ignore
 
+
+mcp = FastApiMCP(app)
+mcp.mount()
 
 # To run this server (example using uvicorn):
 # uvicorn cuery.server.server:app --reload

@@ -30,6 +30,7 @@ urls = { Homepage = "https://github.com/graphext/cuery", Documentation = "https:
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.12",
+    "fastapi-mcp>=0.3.4",
     "glom>=24.11.0",
     "google-genai>=1.18.0",
     "instructor[anthropic,google-generativeai]>=1.8.1",
