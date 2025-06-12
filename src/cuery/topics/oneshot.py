@@ -24,7 +24,7 @@ from ..context import AnyContext
 from ..prompt import Prompt
 from ..response import Field, Response, ResponseSet
 from ..task import Task
-from ..utils import dedent
+from ..utils import customize_fields, dedent
 
 TOPICS_PROMPT = dedent("""
 From the list of texts below (separated by line breaks), extract a two-level nested list of topics.
@@ -61,6 +61,100 @@ Assign the correct topic and subtopic to the following text.
 """)
 
 
+class Topic(Response):
+    """A response containing a topic and its subtopics.
+
+    Validates that subtopics are sufficiently distinct from each other and from the parent topic.
+    """
+
+    topic: str = Field(..., description="The top-level topic.")
+    subtopics: list[str] = Field(..., description="A list of subtopics under the top-level topic.")
+
+    @model_validator(mode="after")
+    def validate_subtopics(self) -> Self:
+        # Topic titles should be at least N character edits apart
+        min_ldist = 2
+
+        subtopics = [st.lower() for st in self.subtopics]
+        errors = []
+
+        sim_err = "Subtopic '{}' too similar to other subtopic '{}'.".format
+        perm_err = "Subtopic '{}' is a duplicate (permutation) of subtopic '{}'.".format
+
+        for i, st in enumerate(subtopics):
+            # Subtopics should not be too similar to their parent topic
+            if ldist(st, self.topic.lower()) < min_ldist:
+                errors.append(f"Subtopic '{st}' too similar to parent topic '{self.topic}'.")
+
+            # Subtopics should not be too similar to each other
+            for j in range(i + 1, len(subtopics)):
+                other = subtopics[j]
+
+                # Check Levenshtein distance for similarity
+                if ldist(st.replace(" ", ""), other.replace(" ", "")) < min_ldist:
+                    errors.append(sim_err(st, other))
+
+                # Check for permutations of words
+                if set(st.split()) == set(other.split()):
+                    errors.append(perm_err(st, other))
+
+        if errors:
+            raise ValueError("Invalid subtopics:\n" + "\n".join(errors))
+
+        return self
+
+
+class Topics(Response):
+    """A response containing a two-level nested list of topics."""
+
+    topics: list[Topic] = Field(
+        ..., description="A list of top-level topics with their subtopics."
+    )
+
+
+class TopicAssignment(Response):
+    """Base class for topic and subtopic assignment(!) with validation of correspondence."""
+
+    topic: str
+    subtopic: str
+
+    mapping: ClassVar[dict[str, list]] = {}
+
+    @model_validator(mode="after")
+    def is_subtopic(self) -> Self:
+        allowed = self.mapping.get(self.topic, [])
+        if self.subtopic not in allowed:
+            raise ValueError(
+                f"Subtopic '{self.subtopic}' is not a valid subtopic for topic '{self.topic}'."
+                f" Allowed subtopics are: {allowed}."
+            )
+        return self
+
+
+def make_topic_model(n_topics: int, n_subtopics: int) -> type[Topics]:
+    """Create a specific response model for a list of N topics with M subtopics."""
+    TopicK = customize_fields(Topic, "TopicK", subtopics={"max_length": n_subtopics})
+    return customize_fields(
+        Topics, "TopicsN", topics={"max_length": n_topics, "annotation": list[TopicK]}
+    )
+
+
+def make_assignment_model(topics: dict[str, list[str]]) -> type:
+    """Create a Pydantic model class for topics and subtopic assignment."""
+    tops = list(topics)
+    subs = [topic for subtopics in topics.values() for topic in subtopics]
+
+    cls = utils.customize_fields(
+        TopicAssignment,
+        "CustomTopicAssignment",
+        topic={"annotation": Literal[*tops]},
+        subtopic={"annotation": Literal[*subs]},
+    )
+
+    cls.mapping = topics
+    return cls
+
+
 class TopicExtractor:
     """Enforce the topic-subtopic hierarchy directly via response model."""
 
@@ -78,60 +172,8 @@ class TopicExtractor:
             "extra": extra or "",
         }
         prompt = Prompt.from_string(TOPICS_PROMPT % prompt_args)
-
-        class Topic(Response):
-            topic: str = Field(..., description="The top-level topic.")
-            subtopics: list[str] = Field(
-                ...,
-                description="A list of subtopics under the top-level topic.",
-                max_length=n_subtopics,
-            )
-
-            @model_validator(mode="after")
-            def validate_subtopics(self) -> Self:
-                # Topic titles should be at least N character edits apart
-                min_ldist = 2
-
-                subtopics = [st.lower() for st in self.subtopics]
-                errors = []
-
-                sim_err = "Subtopic '{}' too similar to other subtopic '{}'.".format
-                perm_err = "Subtopic '{}' is a duplicate (permutation) of subtopic '{}'.".format
-
-                for i, st in enumerate(subtopics):
-                    # Subtopics should not be too similar to their parent topic
-                    if ldist(st, self.topic.lower()) < min_ldist:
-                        errors.append(
-                            f"Subtopic '{st}' too similar to parent topic '{self.topic}'."
-                        )
-
-                    # Subtopics should not be too similar to each other
-                    for j in range(i + 1, len(subtopics)):
-                        other = subtopics[j]
-
-                        # Check Levenshtein distance for similarity
-                        if ldist(st.replace(" ", ""), other.replace(" ", "")) < min_ldist:
-                            errors.append(sim_err(st, other))
-
-                        # Check for permutations of words
-                        if set(st.split()) == set(other.split()):
-                            errors.append(perm_err(st, other))
-
-                if errors:
-                    raise ValueError("Invalid subtopics:\n" + "\n".join(errors))
-
-                return self
-
-        class Topics(Response):
-            """A response containing a two-level nested list of topics."""
-
-            topics: list[Topic] = Field(
-                ...,
-                description="A list of top-level topics with their subtopics.",
-                max_length=n_topics,
-            )
-
-        self.task = Task(prompt=prompt, response=Topics)
+        response = make_topic_model(n_topics, n_subtopics)
+        self.task = Task(prompt=prompt, response=response)
 
     async def __call__(
         self,
@@ -156,30 +198,6 @@ class TopicExtractor:
         return responses[0]
 
 
-def make_topic_class(topics: dict[str, list[str]]) -> type:
-    """Create a Pydantic model class for topics and subtopics."""
-    tops = list(topics.keys())
-    subs = [sub for sublist in topics.values() for sub in sublist]
-
-    class Topic(Response):
-        topic: Literal[*tops]
-        subtopic: Literal[*subs]
-
-        mapping: ClassVar[dict[str, list]] = topics
-
-        @model_validator(mode="after")
-        def is_subtopic(self) -> Self:
-            allowed = self.mapping.get(self.topic, [])
-            if self.subtopic not in allowed:
-                raise ValueError(
-                    f"Subtopic '{self.subtopic}' is not a valid subtopic for topic '{self.topic}'."
-                    f" Allowed subtopics are: {allowed}."
-                )
-            return self
-
-    return Topic
-
-
 class TopicAssigner:
     """Enforce correct topic-subtopic assignment via a Pydantic model."""
 
@@ -194,7 +212,7 @@ class TopicAssigner:
             ],  # type: ignore
             required=["text"],
         )
-        response = make_topic_class(topics)
+        response = make_assignment_model(topics)
         self.task = Task(prompt=prompt, response=response)
 
     async def __call__(self, texts: AnyContext, model: str, **kwds) -> ResponseSet:
