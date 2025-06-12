@@ -29,6 +29,7 @@ classifiers = [
 urls = { Homepage = "https://github.com/graphext/cuery", Documentation = "https://cuery.readthedocs.io/" }
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.115.12",
     "glom>=24.11.0",
     "google-genai>=1.18.0",
     "instructor[anthropic,google-generativeai]>=1.8.1",
@@ -41,6 +42,7 @@ dependencies = [
     "rich>=13.9.4",
     "tiktoken>=0.9.0",
     "typer>=0.15.4",
+    "uvicorn>=0.34.3",
 ]
 
 [project.scripts]

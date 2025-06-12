@@ -111,6 +111,10 @@ class Topics(Response):
         ..., description="A list of top-level topics with their subtopics."
     )
 
+    def to_dict(self) -> dict[str, list[str]]:
+        """Convert the response to a dictionary."""
+        return {t.topic: t.subtopics for t in self.topics}
+
 
 class TopicAssignment(Response):
     """Base class for topic and subtopic assignment(!) with validation of correspondence."""
@@ -139,7 +143,7 @@ def make_topic_model(n_topics: int, n_subtopics: int) -> type[Topics]:
     )
 
 
-def make_assignment_model(topics: dict[str, list[str]]) -> type:
+def make_assignment_model(topics: dict[str, list[str]]) -> TopicAssignment:
     """Create a Pydantic model class for topics and subtopic assignment."""
     tops = list(topics)
     subs = [topic for subtopics in topics.values() for topic in subtopics]
@@ -160,7 +164,7 @@ class TopicExtractor:
 
     def __init__(
         self,
-        domain: str,
+        domain: str | None = None,
         n_topics: int = 10,
         n_subtopics: int = 5,
         extra: str | None = None,
@@ -168,7 +172,7 @@ class TopicExtractor:
         prompt_args = {
             "n_topics": n_topics,
             "n_subtopics": n_subtopics,
-            "domain": domain,
+            "domain": domain or "",
             "extra": extra or "",
         }
         prompt = Prompt.from_string(TOPICS_PROMPT % prompt_args)
@@ -183,7 +187,7 @@ class TopicExtractor:
         max_tokens: float | None = None,
         max_texts: float | None = None,
         **kwds,
-    ) -> Response:
+    ) -> Topics:
         """Extracts a two-level topic hierarchy from a list of texts."""
         text = utils.concat_up_to(
             texts,
@@ -195,15 +199,16 @@ class TopicExtractor:
         )
         context = {"texts": text}
         responses = await self.task.call(context=context, model=model, **kwds)
-        return responses[0]
+        return responses[0]  # type: ignore
 
 
 class TopicAssigner:
     """Enforce correct topic-subtopic assignment via a Pydantic model."""
 
-    def __init__(self, hierarchy: Response):
-        topics = hierarchy.to_dict()["topics"]
-        topics = {t["topic"]: t["subtopics"] for t in topics}
+    def __init__(self, topics: Topics | dict[str, list[str]]):
+        if isinstance(topics, Topics):
+            topics = topics.to_dict()
+
         topics_json = json.dumps(topics, indent=2)
         prompt = Prompt(
             messages=[
@@ -212,7 +217,7 @@ class TopicAssigner:
             ],  # type: ignore
             required=["text"],
         )
-        response = make_assignment_model(topics)
+        response = make_assignment_model(topics)  # type: ignore
         self.task = Task(prompt=prompt, response=response)
 
     async def __call__(self, texts: AnyContext, model: str, **kwds) -> ResponseSet:
