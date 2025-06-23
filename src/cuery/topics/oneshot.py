@@ -22,7 +22,7 @@ from pydantic import model_validator
 from .. import utils
 from ..context import AnyContext
 from ..prompt import Prompt
-from ..response import Field, Response, ResponseSet
+from ..response import Field, Response, ResponseClass, ResponseSet
 from ..task import Task
 from ..utils import customize_fields, dedent
 
@@ -143,13 +143,16 @@ def make_topic_model(n_topics: int, n_subtopics: int) -> type[Topics]:
     )
 
 
-def make_assignment_model(topics: dict[str, list[str]]) -> TopicAssignment:
+def make_assignment_model(
+    topics: dict[str, list[str]],
+    base: ResponseClass = TopicAssignment,
+) -> TopicAssignment:
     """Create a Pydantic model class for topics and subtopic assignment."""
     tops = list(topics)
     subs = [topic for subtopics in topics.values() for topic in subtopics]
 
     cls = utils.customize_fields(
-        TopicAssignment,
+        base,
         "CustomTopicAssignment",
         topic={"annotation": Literal[*tops]},
         subtopic={"annotation": Literal[*subs]},

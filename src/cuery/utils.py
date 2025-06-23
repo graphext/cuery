@@ -154,6 +154,13 @@ def jinja_vars(template: str) -> list[str]:
     return list(meta.find_undeclared_variables(parsed))
 
 
+def render_template(template: str, **context: dict) -> str:
+    """Render a Jinja template with the given context."""
+    env = Environment(autoescape=True)
+    env.globals.update(context)
+    return env.from_string(template).render(context)
+
+
 def model_encoding(model: str) -> Encoding:
     """Get the encoding name for a given model."""
     if "/" in model:
