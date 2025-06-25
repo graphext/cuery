@@ -1,4 +1,4 @@
-import json
+import asyncio
 from collections.abc import Iterable
 from copy import deepcopy
 from datetime import datetime
@@ -8,6 +8,8 @@ import pandas as pd
 from apify_client import ApifyClientAsync
 from google.ads.googleads.client import GoogleAdsClient
 from pandas import DataFrame, NamedAgg
+
+from cuery.utils import LOG
 
 LANGUAGE = "1003"  # Español
 GEO_TARGET = "2724"  # España
@@ -89,43 +91,45 @@ def process_keywords(response: Iterable) -> DataFrame:
     return pd.DataFrame(keywords)
 
 
-async def fetch_serps(token_path: str | Path, keywords: Iterable[str], **kwargs):
-    """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor.
-
-    For parameters see: https://apify.com/apify/google-search-scraper/input-schema
-
-    TODO: concurrency
-
-        # Split keywords into batches
-        keyword_batches = [
-            ["keyword1", "keyword2"],
-            ["keyword3", "keyword4"],
-            ["keyword5", "keyword6"]
-        ]
-
-        # Launch concurrent tasks
-        tasks = [
-            client.actor("actor-id").call(run_input={"keywords": batch})
-            for batch in keyword_batches
-        ]
-
-        # Wait for all to complete
-        results = await asyncio.gather(*tasks)
-        return results
-    """
+async def fetch_serps(
+    token_path: str | Path,
+    keywords: Iterable[str],
+    batch_size: int = 10,
+    **kwargs,
+):
+    """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor."""
     with open(token_path) as f:
         token = f.read().strip()
 
     client = ApifyClientAsync(token)
 
-    run_input = {"queries": "\n".join(keywords), **kwargs}
+    keywords_list = list(keywords)
+    keyword_batches = [
+        keywords_list[i : i + batch_size] for i in range(0, len(keywords_list), batch_size)
+    ]
 
-    run = await client.actor("apify/google-search-scraper").call(run_input=run_input)
-    if run is None:
-        raise Exception("Actor run failed. Check the Apify console for details.")
+    async def process_batch(batch):
+        """Process a single batch of keywords."""
+        run_input = {"queries": "\n".join(batch), **kwargs}
 
-    dataset_client = client.dataset(run["defaultDatasetId"])
-    return await dataset_client.list_items()
+        actor = client.actor("apify/google-search-scraper")
+        run = await actor.call(run_input=run_input)
+        if run is None:
+            LOG.error(f"Actor run failed for batch: {batch}... ")
+            return None
+
+        dataset_client = client.dataset(run["defaultDatasetId"])
+        return await dataset_client.list_items()
+
+    tasks = [process_batch(batch) for batch in keyword_batches]
+    batch_results = await asyncio.gather(*tasks)
+
+    result = []
+    for batch_result in batch_results:
+        if batch_result is not None:
+            result.extend(batch_result.items)
+
+    return result
 
 
 def process_toplevel_keys(row: dict):
@@ -278,6 +282,8 @@ def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
         "num_has_personal_info": NamedAgg("personalInfo", lambda ser: num_notna(ser)),
         "num_has_tweet": NamedAgg("tweetCards", lambda ser: num_notna(ser)),
     }
+
+    agg_funcs = {k: v for k, v in agg_funcs.items() if v.column in df.columns}
 
     # These apply to only the top N results
     top_agg_funcs = {

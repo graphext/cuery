@@ -215,7 +215,7 @@ class SerpTopicAndIntentAssigner:
             required=["term", "domains", "titles", "breadcrumbs"],
         )
         response = make_assignment_model(topics, TopicAndIntent)  # type: ignore
-        self.task = Task(prompt=prompt, response=response)
+        self.task = Task(prompt=prompt, response=response)  # type: ignore
 
     async def __call__(self, df: DataFrame, model: str, **kwds) -> ResponseSet:
         """Assign topics and classify intent for each keyword in the DataFrame."""
