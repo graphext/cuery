@@ -1,0 +1,7 @@
+When writing Python, follow the Ruff linter format, using the corresponding configuration in pyproject.toml
+
+Specifically:
+- target python version = 3.11
+- use maximum line length = 99
+- use modern type hint (no explicit Union/Optional etc.)
+- use double quotes for strings

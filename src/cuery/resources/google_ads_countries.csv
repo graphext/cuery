@@ -1,0 +1,219 @@
+Name,Country Code,Criteria ID
+Afghanistan,AF,2004
+Albania,AL,2008
+Antarctica,AQ,2010
+Algeria,DZ,2012
+American Samoa,AS,2016
+Andorra,AD,2020
+Angola,AO,2024
+Antigua and Barbuda,AG,2028
+Azerbaijan,AZ,2031
+Argentina,AR,2032
+Australia,AU,2036
+Austria,AT,2040
+The Bahamas,BS,2044
+Bahrain,BH,2048
+Bangladesh,BD,2050
+Armenia,AM,2051
+Barbados,BB,2052
+Belgium,BE,2056
+Bhutan,BT,2064
+Bolivia,BO,2068
+Bosnia and Herzegovina,BA,2070
+Botswana,BW,2072
+Brazil,BR,2076
+Belize,BZ,2084
+Solomon Islands,SB,2090
+Brunei,BN,2096
+Bulgaria,BG,2100
+Myanmar (Burma),MM,2104
+Burundi,BI,2108
+Belarus,BY,2112
+Cambodia,KH,2116
+Cameroon,CM,2120
+Canada,CA,2124
+Cabo Verde,CV,2132
+Central African Republic,CF,2140
+Sri Lanka,LK,2144
+Chad,TD,2148
+Chile,CL,2152
+China,CN,2156
+Christmas Island,CX,2162
+Cocos (Keeling) Islands,CC,2166
+Colombia,CO,2170
+Comoros,KM,2174
+Republic of the Congo,CG,2178
+Democratic Republic of the Congo,CD,2180
+Cook Islands,CK,2184
+Costa Rica,CR,2188
+Croatia,HR,2191
+Cyprus,CY,2196
+Czechia,CZ,2203
+Benin,BJ,2204
+Denmark,DK,2208
+Dominica,DM,2212
+Dominican Republic,DO,2214
+Ecuador,EC,2218
+El Salvador,SV,2222
+Equatorial Guinea,GQ,2226
+Ethiopia,ET,2231
+Eritrea,ER,2232
+Estonia,EE,2233
+South Georgia and the South Sandwich Islands,GS,2239
+Fiji,FJ,2242
+Finland,FI,2246
+France,FR,2250
+French Polynesia,PF,2258
+French Southern and Antarctic Lands,TF,2260
+Djibouti,DJ,2262
+Gabon,GA,2266
+Georgia,GE,2268
+The Gambia,GM,2270
+Germany,DE,2276
+Ghana,GH,2288
+Kiribati,KI,2296
+Greece,GR,2300
+Grenada,GD,2308
+Guam,GU,2316
+Guatemala,GT,2320
+Guinea,GN,2324
+Guyana,GY,2328
+Haiti,HT,2332
+Heard Island and McDonald Islands,HM,2334
+Vatican City,VA,2336
+Honduras,HN,2340
+Hungary,HU,2348
+Iceland,IS,2352
+India,IN,2356
+Indonesia,ID,2360
+Iraq,IQ,2368
+Ireland,IE,2372
+Israel,IL,2376
+Italy,IT,2380
+Cote d'Ivoire,CI,2384
+Jamaica,JM,2388
+Japan,JP,2392
+Kazakhstan,KZ,2398
+Jordan,JO,2400
+Kenya,KE,2404
+South Korea,KR,2410
+Kuwait,KW,2414
+Kyrgyzstan,KG,2417
+Laos,LA,2418
+Lebanon,LB,2422
+Lesotho,LS,2426
+Latvia,LV,2428
+Liberia,LR,2430
+Libya,LY,2434
+Liechtenstein,LI,2438
+Lithuania,LT,2440
+Luxembourg,LU,2442
+Madagascar,MG,2450
+Malawi,MW,2454
+Malaysia,MY,2458
+Maldives,MV,2462
+Mali,ML,2466
+Malta,MT,2470
+Mauritania,MR,2478
+Mauritius,MU,2480
+Mexico,MX,2484
+Monaco,MC,2492
+Mongolia,MN,2496
+Moldova,MD,2498
+Montenegro,ME,2499
+Morocco,MA,2504
+Mozambique,MZ,2508
+Oman,OM,2512
+Namibia,,2516
+Nauru,NR,2520
+Nepal,NP,2524
+Netherlands,NL,2528
+Curacao,CW,2531
+Sint Maarten,SX,2534
+Caribbean Netherlands,BQ,2535
+New Caledonia,NC,2540
+Vanuatu,VU,2548
+New Zealand,NZ,2554
+Nicaragua,NI,2558
+Niger,NE,2562
+Nigeria,NG,2566
+Niue,NU,2570
+Norfolk Island,NF,2574
+Norway,NO,2578
+Northern Mariana Islands,MP,2580
+United States Minor Outlying Islands,UM,2581
+Micronesia,FM,2583
+Marshall Islands,MH,2584
+Palau,PW,2585
+Pakistan,PK,2586
+Panama,PA,2591
+Papua New Guinea,PG,2598
+Paraguay,PY,2600
+Peru,PE,2604
+Philippines,PH,2608
+Pitcairn Islands,PN,2612
+Poland,PL,2616
+Portugal,PT,2620
+Guinea-Bissau,GW,2624
+Timor-Leste,TL,2626
+Qatar,QA,2634
+Romania,RO,2642
+Russia,RU,2643
+Rwanda,RW,2646
+Saint Barthelemy,BL,2652
+"Saint Helena, Ascension and Tristan da Cunha",SH,2654
+Saint Kitts and Nevis,KN,2659
+Saint Lucia,LC,2662
+Saint Martin,MF,2663
+Saint Pierre and Miquelon,PM,2666
+Saint Vincent and the Grenadines,VC,2670
+San Marino,SM,2674
+Sao Tome and Principe,ST,2678
+Saudi Arabia,SA,2682
+Senegal,SN,2686
+Serbia,RS,2688
+Seychelles,SC,2690
+Sierra Leone,SL,2694
+Singapore,SG,2702
+Slovakia,SK,2703
+Vietnam,VN,2704
+Slovenia,SI,2705
+Somalia,SO,2706
+South Africa,ZA,2710
+Zimbabwe,ZW,2716
+Spain,ES,2724
+South Sudan,SS,2728
+Sudan,SD,2736
+Suriname,SR,2740
+Eswatini,SZ,2748
+Sweden,SE,2752
+Switzerland,CH,2756
+Tajikistan,TJ,2762
+Thailand,TH,2764
+Togo,TG,2768
+Tokelau,TK,2772
+Tonga,TO,2776
+Trinidad and Tobago,TT,2780
+United Arab Emirates,AE,2784
+Tunisia,TN,2788
+Turkiye,TR,2792
+Turkmenistan,TM,2795
+Tuvalu,TV,2798
+Uganda,UG,2800
+Ukraine,UA,2804
+North Macedonia,MK,2807
+Egypt,EG,2818
+United Kingdom,GB,2826
+Guernsey,GG,2831
+Jersey,JE,2832
+Isle of Man,IM,2833
+Tanzania,TZ,2834
+United States,US,2840
+Burkina Faso,BF,2854
+Uruguay,UY,2858
+Uzbekistan,UZ,2860
+Venezuela,VE,2862
+Wallis and Futuna,WF,2876
+Samoa,WS,2882
+Yemen,YE,2887
+Zambia,ZM,2894

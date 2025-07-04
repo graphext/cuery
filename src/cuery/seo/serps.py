@@ -1,100 +1,25 @@
+"""Fetch SERP results using Apify actors."""
+
 import asyncio
+import json
 from collections.abc import Iterable
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 from apify_client import ApifyClientAsync
-from google.ads.googleads.client import GoogleAdsClient
+from async_lru import alru_cache
 from pandas import DataFrame, NamedAgg
 
-from cuery.utils import LOG
-
-LANGUAGE = "1003"  # Español
-GEO_TARGET = "2724"  # España
-CUSTOMER = "6560490700"
+from ..utils import LOG
+from .tasks import EntityExtractor, SerpTopicAndIntentAssigner, SerpTopicExtractor
 
 
-def ads_client(config_path: str | Path):
-    return GoogleAdsClient.load_from_storage(config_path)
-
-
-def fetch_keywords(
-    ads_config: str | Path,
-    keywords: list[str],
-    customer: str = CUSTOMER,
-    language: str = LANGUAGE,
-    geo_target: str = GEO_TARGET,
-    metrics_start: str = "2023-03",
-    metrics_end: str = "2024-02",
-) -> Iterable:
-    client = GoogleAdsClient.load_from_storage(ads_config)
-
-    kwd_service = client.get_service("KeywordPlanIdeaService")
-    ads_service = client.get_service("GoogleAdsService")
-
-    request = client.get_type("GenerateKeywordIdeasRequest")
-    request.customer_id = customer
-
-    # Configurar palabras clave de semilla
-    keyword_seed = client.get_type("KeywordSeed")
-    keyword_seed.keywords.extend(keywords)
-    request.keyword_seed = keyword_seed
-
-    # Añadir idioma
-    request.language = ads_service.language_constant_path(language)
-
-    # Añadir ubicación geográfica
-    request.geo_target_constants.append(ads_service.geo_target_constant_path(geo_target))
-
-    # Configurar métricas históricas
-    start = datetime.strptime(metrics_start, "%Y-%m")
-    end = datetime.strptime(metrics_end, "%Y-%m")
-    request.historical_metrics_options.year_month_range.start.year = start.year
-    request.historical_metrics_options.year_month_range.start.month = start.month
-    request.historical_metrics_options.year_month_range.end.year = end.year
-    request.historical_metrics_options.year_month_range.end.month = end.month
-    request.historical_metrics_options.include_average_cpc = True
-
-    return kwd_service.generate_keyword_ideas(request=request)
-
-
-def process_keywords(response: Iterable) -> DataFrame:
-    keywords = []
-    for idea in response.results:
-        info = {
-            "keyword": idea.text,
-        }
-
-        if metrics := getattr(idea, "keyword_idea_metrics", None):
-            info["avg_monthly_searches"] = getattr(metrics, "avg_monthly_searches", None)
-
-            if avg_cpc := getattr(metrics, "average_cpc_micros", None):
-                info["average_cpc"] = round(avg_cpc / 1_000_000, 2)
-
-            if competition := getattr(metrics, "competition", None):
-                competition_map = {"LOW": 33, "MEDIUM": 66, "HIGH": 100}
-                info["competition_score"] = competition
-                info["competition"] = competition_map.get(metrics.competition.name, None)
-
-            if volumes := getattr(metrics, "monthly_search_volumes", None):
-                for volume in volumes:
-                    year = volume.year
-                    month = volume.month
-                    date = datetime.strptime(f"{year}-{month.name.capitalize()}", "%Y-%B")
-                    volume = volume.monthly_searches
-                    info[f"search_volume_{date.year}_{date.month:02}"] = volume
-
-        keywords.append(info)
-
-    return pd.DataFrame(keywords)
-
-
+@alru_cache(maxsize=3)
 async def fetch_serps(
     token_path: str | Path,
-    keywords: Iterable[str],
-    batch_size: int = 10,
+    keywords: tuple[str, ...],
+    batch_size: int = 100,
     **kwargs,
 ):
     """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor."""
@@ -133,6 +58,7 @@ async def fetch_serps(
 
 
 def process_toplevel_keys(row: dict):
+    """Process top-level keys in a SERP result row (single keyword)."""
     rm = [
         "#debug",
         "#error",
@@ -300,3 +226,106 @@ def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
     topagg = top.groupby("term").agg(**top_agg_funcs).reset_index()
 
     return agg.merge(topagg, on="term", how="left")
+
+
+def token_rank(tokens: str | list[str], texts: list[str] | None) -> int | None:
+    """Find position of first occurrence of a token in a list of texts."""
+    if isinstance(texts, list):
+        if isinstance(tokens, str):
+            tokens = [tokens]
+
+        for i, text in enumerate(texts):
+            if any(token.lower() in text.lower() for token in tokens):
+                return i + 1
+
+    return None
+
+
+def add_ranks(
+    df: DataFrame,
+    brands: str | list[str] | None,
+    competitors: str | list[str] | None,
+) -> DataFrame:
+    """Calculate brand and competitor ranks in organic search results."""
+    if brands is not None:
+        df["title_rank_brand"] = df.titles.apply(lambda x: token_rank(brands, x))
+        df["domain_rank_brand"] = df.domains.apply(lambda x: token_rank(brands, x))
+        df["description_rank_brand"] = df.descriptions.apply(lambda x: token_rank(brands, x))
+
+    if competitors is not None:
+        # First position of any(!) competitor
+        df["title_rank_competition"] = df.titles.apply(lambda x: token_rank(competitors, x))
+        df["description_rank_competition"] = df.descriptions.apply(
+            lambda x: token_rank(competitors, x)
+        )
+        df["domain_rank_competition"] = df.domains.apply(lambda x: token_rank(competitors, x))
+
+        # Specific ranks for each individual competitor
+        for name in competitors:
+            c_ranks = []
+            for col in ("titles", "descriptions", "domains"):
+                rank = df[col].apply(lambda x, name=name: token_rank(name, x))
+                c_ranks.append(rank)
+
+            c_ranks = pd.concat(c_ranks, axis=1)
+            df[f"min_rank_{name}"] = c_ranks.min(axis=1)
+
+    return df
+
+
+async def topic_and_intent(
+    df: DataFrame,
+    max_samples: int,
+    topic_model: str,
+    assignment_model: str,
+) -> DataFrame:
+    """Classify keywords and their top N organic results into topics and intent."""
+    n_samples_max = min(max_samples, len(df))
+
+    extractor = SerpTopicExtractor()
+    topic_intent = await extractor(df=df.sample(n=n_samples_max), model=topic_model)
+    LOG.info("Extracted topic hierarchy")
+    LOG.info(json.dumps(topic_intent.to_dict(), indent=2, ensure_ascii=False))
+
+    assigner = SerpTopicAndIntentAssigner(topic_intent)
+    classified = await assigner(df=df, model=assignment_model, n_concurrent=100)
+    clf = classified.to_pandas()
+    return clf[["term", "topic", "subtopic", "intent"]]
+
+
+async def process_ai_overviews(
+    df: DataFrame,
+    entity_model: str = "openai/gpt-4.1-mini",
+) -> DataFrame | None:
+    """Process AI overviews in SERP data and extract entities."""
+    if "aiOverview_content" in df.columns and df["aiOverview_content"].notna().any():
+        try:
+            # Todo: extract brand and competitor ranks
+            ai_df = df[df.aiOverview_content.notna()].copy().reset_index()
+            entity_extractor = EntityExtractor()
+            entities = await entity_extractor(df=ai_df, model=entity_model, n_concurrent=100)
+            ent_df = entities.to_pandas(explode=False)
+
+            for kind in ("brand/company", "product/service", "technology"):
+                ent_df[f"ai_overview_{kind}"] = ent_df.entities.apply(
+                    lambda es, kind=kind: [
+                        e.name
+                        for e in es
+                        if e is not None
+                        and hasattr(e, "type")
+                        and hasattr(e, "name")
+                        and e.type == kind
+                    ]
+                    if es is not None
+                    else None
+                )
+
+            ent_df["term"] = ai_df["term"]
+            return ent_df.drop(
+                columns=["aiOverview_content", "aiOverview_source_titles", "entities"]
+            )
+        except Exception as exc:
+            LOG.error(f"Error processing AI overviews: {exc}")
+            return None
+
+    return None

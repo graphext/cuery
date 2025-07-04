@@ -29,16 +29,21 @@ classifiers = [
 urls = { Homepage = "https://github.com/graphext/cuery", Documentation = "https://cuery.readthedocs.io/" }
 requires-python = ">=3.11"
 dependencies = [
+    "async-lru>=2.0.5",
     "fastapi>=0.115.12",
     "fastapi-mcp>=0.3.4",
     "glom>=24.11.0",
     "google-genai>=1.18.0",
+    "gradio>=5.9.1",
     "instructor[anthropic,google-generativeai]>=1.8.1",
+    "jsonschema>=4.17.0",
     "levenshtein>=0.27.1",
     "litellm>=1.69.1",
+    "openai>=1.58.1",
     "pandas>=2.2.3",
     "pre-commit",
     "pyarrow>=20.0.0",
+    "pydantic>=2.0.0",
     "pyyaml>=6.0.2",
     "rich>=13.9.4",
     "tiktoken>=0.9.0",
@@ -49,10 +54,15 @@ dependencies = [
 [project.scripts]
 cuery = "cuery.cli:app"
 
+
+[project.optional-dependencies]
+seo = ["apify", "google-ads"]
+
+
 [dependency-groups]
 dev = ["ipykernel>=6.29.5", "ipython>=9.2.0", "jupyter>=1.1.1", "ruff>=0.11.9"]
-
 docs = ["pydata-sphinx-theme>=0.16.1", "sphinx-autoapi>=3.6.0", "sphinx>=8.2.3"]
+
 
 [tool.uv]
 python-preference = "managed"

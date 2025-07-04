@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from cuery.builder.ui import launch
 from cuery.task import Task
 
 app = typer.Typer()
@@ -41,29 +42,11 @@ def run_task(task_name: str, csv: Path, output: Path):
     result.to_csv(output, index=False)
 
 
-# @app.command()
-# def chain(task_ids: str, csv: Path, output: Path):
-#     """Execute a chain of Task instances by id (comma-separated) with a CSV file as input."""
-#     ids = [int(i) for i in task_ids.split(",")]
-#     tasks = []
-#     for i in ids:
-#         task = Task.registry.get(i)
-#         if not task:
-#             typer.echo(f"No Task found with id {i}")
-#             raise typer.Exit(1)
-#         tasks.append(task)
-#     chain = Chain(*tasks)
-#     df = pd.read_csv(csv)
-#     result = typer.run(lambda: chain(df))
-#     if hasattr(result, "to_csv"):
-#         if output:
-#             result.to_csv(output, index=False)
-#             typer.echo(f"Output written to {output}")
-#         else:
-#             typer.echo(result)
-#     else:
-#         typer.echo(result)
+@app.command("builder")
+def launch_builder():
+    """Launch the interactive schema builder interface."""
+    launch()
 
 
-# if __name__ == "__main__":
-#     app()
+if __name__ == "__main__":
+    app()

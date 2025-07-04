@@ -27,8 +27,8 @@ from pydantic import Field
 from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
+from ..topics.oneshot import TopicAssignment, Topics, make_assignment_model, make_topic_model
 from ..utils import dedent
-from .oneshot import TopicAssignment, Topics, make_assignment_model, make_topic_model
 
 SERP_TOPICS_PROMPT = dedent("""
 From the keyword SERP data below, extract a two-level nested list of topics.
