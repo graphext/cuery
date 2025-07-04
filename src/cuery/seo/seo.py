@@ -26,8 +26,6 @@ class HashableCfg(BaseModel):
 class GoogleKwdConfig(HashableCfg):
     """Configuration for Google Ads API access."""
 
-    credentials: str | Path
-    customer: str
     keywords: tuple[str, ...]
     ideas: bool = False
     max_ideas: int | None = None
@@ -35,10 +33,11 @@ class GoogleKwdConfig(HashableCfg):
     geo_target: str = "us"
     metrics_start: str | None = None
     metrics_end: str | None = None
+    credentials: str | Path | dict | None = None
+    customer: str | None = None
 
 
 class SerpConfig(HashableCfg):
-    token_path: str | Path
     batch_size: int = 100
     resultsPerPage: int = 100
     maxPagesPerQuery: int = 1
@@ -46,6 +45,7 @@ class SerpConfig(HashableCfg):
     searchLanguage: str | None = None
     languageCode: str | None = None
     params: dict | None = Field(default_factory=dict)
+    apify_token: str | Path | None = None
 
 
 class SeoConfig(HashableCfg):

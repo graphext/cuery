@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
@@ -17,14 +18,17 @@ from .tasks import EntityExtractor, SerpTopicAndIntentAssigner, SerpTopicExtract
 
 @alru_cache(maxsize=3)
 async def fetch_serps(
-    token_path: str | Path,
     keywords: tuple[str, ...],
     batch_size: int = 100,
+    apify_token: str | Path | None = None,
     **kwargs,
 ):
     """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor."""
-    with open(token_path) as f:
-        token = f.read().strip()
+    if isinstance(apify_token, str | Path):
+        with open(apify_token) as f:
+            token = f.read().strip()
+    else:
+        token = os.environ["APIFY_TOKEN"]
 
     client = ApifyClientAsync(token)
 

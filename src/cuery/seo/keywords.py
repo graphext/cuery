@@ -10,6 +10,9 @@ Useful documentation:
 
 """
 
+import json
+import os
+import tempfile
 from collections.abc import Iterable
 from datetime import datetime
 from functools import lru_cache
@@ -32,7 +35,45 @@ from ..response import Field, Response, ResponseSet
 from ..task import Task
 from ..utils import dedent
 
-CUSTOMER = "6560490700"
+
+def config_from_env() -> dict:
+    """Load Google Ads API configuration from environment variables."""
+    vars = (
+        "GOOGLE_ADS_DEVELOPER_TOKEN",
+        "GOOGLE_ADS_LOGIN_CUSTOMER_ID",
+        "GOOGLE_ADS_USE_PROTO_PLUS",
+        "GOOGLE_ADS_JSON_KEY",
+        "GOOGLE_ADS_JSON_KEY_FILE_PATH",
+    )
+    return {
+        var.replace("GOOGLE_ADS_", "").lower(): os.environ[var]
+        for var in vars
+        if var in os.environ
+    }
+
+
+def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClient:
+    """Load Google Ads client from credentials."""
+    if config is None:
+        config = config_from_env()
+
+    if isinstance(config, dict):
+        if json_key := config.pop("json_key", None):
+            json_key = json.loads(json_key)
+            with tempfile.NamedTemporaryFile("w", suffix=".json") as fp:
+                json.dump(json_key, fp)
+                fp.flush()
+                config["json_key_file_path"] = fp.name
+                client = GoogleAdsClient.load_from_dict(config)
+
+            return client  # noqa: RET504
+
+        return GoogleAdsClient.load_from_dict(config)
+
+    if isinstance(config, str | Path):
+        return GoogleAdsClient.load_from_storage(config)
+
+    raise ValueError(f"Invalid config type: {type(config)}. Need PathLike, dict or None.")
 
 
 def year_month_from_date(date: str | datetime) -> tuple[int, MonthOfYearEnum.MonthOfYear]:
@@ -50,8 +91,6 @@ def year_month_from_date(date: str | datetime) -> tuple[int, MonthOfYearEnum.Mon
 
 @lru_cache(maxsize=3)
 def fetch_keywords(  # noqa: PLR0913
-    credentials: str | Path,
-    customer: str,
     keywords: tuple[str, ...],
     ideas: bool = False,
     max_ideas: int | None = None,
@@ -59,9 +98,12 @@ def fetch_keywords(  # noqa: PLR0913
     geo_target: str = "us",
     metrics_start: str | None = None,
     metrics_end: str | None = None,
+    credentials: str | Path | dict | None = None,
+    customer: str | None = None,
 ):
     """Fetch metrics for a fixed list of keywords or generated keyword ideas from Google Ads API."""
-    client = GoogleAdsClient.load_from_storage(credentials)
+    client = connect_ads_client(credentials)
+
     ads_service = client.get_service("GoogleAdsService")
     kwd_service = client.get_service("KeywordPlanIdeaService")
 
@@ -78,7 +120,9 @@ def fetch_keywords(  # noqa: PLR0913
         request.keywords = list(keywords)
         request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
 
-    request.customer_id = customer
+    request.customer_id = customer or os.environ.get(
+        "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
+    )
 
     lang_id = resources.google_lang_id(language)
     request.language = ads_service.language_constant_path(lang_id)

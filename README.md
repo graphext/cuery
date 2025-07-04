@@ -401,10 +401,17 @@ git clone https://github.com/graphext/cuery.git
 cd cuery
 
 # Install dependencies
-uv sync --all-groups
+uv sync --all-groups --all-extras
 
 # Set up pre-commit hooks
 pre-commit install
+```
+
+# Publish
+
+```bash
+uv build
+uv publish --token `cat /path/to/token.txt`
 ```
 
 # Docs
@@ -414,7 +421,7 @@ Cuery uses [Sphinx](https://sphinx-autoapi.readthedocs.io/en/latest/) with the [
 To build and render:
 
 ``` bash
-(cd docs && uv run make clean html)
+`(cd docs && uv run make clean html)`
 (cd docs/build/html && uv run python -m http.server)
 ```
 
