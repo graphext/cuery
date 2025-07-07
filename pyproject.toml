@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.4.2"
+version = "0.4.3"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -33,9 +33,9 @@ dependencies = [
     "fastapi>=0.115.12",
     "fastapi-mcp>=0.3.4",
     "glom>=24.11.0",
-    "google-genai>=1.18.0",
+    "google-genai>=1.23.0,<1.24.0",
     "gradio>=5.9.1",
-    "instructor[anthropic,google-generativeai]>=1.8.1",
+    "instructor[anthropic,google-genai]>=1.8.1",
     "jsonschema>=4.17.0",
     "levenshtein>=0.27.1",
     "litellm>=1.69.1",
