@@ -14,10 +14,6 @@ from openai import OpenAI
 from pandas import DataFrame
 from pydantic import BaseModel, Field, field_validator
 
-from ..utils import set_api_keys
-
-set_api_keys()
-
 SYSTEM_PROMPT = """
 You are an expert at helping users design JSON schemas for structured data extraction from LLMs.
 
