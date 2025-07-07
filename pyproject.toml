@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.4.0"
+version = "0.4.1"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -61,7 +61,12 @@ seo = ["apify", "google-ads"]
 
 [dependency-groups]
 dev = ["ipykernel>=6.29.5", "ipython>=9.2.0", "jupyter>=1.1.1", "ruff>=0.11.9"]
-docs = ["pydata-sphinx-theme>=0.16.1", "sphinx-autoapi>=3.6.0", "sphinx>=8.2.3"]
+docs = [
+    "pydata-sphinx-theme>=0.16.1",
+    "sphinx-autoapi>=3.6.0",
+    "sphinx>=8.2.3",
+    "autodoc_pydantic",
+]
 
 
 [tool.uv]

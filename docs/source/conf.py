@@ -13,7 +13,7 @@ author = "Thomas Buhrmann"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["autoapi.extension", "sphinx.ext.autodoc"]
+extensions = ["autoapi.extension", "sphinx.ext.autodoc", "sphinxcontrib.autodoc_pydantic"]
 
 autoapi_dirs = ["../../src"]
 autodoc_typehints = "description"
