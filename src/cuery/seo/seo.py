@@ -1,4 +1,38 @@
-"""High-level API to fetch SEO data from various sources and to enrich with AI."""
+"""High-level API to fetch SEO data from various sources and to enrich with AI.
+
+Authentication
+    To use all features and data sources, i.e. to have access to Google Ads, Apify, and AI models,
+    you can either:
+
+    - pass paths to credential files in the configuration
+    - pass dictionaries/strings with already loaded credentials
+    - or set the respective environment variables
+
+
+    Google Ads
+        Google Ads variables should be prefixed with `GOOGLE_ADS_` and can be set as follows::
+
+            os.environ["GOOGLE_ADS_DEVELOPER_TOKEN"] = "..."
+            os.environ["GOOGLE_ADS_LOGIN_CUSTOMER_ID"] = "..."
+            os.environ["GOOGLE_ADS_USE_PROTO_PLUS"] = "true"
+            os.environ["GOOGLE_ADS_JSON_KEY"] = json.dumps(json_key)
+            os.environ["GOOGLE_ADS_CUSTOMER_ID"] = "..."
+
+
+    Apify
+        For Apify, you can set the `APIFY_TOKEN` environment variable::
+
+            os.environ["APIFY_TOKEN"] = "..."
+
+    LLMs
+        For AI use, set the corresponding API keys like this::
+
+            llm_keys = {
+                "OpenAI": "...",
+                "Google": "...",
+            }
+            cuery.utils.set_api_keys(llm_keys)
+"""
 
 from pathlib import Path
 from warnings import warn

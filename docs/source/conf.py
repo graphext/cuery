@@ -13,7 +13,12 @@ author = "Thomas Buhrmann"
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["autoapi.extension", "sphinx.ext.autodoc", "sphinxcontrib.autodoc_pydantic"]
+extensions = [
+    "autoapi.extension",
+    "sphinx.ext.autodoc",
+    "sphinxcontrib.autodoc_pydantic",
+    "sphinx.ext.napoleon",
+]
 
 autoapi_dirs = ["../../src"]
 autodoc_typehints = "description"
@@ -21,6 +26,9 @@ autodoc_typehints = "description"
 templates_path = ["_templates"]
 exclude_patterns = []
 
+# Napoleon settings
+napoleon_google_docstring = True
+napoleon_use_admonition_for_examples = False
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

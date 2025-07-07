@@ -421,7 +421,7 @@ Cuery uses [Sphinx](https://sphinx-autoapi.readthedocs.io/en/latest/) with the [
 To build and render:
 
 ``` bash
-`(cd docs && uv run make clean html)`
+(cd docs && uv run make clean html)
 (cd docs/build/html && uv run python -m http.server)
 ```
 
