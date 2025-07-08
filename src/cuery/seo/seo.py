@@ -50,6 +50,7 @@ from .serps import (
     process_serps,
     topic_and_intent,
 )
+from .traffic import add_keyword_traffic
 
 
 class HashableConfig(BaseModel):
@@ -127,6 +128,8 @@ class SeoConfig(HashableConfig):
     """Model to use for intent classification from SERP organic results."""
     entity_model: str | None = "openai/gpt-4.1-mini"
     """Model to use for entity extraction from AI overviews."""
+    fetch_traffic: bool = False
+    """Whether to fetch traffic data for keywords using Similarweb scraper."""
 
 
 async def fetch_data(cfg: SeoConfig) -> DataFrame:
@@ -176,6 +179,8 @@ async def fetch_data(cfg: SeoConfig) -> DataFrame:
             if ai_df is not None:
                 df = df.merge(ai_df, on="term", how="left")
 
-    # Todo: add traffic data ...
+    if cfg.fetch_traffic:
+        LOG.info("Fetching and processing traffic data for keywords")
+        df = await add_keyword_traffic(df)
 
     return df

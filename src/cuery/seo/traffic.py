@@ -151,14 +151,25 @@ async def add_keyword_traffic(kwds: DataFrame) -> DataFrame:
     """
     required_columns = ["keyword", "domains"]
     if any(col not in kwds for col in required_columns):
-        raise ValueError(f"Keywords DF must contain at least these columns: {required_columns}!")
+        LOG.warning(
+            f"Keywords DF must contain at least these columns: {required_columns}! "
+            "Will return original DataFrame without traffic data."
+        )
+        return kwds
 
-    kwds_expl = kwds[["keyword", "domains"]].explode(column="domains")
+    try:
+        kwds_expl = kwds[["keyword", "domains"]].explode(column="domains")
 
-    trf = await fetch_domain_traffic(tuple(kwds_expl.domains))
-    trf = process_traffic(trf)
+        trf = await fetch_domain_traffic(tuple(kwds_expl.domains))
+        trf = process_traffic(trf)
 
-    kwds_trf = kwds_expl.merge(trf, left_on="domains", right_on="url", how="left")
-    agg_trf = aggregate_traffic(kwds_trf, by="keyword")
+        kwds_trf = kwds_expl.merge(trf, left_on="domains", right_on="url", how="left")
+        agg_trf = aggregate_traffic(kwds_trf, by="keyword")
 
-    return kwds.merge(agg_trf, on="keyword", how="left")
+        return kwds.merge(agg_trf, on="keyword", how="left")
+    except Exception as exc:
+        LOG.warning(
+            f"Failed to fetch traffic data for keywords: {exc}. "
+            "Will return original DataFrame without traffic data."
+        )
+        return kwds
