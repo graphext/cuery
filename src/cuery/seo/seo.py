@@ -165,8 +165,10 @@ async def fetch_data(cfg: SeoConfig) -> DataFrame:
                 max_samples=cfg.topic_max_samples,
                 topic_model=cfg.topic_model,
                 assignment_model=cfg.assignment_model,
+                max_retries=6,
             )
-            df = df.merge(clf_df, on="term", how="left")
+            if clf_df is not None:
+                df = df.merge(clf_df, on="term", how="left")
 
         if cfg.entity_model is not None:
             LOG.info("Processing AI overviews from SERP data")

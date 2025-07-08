@@ -20,7 +20,6 @@ import json
 from string import Template
 from typing import Literal
 
-import pandas as pd
 from pandas import DataFrame
 from pydantic import Field
 
@@ -189,7 +188,7 @@ class SerpTopicExtractor:
 
         return grouped.iloc[:n_keywords].to_dict(orient="records")
 
-    async def __call__(self, df: pd.DataFrame, model: str, **kwds) -> Topics:
+    async def __call__(self, df: DataFrame, model: str, **kwds) -> Topics:
         """Extract topics from SERP data DataFrame."""
         context = {"keywords": df.to_dict(orient="records")}
         responses = await self.task.call(context=context, model=model, **kwds)

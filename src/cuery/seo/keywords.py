@@ -19,6 +19,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+import numpy as np
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.v20.enums.types import MonthOfYearEnum
 from google.ads.googleads.v20.services import (
@@ -26,6 +27,7 @@ from google.ads.googleads.v20.services import (
     GenerateKeywordIdeasRequest,
     KeywordSeed,
 )
+from numpy import ndarray
 from pandas import DataFrame, Series
 
 from .. import resources, utils
@@ -169,6 +171,57 @@ def collect_volume_columns(df: DataFrame):
     return df.drop(columns=vol_cols)
 
 
+def calculate_trend_pct(volumes: list[float] | ndarray | None, n_months: int):
+    """Calculate trend based on monthly search volumes provided as list."""
+    if not isinstance(volumes, list | ndarray) or volumes is None or len(volumes) < n_months:
+        return None
+
+    end_volume = volumes[-1]
+    start_volume = volumes[-n_months]
+    return 100 * (end_volume - start_volume) / (start_volume or 1)
+
+
+def linreg_trend(y: list | ndarray | None) -> float | None:
+    """Calculate linear regression slope for a list of values."""
+    if not isinstance(y, list | ndarray) or y is None or len(y) < 3:
+        return None
+
+    y = np.asarray(y, dtype=float)
+    x = np.arange(len(y))
+    X = np.vstack([np.ones_like(x), x]).T
+
+    theta = np.linalg.inv(X.T @ X) @ X.T @ y
+    intercept, slope = theta
+    # y_pred = X @ theta  # noqa: ERA001
+
+    return slope / y.mean()
+
+
+def add_trend_columns(df: DataFrame) -> DataFrame:
+    """Add trend columns to the DataFrame based on the specified trend type."""
+    if "search_volume" in df.columns:
+        valid_idx = df["search_volume"].first_valid_index()
+        if valid_idx is not None:
+            some_value = df["search_volume"][valid_idx]
+            n_months = len(some_value)
+            if n_months >= 12:  # noqa: PLR2004
+                df["search_volume_growth_yoy"] = df["search_volume"].apply(
+                    lambda x: calculate_trend_pct(x, 12)
+                )
+
+            if n_months >= 3:  # noqa: PLR2004
+                df["search_volume_growth_3m"] = df["search_volume"].apply(
+                    lambda x: calculate_trend_pct(x, 3)
+                )
+                df["search_volume_trend"] = df["search_volume"].apply(lambda x: linreg_trend(x))
+            elif n_months > 1:
+                df["search_volume_growth_1m"] = df["search_volume"].apply(
+                    lambda x: calculate_trend_pct(x, 2)
+                )
+
+    return df
+
+
 def process_keywords(response: Iterable, collect_volumes: bool = True) -> DataFrame:
     keywords = []
     for kwd in response.results:
@@ -203,6 +256,7 @@ def process_keywords(response: Iterable, collect_volumes: bool = True) -> DataFr
     df = DataFrame(keywords)
     if collect_volumes:
         df = collect_volume_columns(df)
+        df = add_trend_columns(df)
 
     return df
 

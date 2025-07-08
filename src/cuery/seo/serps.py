@@ -282,19 +282,29 @@ async def topic_and_intent(
     max_samples: int,
     topic_model: str,
     assignment_model: str,
-) -> DataFrame:
+    max_retries: int = 5,
+) -> DataFrame | None:
     """Classify keywords and their top N organic results into topics and intent."""
     n_samples_max = min(max_samples, len(df))
 
-    extractor = SerpTopicExtractor()
-    topic_intent = await extractor(df=df.sample(n=n_samples_max), model=topic_model)
-    LOG.info("Extracted topic hierarchy")
-    LOG.info(json.dumps(topic_intent.to_dict(), indent=2, ensure_ascii=False))
+    try:
+        extractor = SerpTopicExtractor()
+        topic_intent = await extractor(
+            df=df.sample(n=n_samples_max),
+            model=topic_model,
+            max_retries=max_retries,
+        )
+        LOG.info("Extracted topic hierarchy")
+        LOG.info(json.dumps(topic_intent.to_dict(), indent=2, ensure_ascii=False))
 
-    assigner = SerpTopicAndIntentAssigner(topic_intent)
-    classified = await assigner(df=df, model=assignment_model, n_concurrent=100)
-    clf = classified.to_pandas()
-    return clf[["term", "topic", "subtopic", "intent"]]
+        assigner = SerpTopicAndIntentAssigner(topic_intent)
+        classified = await assigner(df=df, model=assignment_model, n_concurrent=100)
+        clf = classified.to_pandas()
+        return clf[["term", "topic", "subtopic", "intent"]]
+    except Exception as exc:
+        LOG.error(f"Error during topic and intent extraction: {exc}")
+        LOG.exception("Stack trace:")
+        return None
 
 
 async def process_ai_overviews(
