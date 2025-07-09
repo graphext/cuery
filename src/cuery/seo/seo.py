@@ -137,10 +137,20 @@ class SeoConfig(HashableConfig):
 async def fetch_data(cfg: SeoConfig) -> DataFrame:
     """Fetch all supported SEO data types for a given set of keywords."""
 
+    LOG.info(f"Starting SEO data extraction with configuration:\n{cfg.model_dump_json(indent=2)}")
+
     LOG.info("Fetching and processing keywords from Google Ads API")
     kwd_cfg = cfg.kwd_cfg.model_dump()
     kwds = fetch_keywords(**kwd_cfg)
+    if kwds is None or len(kwds.results) == 0:
+        LOG.error(
+            "No keywords were fetched from Google Ads API! "
+            "Check your configuration, credentials, and network connection."
+        )
+        return DataFrame()
+
     df = process_keywords(kwds, collect_volumes=True)
+    LOG.info(f"Got keyword dataframe:\n{df.head()}")
 
     LOG.info("Fetching and processing SERP data")
     if cfg.serp_cfg is not None:

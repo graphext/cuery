@@ -25,7 +25,6 @@ from google.ads.googleads.v20.enums.types import MonthOfYearEnum
 from google.ads.googleads.v20.services import (
     GenerateKeywordHistoricalMetricsRequest,
     GenerateKeywordIdeasRequest,
-    KeywordSeed,
 )
 from numpy import ndarray
 from pandas import DataFrame, Series
@@ -35,7 +34,7 @@ from ..context import AnyContext
 from ..prompt import Prompt
 from ..response import Field, Response, ResponseSet
 from ..task import Task
-from ..utils import dedent
+from ..utils import LOG, dedent
 
 
 def config_from_env() -> dict:
@@ -116,11 +115,15 @@ def fetch_keywords(  # noqa: PLR0913
         request = GenerateKeywordIdeasRequest()
 
         if page and not keywords:
+            LOG.info(f"Fetching keyword ideas for page {page} only.")
             request.url_seed.url = page
+            request.page_size = max_ideas or 100
         elif keywords and not page:
+            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords.")
             request.keyword_seed.keywords.extend(keywords)
             request.page_size = max_ideas or 100
         elif keywords and page:
+            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords and page: {page}.")
             request.keyword_and_url_seed.url = page
             request.keyword_and_url_seed.keywords.extend(keywords)
             request.page_size = max_ideas or 100
@@ -134,6 +137,7 @@ def fetch_keywords(  # noqa: PLR0913
             raise ValueError(
                 "No keywords provided. Please provide keywords to fetch historical metrics for."
             )
+        LOG.info(f"Fetching historical metrics for {len(keywords)} keywords.")
         request = GenerateKeywordHistoricalMetricsRequest()
         request.keywords = list(keywords)
         request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
