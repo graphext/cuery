@@ -113,20 +113,18 @@ def fetch_keywords(  # noqa: PLR0913
 
     if ideas:
         request = GenerateKeywordIdeasRequest()
+        request.page_size = max_ideas or 100
 
         if page and not keywords:
             LOG.info(f"Fetching keyword ideas for page {page} only.")
             request.url_seed.url = page
-            request.page_size = max_ideas or 100
         elif keywords and not page:
             LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords.")
             request.keyword_seed.keywords.extend(keywords)
-            request.page_size = max_ideas or 100
         elif keywords and page:
             LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords and page: {page}.")
             request.keyword_and_url_seed.url = page
             request.keyword_and_url_seed.keywords.extend(keywords)
-            request.page_size = max_ideas or 100
         else:
             raise ValueError(
                 "Either 'keywords' or 'page' must be provided when 'ideas' is True. "
