@@ -26,7 +26,7 @@ from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, RichHandler, Tex
 
 if not logging.getLogger("cuery").hasHandlers():
     LOG = logging.getLogger("cuery")
-    LOG.addHandler(RichHandler(markup=False))
+    LOG.addHandler(RichHandler(markup=False, show_path=False, enable_link_path=False))
     LOG.setLevel(logging.INFO)
 else:
     LOG = logging.getLogger("cuery")

@@ -63,8 +63,10 @@ class HashableConfig(BaseModel):
 class GoogleKwdConfig(HashableConfig):
     """Configuration for Google Ads API access."""
 
-    keywords: tuple[str, ...]
+    keywords: tuple[str, ...] | None = None
     """The (initial) keywords to fetch data for."""
+    page: str | None = None
+    """The page to fetch data for (if applicable)."""
     ideas: bool = False
     """Whether to expand initial keywords with Google Keyword Planner's idea generator."""
     max_ideas: int | None = None
@@ -146,7 +148,20 @@ async def fetch_data(cfg: SeoConfig) -> DataFrame:
         serp_params = serp_cfg.pop("params", {})
         serps = await fetch_serps(keywords=tuple(df.keyword), **serp_cfg, **serp_params)
 
+        if serps is None:
+            LOG.warning(
+                "The SERP actor has failed! Check your logs, configuration etc. "
+                "Will return keyword metrics only."
+            )
+            return df
+
+        if len(serps) == 0:
+            LOG.warning("Got 0 SERP results! Will return keyword metrics only.")
+            return df
+
         features, org, paid, ads = process_serps(serps, copy=True)
+        LOG.info(f"Got SERP dataframes\nFeatures:\n{features.head()}")
+        LOG.info(f"Organic:\n{org.head()}")
 
         if set(features.term) != set(df.keyword):
             warn("SERP terms do not match keywords!", stacklevel=2)

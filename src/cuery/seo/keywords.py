@@ -93,7 +93,8 @@ def year_month_from_date(date: str | datetime) -> tuple[int, MonthOfYearEnum.Mon
 
 @lru_cache(maxsize=3)
 def fetch_keywords(  # noqa: PLR0913
-    keywords: tuple[str, ...],
+    keywords: tuple[str, ...] | None = None,
+    page: str | None = None,
     ideas: bool = False,
     max_ideas: int | None = None,
     language: str = "en",
@@ -113,11 +114,29 @@ def fetch_keywords(  # noqa: PLR0913
 
     if ideas:
         request = GenerateKeywordIdeasRequest()
-        keyword_seed = KeywordSeed()
-        keyword_seed.keywords.extend(keywords)
-        request.keyword_seed = keyword_seed
-        request.page_size = max_ideas or 100
+
+        if page and not keywords:
+            request.url_seed.url = page
+
+        if keywords and not page:
+            request.keyword_seed.keywords.extend(keywords)
+            request.page_size = max_ideas or 100
+
+        if keywords and page:
+            request.keyword_and_url_seed.url = page
+            request.keyword_and_url_seed.keywords.extend(keywords)
+            request.page_size = max_ideas or 100
+
+        else:
+            raise ValueError(
+                "Either 'keywords' or 'page' must be provided when 'ideas' is True. "
+                "Provide a list of keywords or a page URL to fetch ideas from."
+            )
     else:
+        if not keywords:
+            raise ValueError(
+                "No keywords provided. Please provide keywords to fetch historical metrics for."
+            )
         request = GenerateKeywordHistoricalMetricsRequest()
         request.keywords = list(keywords)
         request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
