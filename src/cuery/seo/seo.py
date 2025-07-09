@@ -43,6 +43,7 @@ from pydantic import BaseModel, Field
 from ..utils import LOG
 from .keywords import fetch_keywords, process_keywords
 from .serps import (
+    add_brand_mentions,
     add_ranks,
     aggregate_organic_results,
     fetch_serps,
@@ -193,6 +194,9 @@ async def fetch_data(cfg: SeoConfig) -> DataFrame:
             ai_df = await process_ai_overviews(features, entity_model=cfg.entity_model)
             if ai_df is not None:
                 df = df.merge(ai_df, on="term", how="left")
+
+        if cfg.brands or cfg.competitors:
+            df = add_brand_mentions(df, brands=cfg.brands, competitors=cfg.competitors)
 
     if cfg.fetch_traffic:
         LOG.info("Fetching and processing traffic data for keywords")

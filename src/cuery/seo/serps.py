@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
@@ -10,7 +11,7 @@ from pathlib import Path
 import pandas as pd
 from apify_client import ApifyClientAsync
 from async_lru import alru_cache
-from pandas import DataFrame, NamedAgg
+from pandas import DataFrame, NamedAgg, Series
 
 from ..utils import LOG
 from .tasks import EntityExtractor, SerpTopicAndIntentAssigner, SerpTopicExtractor
@@ -343,3 +344,97 @@ async def process_ai_overviews(
             return None
 
     return None
+
+
+def mentioned_in_string(
+    words: str | list[str],
+    text: str | None,
+    whole_word: bool = True,
+) -> list[str] | None:
+    """Check if the brand is mentioned in the text."""
+    if not text:
+        return None
+
+    if isinstance(words, str):
+        words = [words]
+
+    if whole_word:
+        return [
+            word for word in words if re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE)
+        ]
+
+    return [word for word in words if word.lower() in text.lower()]
+
+
+def mentioned_in_list(
+    words: str | list[str],
+    texts: list[str] | None,
+    whole_word: bool = True,
+) -> list[str] | None:
+    """Check if the brand is mentioned in any of the strings in the list."""
+    if not texts:
+        return None
+
+    mentions = []
+    for txt in texts:
+        if txt_words := mentioned_in_string(words, txt, whole_word):
+            mentions.extend(txt_words)
+
+    return mentions if mentions else None
+
+
+def mentioned_brands(
+    ser: Series,
+    brands: str | list[str],
+    whole_word: bool = True,
+) -> Series:
+    valid_idx = ser.first_valid_index()
+    if valid_idx is None:
+        return Series([False] * len(ser), index=ser.index)
+
+    someval = ser[valid_idx]
+    if isinstance(someval, str):
+        return ser.apply(lambda txt: mentioned_in_string(brands, txt, whole_word))
+
+    if isinstance(someval, list):
+        return ser.apply(lambda lst: mentioned_in_list(brands, lst, whole_word))
+
+    raise TypeError(f"Unsupported type {type(someval)} in Series.")
+
+
+def add_brand_mentions(
+    df,
+    brands: str | list[str] | None = None,
+    competitors: str | list[str] | None = None,
+    whole_word: bool = True,
+) -> DataFrame:
+    """Process brand mentions in SERP data."""
+    if "aiOverview_content" in df.columns:
+        if brands:
+            df["aiOverview_brand_mentions"] = mentioned_brands(
+                df["aiOverview_content"],
+                brands=brands,
+                whole_word=whole_word,
+            )
+        if competitors:
+            df["aiOverview_competitor_mentions"] = mentioned_brands(
+                df["aiOverview_content"],
+                brands=competitors,
+                whole_word=whole_word,
+            )
+
+    if "aiOverview_source_titles" in df.columns:
+        if brands:
+            df["aiOverview_source_mentions"] = mentioned_brands(
+                df["aiOverview_source_titles"],
+                brands=brands,
+                whole_word=True,
+            )
+        if competitors:
+            df["aiOverview_source_competitor_mentions"] = mentioned_brands(
+                df["aiOverview_source_titles"],
+                brands=competitors,
+                whole_word=True,
+            )
+
+    return df
