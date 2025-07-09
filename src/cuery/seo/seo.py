@@ -211,4 +211,7 @@ async def fetch_data(cfg: SeoConfig) -> DataFrame:
         LOG.info("Fetching and processing traffic data for keywords")
         df = await add_keyword_traffic(df)
 
+    if "term" in df.columns:
+        df = df.drop(columns=["term"])
+
     return df
