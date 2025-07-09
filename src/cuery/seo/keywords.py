@@ -117,16 +117,13 @@ def fetch_keywords(  # noqa: PLR0913
 
         if page and not keywords:
             request.url_seed.url = page
-
-        if keywords and not page:
+        elif keywords and not page:
             request.keyword_seed.keywords.extend(keywords)
             request.page_size = max_ideas or 100
-
-        if keywords and page:
+        elif keywords and page:
             request.keyword_and_url_seed.url = page
             request.keyword_and_url_seed.keywords.extend(keywords)
             request.page_size = max_ideas or 100
-
         else:
             raise ValueError(
                 "Either 'keywords' or 'page' must be provided when 'ideas' is True. "
