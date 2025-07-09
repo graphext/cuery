@@ -96,7 +96,6 @@ class SerpConfig(HashableConfig):
     """Number of keywords to fetch in a single batch."""
     resultsPerPage: int = 100
     """Number of results to fetch per page."""
-
     maxPagesPerQuery: int = 1
     """Maximum number of pages to fetch per query."""
     country: str | None = None
