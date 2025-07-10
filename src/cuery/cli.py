@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -7,6 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from cuery.builder.ui import launch
+from cuery.seo import SeoConfig
 from cuery.task import Task
 
 app = typer.Typer()
@@ -46,6 +48,15 @@ def run_task(task_name: str, csv: Path, output: Path):
 def launch_builder():
     """Launch the interactive schema builder interface."""
     launch()
+
+
+@app.command("seo-schema")
+def generate_seo_schema(output: Path = Path("input_schema.json")):
+    """Generate the SEO schema JSON file."""
+    schema = SeoConfig.model_json_schema()
+    with open(output, "w") as fp:
+        json.dump(schema, fp, indent=2)
+    typer.echo(f"SEO schema written to {output}")
 
 
 if __name__ == "__main__":

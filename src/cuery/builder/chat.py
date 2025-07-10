@@ -4,7 +4,6 @@ I.e. the logic of interaction with OpenAI etc.
 """
 
 import json
-import os
 import random
 from typing import Any
 
@@ -111,7 +110,13 @@ class SchemaResponse(BaseModel):
 
 
 CURRENT_SCHEMA = None
-CLIENT = instructor.from_openai(OpenAI())
+CLIENT = None
+
+
+def connect():
+    """Connect to OpenAI API using instructor."""
+    global CLIENT  # noqa: PLW0603
+    CLIENT = instructor.from_openai(OpenAI())
 
 
 def ai_chat(message: str, history: list) -> tuple[str, str, DataFrame | None]:
