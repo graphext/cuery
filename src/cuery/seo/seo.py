@@ -66,8 +66,10 @@ class GoogleKwdConfig(HashableConfig):
 
     keywords: tuple[str, ...] | None = None
     """The (initial) keywords to fetch data for."""
-    page: str | None = None
+    url: str | None = None
     """The page to fetch data for (if applicable)."""
+    whole_site: bool = False
+    """Whether to fetch keyword ideas for the whole site (if `url` is provided)."""
     ideas: bool = False
     """Whether to expand initial keywords with Google Keyword Planner's idea generator."""
     max_ideas: int | None = None

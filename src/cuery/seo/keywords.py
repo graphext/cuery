@@ -1,18 +1,23 @@
 """Easier access to Google Ads API for SEO purposes.
 
 Useful documentation:
-    - https://developers.google.com/google-ads/api/samples/generate-keyword-ideas
-    - https://developers.google.com/google-ads/api/reference/rpc/v20/GenerateKeywordIdeasRequest
-    - https://developers.google.com/google-ads/api/docs/keyword-planning/generate-historical-metrics
-    - https://developers.google.com/google-ads/api/reference/rpc/v20/GenerateKeywordHistoricalMetricsRequest
-    - https://developers.google.com/google-ads/api/data/codes-formats#expandable-7
-    - https://developers.google.com/google-ads/api/data/geotargets
+    - Keyword ideas:
+        - https://developers.google.com/google-ads/api/docs/keyword-planning/generate-keyword-ideas
+        - https://developers.google.com/google-ads/api/samples/generate-keyword-ideas
+        - https://developers.google.com/google-ads/api/reference/rpc/v20/GenerateKeywordIdeasRequest
+    - Historical metrics:
+        - https://developers.google.com/google-ads/api/docs/keyword-planning/generate-historical-metrics
+        - https://developers.google.com/google-ads/api/reference/rpc/v20/GenerateKeywordHistoricalMetricsRequest
+    - ID/Code references:
+        - https://developers.google.com/google-ads/api/data/codes-formats#expandable-7
+        - https://developers.google.com/google-ads/api/data/geotargets
 
 """
 
 import json
 import os
 import tempfile
+import urllib.parse
 from collections.abc import Iterable
 from datetime import datetime
 from functools import lru_cache
@@ -90,10 +95,23 @@ def year_month_from_date(date: str | datetime) -> tuple[int, MonthOfYearEnum.Mon
     return y, m
 
 
+def is_domain(url: str) -> bool:
+    """Check if the URL is a domain only, without path."""
+    if not url:
+        return False
+
+    if not url.startswith("http"):
+        url = "https://" + url
+
+    parsed = urllib.parse.urlparse(str(url))
+    return not parsed.path.strip("/")
+
+
 @lru_cache(maxsize=3)
 def fetch_keywords(  # noqa: PLR0913
     keywords: tuple[str, ...] | None = None,
-    page: str | None = None,
+    url: str | None = None,
+    whole_site: bool = False,
     ideas: bool = False,
     max_ideas: int | None = None,
     language: str = "en",
@@ -114,21 +132,30 @@ def fetch_keywords(  # noqa: PLR0913
     if ideas:
         request = GenerateKeywordIdeasRequest()
         request.page_size = max_ideas or 100
+        request.include_adult_keywords = False
+        request.keyword_annotation.append(
+            client.enums.KeywordPlanKeywordAnnotationEnum.KEYWORD_CONCEPT
+        )
 
-        if page and not keywords:
-            LOG.info(f"Fetching keyword ideas for page {page} only.")
-            request.url_seed.url = page
-        elif keywords and not page:
+        if url and whole_site and is_domain(url):
+            LOG.info(f"Fetching keyword ideas for whole site {url}.")
+            request.site_seed.site = url
+            if keywords:
+                LOG.warning("Manually specified keywords will be ignored!")
+        elif url and not keywords:
+            LOG.info(f"Fetching keyword ideas for page {url} only.")
+            request.url_seed.url = url
+        elif keywords and not url:
             LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords.")
             request.keyword_seed.keywords.extend(keywords)
-        elif keywords and page:
-            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords and page: {page}.")
-            request.keyword_and_url_seed.url = page
+        elif keywords and url:
+            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords and page: {url}.")
+            request.keyword_and_url_seed.url = url
             request.keyword_and_url_seed.keywords.extend(keywords)
         else:
             raise ValueError(
-                "Either 'keywords' or 'page' must be provided when 'ideas' is True. "
-                "Provide a list of keywords or a page URL to fetch ideas from."
+                "Either 'keywords' or 'url' must be provided when 'ideas' is True. "
+                "Provide a list of keywords or a url URL to fetch ideas from."
             )
     else:
         if not keywords:
@@ -138,7 +165,8 @@ def fetch_keywords(  # noqa: PLR0913
         LOG.info(f"Fetching historical metrics for {len(keywords)} keywords.")
         request = GenerateKeywordHistoricalMetricsRequest()
         request.keywords = list(keywords)
-        request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
+
+    request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
 
     request.customer_id = customer or os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
@@ -241,27 +269,37 @@ def add_trend_columns(df: DataFrame) -> DataFrame:
 
 
 def process_keywords(response: Iterable, collect_volumes: bool = True) -> DataFrame:
-    keywords = []
+    """Process Google Ads API keyword response into a DataFrame."""
+
+    # Check which metrics and attributes we have extracted
+    if hasattr(response.results[0], "keyword_idea_metrics"):
+        metrics_attr = "keyword_idea_metrics"
+    else:
+        metrics_attr = "keyword_metrics"
+
+    some_metrics = getattr(response.results[0], metrics_attr, None)
+    fields = [
+        "avg_monthly_searches",
+        "competition",
+        "competition_index",
+        "average_cpc_micros",
+        "low_top_of_page_bid_micros",
+        "high_top_of_page_bid_micros",
+    ]
+    fields = [f for f in fields if hasattr(some_metrics, f)]
+
+    records = []
     for kwd in response.results:
         record = {
             "keyword": kwd.text,
         }
 
-        metrics = getattr(kwd, "keyword_idea_metrics", None) or getattr(
-            kwd, "keyword_metrics", None
-        )
-        if metrics is not None:
-            record["avg_monthly_searches"] = getattr(metrics, "avg_monthly_searches", None)
-            record["competition"] = getattr(metrics, "competition", None)
-            record["competition_index"] = getattr(metrics, "competition_index", None)
+        if (metrics := getattr(kwd, metrics_attr, None)) is not None:
+            # Single value metrics
+            for field in fields:
+                record[field] = getattr(metrics, field, None)
 
-            record["low_top_of_page_bid_micros"] = getattr(
-                metrics, "low_top_of_page_bid_micros", None
-            )
-            record["high_top_of_page_bid_micros"] = getattr(
-                metrics, "high_top_of_page_bid_micros", None
-            )
-
+            # Monthly search volumes
             if volumes := getattr(metrics, "monthly_search_volumes", None):
                 for volume in volumes:
                     year = volume.year
@@ -269,9 +307,23 @@ def process_keywords(response: Iterable, collect_volumes: bool = True) -> DataFr
                     date = datetime.strptime(f"{year}-{month.name.capitalize()}", "%Y-%B")
                     record[f"search_volume_{date.year}_{date.month:02}"] = volume.monthly_searches
 
-        keywords.append(record)
+        # Concept annotations
+        if (annotations := getattr(kwd, "keyword_annotations", None)) is not None:  # noqa: SIM102
+            if (concepts := getattr(annotations, "concepts", None)) is not None:
+                concept_names, concept_groups = set(), set()
+                for concept in concepts:
+                    concept_names.add(concept.name)
+                    if hasattr(concept, "concept_group"):
+                        concept_groups.add(concept.concept_group.name)
 
-    df = DataFrame(keywords)
+                concept_names -= {"Others", "Non-Brands"}
+                concept_groups.discard("Others")
+                record["concepts"] = list(concept_names) or None
+                record["concept_groups"] = list(concept_groups) or None
+
+        records.append(record)
+
+    df = DataFrame(records)
     if collect_volumes:
         df = collect_volume_columns(df)
         df = add_trend_columns(df)
