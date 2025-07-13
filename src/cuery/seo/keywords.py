@@ -1,4 +1,4 @@
-"""Easier access to Google Ads API for SEO purposes.
+"""Easier access to Google Ads API for keyword research.
 
 Useful documentation:
     - Keyword ideas:
@@ -29,17 +29,115 @@ from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.v20.enums.types import MonthOfYearEnum
 from google.ads.googleads.v20.services import (
     GenerateKeywordHistoricalMetricsRequest,
+    GenerateKeywordHistoricalMetricsResponse,
     GenerateKeywordIdeasRequest,
+)
+from google.ads.googleads.v20.services.services.keyword_plan_idea_service.pagers import (
+    GenerateKeywordIdeasPager,
 )
 from numpy import ndarray
 from pandas import DataFrame, Series
+from pydantic import Field, field_validator, model_validator
 
 from .. import resources, utils
 from ..context import AnyContext
 from ..prompt import Prompt
-from ..response import Field, Response, ResponseSet
+from ..response import Response, ResponseSet
 from ..task import Task
-from ..utils import LOG, dedent
+from ..utils import LOG, HashableConfig, dedent
+
+
+class GoogleKwdConfig(HashableConfig):
+    """Configuration for Google Ads API access."""
+
+    keywords: tuple[str, ...] | None = None
+    """The (initial) keywords to fetch data for.
+    When generating keyword ideas, only the first 20 keywords will be used.
+    Will be ignored in whole-site mode.
+    """
+    url: str | None = None
+    """The page to fetch data for (if applicable). For whole-site mode,
+    provide a pure domain URL (e.g., 'example.com').
+    """
+    whole_site: bool = False
+    """Whether to fetch keyword ideas for the whole site (if `url` is provided)."""
+    ideas: bool = False
+    """Whether to expand initial keywords with Google Keyword Planner's idea generator.
+    Otherwise, will fetch historical metrics for the provided keywords only.
+    """
+    max_ideas: int | None = None
+    """Maximum number of additional keyword ideas to fetch (if `ideas` is True)."""
+    language: str = "en"
+    """The language to use for keyword data (e.g., 'en' for English)."""
+    country: str = "us"
+    """The geographical target for keyword data (e.g., 'us' for United States)."""
+    metrics_start: str | None = None
+    """Start date (year and month) for metrics in YYYY-MM format (e.g., '2023-01').
+    Either provide both `metrics_start` and `metrics_end` or neither.
+    """
+    metrics_end: str | None = None
+    """End date (year and month) for metrics in YYYY-MM format (e.g., '2023-12').
+    Either provide both `metrics_start` and `metrics_end` or neither.
+    """
+    credentials: str | Path | dict | None = None
+    """Path to Google Ads API credentials file or a dictionary with credentials.
+    If not provided, will look for environment variables with prefix `GOOGLE_ADS_`.
+    """
+    customer: str | None = None
+    """Google Ads customer ID to use for API requests.
+    If not provided, will use the `GOOGLE_ADS_CUSTOMER_ID` or `GOOGLE_ADS_LOGIN_CUSTOMER_ID`
+    environment variable.
+    """
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, v):
+        try:
+            resources.google_lang_id(v)
+            return v
+        except ValueError as e:
+            raise ValueError(f"Invalid language code: {v}") from e
+
+    @field_validator("country")
+    @classmethod
+    def validate_country(cls, v):
+        try:
+            resources.google_country_id(v)
+            return v
+        except ValueError as e:
+            raise ValueError(f"Invalid country code: {v}") from e
+
+    @model_validator(mode="after")
+    def validate(self):
+        # Consistent dates
+        if (self.metrics_start is not None and self.metrics_end is None) or (
+            self.metrics_start is None and self.metrics_end is not None
+        ):
+            raise ValueError("Either provide both metrics_end and metrics_start or neither!")
+
+        if self.metrics_start and self.metrics_end:
+            try:
+                start = datetime.strptime(self.metrics_start, "%Y-%m")
+                end = datetime.strptime(self.metrics_end, "%Y-%m")
+            except ValueError as e:
+                raise ValueError(
+                    "Metrics start and end dates must be in YYYY-MM format (e.g., '2023-01')."
+                ) from e
+
+            if start > end:
+                raise ValueError("Metrics start date must be before or equal to the end date.")
+
+        # Limit keyword seed
+        seed_max = 20
+        whole_site = self.url and self.whole_site and is_domain(self.url)
+        if self.ideas and self.keywords and not whole_site and (len(self.keywords) > seed_max):
+            self.keywords = self.keywords[:seed_max]
+            LOG.warning(
+                "Google only supports up to 20 initial keywords for keyword ideas generation. "
+                "Will use the first 20 keywords and ignore rest."
+            )
+
+        return self
 
 
 def config_from_env() -> dict:
@@ -108,30 +206,20 @@ def is_domain(url: str) -> bool:
 
 
 @lru_cache(maxsize=3)
-def fetch_keywords(  # noqa: PLR0913
-    keywords: tuple[str, ...] | None = None,
-    url: str | None = None,
-    whole_site: bool = False,
-    ideas: bool = False,
-    max_ideas: int | None = None,
-    language: str = "en",
-    geo_target: str = "us",
-    metrics_start: str | None = None,
-    metrics_end: str | None = None,
-    credentials: str | Path | dict | None = None,
-    customer: str | None = None,
-):
-    """Fetch metrics for a fixed list of keywords or generated keyword ideas from Google Ads API."""
-    client = connect_ads_client(credentials)
-
+def fetch_keywords(
+    cfg: GoogleKwdConfig,
+) -> GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse:
+    """Fetch metrics for a fixed list of keywords or generate keyword ideas from Google Ads API."""
+    client = connect_ads_client(cfg.credentials)
     ads_service = client.get_service("GoogleAdsService")
     kwd_service = client.get_service("KeywordPlanIdeaService")
 
     request: GenerateKeywordIdeasRequest | GenerateKeywordHistoricalMetricsRequest
+    url, keywords, whole_site = cfg.url, cfg.keywords, cfg.whole_site
 
-    if ideas:
+    if cfg.ideas:
         request = GenerateKeywordIdeasRequest()
-        request.page_size = max_ideas or 100
+        request.page_size = cfg.max_ideas or 100
         request.include_adult_keywords = False
         request.keyword_annotation.append(
             client.enums.KeywordPlanKeywordAnnotationEnum.KEYWORD_CONCEPT
@@ -143,13 +231,13 @@ def fetch_keywords(  # noqa: PLR0913
             if keywords:
                 LOG.warning("Manually specified keywords will be ignored!")
         elif url and not keywords:
-            LOG.info(f"Fetching keyword ideas for page {url} only.")
+            LOG.info(f"Fetching keyword ideas for page {url}.")
             request.url_seed.url = url
         elif keywords and not url:
-            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords.")
+            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keyword(s).")
             request.keyword_seed.keywords.extend(keywords)
         elif keywords and url:
-            LOG.info(f"Fetching keyword ideas for {len(keywords)} seed keywords and page: {url}.")
+            LOG.info(f"Fetching ideas for {len(keywords)} seed keyword(s) and page: {url}.")
             request.keyword_and_url_seed.url = url
             request.keyword_and_url_seed.keywords.extend(keywords)
         else:
@@ -168,29 +256,29 @@ def fetch_keywords(  # noqa: PLR0913
 
     request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
 
-    request.customer_id = customer or os.environ.get(
+    request.customer_id = cfg.customer or os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
 
-    lang_id = resources.google_lang_id(language)
+    lang_id = resources.google_lang_id(cfg.language)
     request.language = ads_service.language_constant_path(lang_id)
 
-    geo_target = resources.google_country_id(geo_target)
+    geo_target = resources.google_country_id(cfg.country)
     request.geo_target_constants.append(ads_service.geo_target_constant_path(geo_target))
 
     request.historical_metrics_options.include_average_cpc = True
 
-    if metrics_start is not None:
-        y, m = year_month_from_date(metrics_start)
+    if cfg.metrics_start is not None:
+        y, m = year_month_from_date(cfg.metrics_start)
         request.historical_metrics_options.year_month_range.start.year = y
         request.historical_metrics_options.year_month_range.start.month = m
 
-    if metrics_end is not None:
-        y, m = year_month_from_date(metrics_end)
+    if cfg.metrics_end is not None:
+        y, m = year_month_from_date(cfg.metrics_end)
         request.historical_metrics_options.year_month_range.end.year = y
         request.historical_metrics_options.year_month_range.end.month = m
 
-    if ideas:
+    if cfg.ideas:
         return kwd_service.generate_keyword_ideas(request=request)
 
     return kwd_service.generate_keyword_historical_metrics(request=request)
@@ -268,7 +356,10 @@ def add_trend_columns(df: DataFrame) -> DataFrame:
     return df
 
 
-def process_keywords(response: Iterable, collect_volumes: bool = True) -> DataFrame:
+def process_keywords(
+    response: GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse,
+    collect_volumes: bool = True,
+) -> DataFrame:
     """Process Google Ads API keyword response into a DataFrame."""
 
     # Check which metrics and attributes we have extracted
@@ -329,6 +420,21 @@ def process_keywords(response: Iterable, collect_volumes: bool = True) -> DataFr
         df = add_trend_columns(df)
 
     return df
+
+
+def keywords(cfg: GoogleKwdConfig) -> DataFrame:
+    """Fetch and process keywords from Google Ads API based on the provided configuration."""
+    LOG.info(f"Fetching keywords with\n\n{cfg}")
+    response = fetch_keywords(cfg)  # type: ignore
+
+    if response is None or len(response.results) == 0:
+        raise ValueError(
+            "No keywords were fetched from Google Ads API! "
+            "Check your configuration, credentials, and network connection."
+        )
+
+    LOG.info("Processing metrics response into DataFrame.")
+    return process_keywords(response, collect_volumes=cfg.ideas)
 
 
 SYSTEM_PROMPT = dedent("""

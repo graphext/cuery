@@ -7,51 +7,93 @@ import re
 from collections.abc import Iterable
 from copy import deepcopy
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from apify_client import ApifyClientAsync
 from async_lru import alru_cache
 from pandas import DataFrame, NamedAgg, Series
+from pydantic import Field
 
-from ..utils import LOG
+from ..utils import LOG, HashableConfig
 from .tasks import EntityExtractor, SerpTopicAndIntentAssigner, SerpTopicExtractor
 
 
+class SerpConfig(HashableConfig):
+    """Configuration for fetching SERP data using Apify Google Search Scraper actor."""
+
+    batch_size: int = 100
+    """Number of keywords to fetch in a single batch."""
+    resultsPerPage: int = 100
+    """Number of results to fetch per page."""
+    maxPagesPerQuery: int = 1
+    """Maximum number of pages to fetch per query."""
+    country: str | None = None
+    """Country code for SERP data (e.g., 'us' for United States)."""
+    searchLanguage: str | None = None
+    """Search language for SERP data (e.g., 'en' for English)."""
+    languageCode: str | None = None
+    """Language code for SERP data (e.g., 'en' for English)."""
+    params: dict[str, Any] | None = Field(default_factory=dict)
+    """Additional parameters to pass to the Apify actor."""
+    top_n: int = 10
+    """Number of top organic results to consider for aggregation per keyword."""
+    brands: str | list[str] | None = None
+    """List of brand names to identify in SERP data."""
+    competitors: str | list[str] | None = None
+    """List of competitor names to identify in SERP data."""
+    topic_max_samples: int = 500
+    """Maximum number of samples to use for topic and intent extraction from SERP data."""
+    topic_model: str | None = "google/gemini-2.5-flash-preview-05-20"
+    """Model to use for topic extraction from SERP organic results."""
+    assignment_model: str | None = "openai/gpt-4.1-mini"
+    """Model to use for intent classification from SERP organic results."""
+    entity_model: str | None = "openai/gpt-4.1-mini"
+    """Model to use for entity extraction from AI overviews."""
+    apify_token: str | Path | None = None
+    """Path to Apify API token file.
+    If not provided, will use the `APIFY_TOKEN` environment variable.
+    """
+
+
+async def fetch_batch(keywords: list[str], client: ApifyClientAsync, **params):
+    """Process a single batch of keywords."""
+    run_input = {"queries": "\n".join(keywords), **params}
+    actor = client.actor("apify/google-search-scraper")
+    run = await actor.call(run_input=run_input)
+    if run is None:
+        LOG.error(f"Actor run failed for batch: {keywords}... ")
+        return None
+
+    dataset_client = client.dataset(run["defaultDatasetId"])
+    return await dataset_client.list_items()
+
+
 @alru_cache(maxsize=3)
-async def fetch_serps(
-    keywords: tuple[str, ...],
-    batch_size: int = 100,
-    apify_token: str | Path | None = None,
-    **kwargs,
-):
+async def fetch_serps(keywords: tuple[str, ...], cfg: SerpConfig) -> list[dict]:
     """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor."""
-    if isinstance(apify_token, str | Path):
-        with open(apify_token) as f:
+    if isinstance(cfg.apify_token, str | Path):
+        with open(cfg.apify_token) as f:
             token = f.read().strip()
     else:
         token = os.environ["APIFY_TOKEN"]
 
-    client = ApifyClientAsync(token)
+    actor_param_names = (
+        "resultsPerPage",
+        "maxPagesPerQuery",
+        "country",
+        "searchLanguage",
+        "languageCode",
+    )
+    actor_params = {p: getattr(cfg, p) for p in actor_param_names} | (cfg.params or {})
 
     keywords_list = list(keywords)
     keyword_batches = [
-        keywords_list[i : i + batch_size] for i in range(0, len(keywords_list), batch_size)
+        keywords_list[i : i + cfg.batch_size] for i in range(0, len(keywords_list), cfg.batch_size)
     ]
 
-    async def process_batch(batch):
-        """Process a single batch of keywords."""
-        run_input = {"queries": "\n".join(batch), **kwargs}
-
-        actor = client.actor("apify/google-search-scraper")
-        run = await actor.call(run_input=run_input)
-        if run is None:
-            LOG.error(f"Actor run failed for batch: {batch}... ")
-            return None
-
-        dataset_client = client.dataset(run["defaultDatasetId"])
-        return await dataset_client.list_items()
-
-    tasks = [process_batch(batch) for batch in keyword_batches]
+    client = ApifyClientAsync(token)
+    tasks = [fetch_batch(batch, client, **actor_params) for batch in keyword_batches]
     batch_results = await asyncio.gather(*tasks)
 
     result = []
@@ -163,7 +205,7 @@ def extract_paid_products(data: list[dict]) -> list[dict]:
     return results
 
 
-def process_serps(serps, copy=True) -> tuple[DataFrame, DataFrame, DataFrame, DataFrame]:
+def serps_to_pandas(serps, copy=True) -> tuple[DataFrame, DataFrame, DataFrame, DataFrame]:
     if not isinstance(serps, list):
         serps = serps.items
 
@@ -408,7 +450,7 @@ def add_brand_mentions(
     competitors: str | list[str] | None = None,
     whole_word: bool = True,
 ) -> DataFrame:
-    """Process brand mentions in SERP data."""
+    """Identify brand mentions in AI overviews using regex."""
     if "aiOverview_content" in df.columns:
         if brands:
             df["aiOverview_brand_mentions"] = mentioned_brands(
@@ -438,3 +480,61 @@ def add_brand_mentions(
             )
 
     return df
+
+
+async def process_serps(
+    response,
+    cfg: SerpConfig,
+    copy: bool = True,
+) -> DataFrame:
+    """Process SERP results and return dataframes for features, organic, paid, and ads."""
+
+    # Separate SERP sections into DataFrames
+    features, org, paid, ads = serps_to_pandas(response, copy=copy)
+
+    # Process organic results
+    orgagg = aggregate_organic_results(org, top_n=cfg.top_n)
+    if cfg.brands or cfg.competitors:
+        LOG.info("Identifying brand and competitor ranks in organic results")
+        orgagg = add_ranks(orgagg, brands=cfg.brands, competitors=cfg.competitors)
+
+    df = features.merge(orgagg, on="term", how="left")
+
+    # Topics and intent
+    if cfg.topic_model is not None and cfg.assignment_model is not None:
+        LOG.info("Extracting topics and intents from keywords and top organic results")
+        topics = await topic_and_intent(
+            orgagg,
+            max_samples=cfg.topic_max_samples,
+            topic_model=cfg.topic_model,
+            assignment_model=cfg.assignment_model,
+            max_retries=6,
+        )
+        if topics is not None:
+            df = df.merge(topics, on="term", how="left")
+
+    # AI overview entities
+    if cfg.entity_model is not None:
+        LOG.info("Extracting entities from AI overviews")
+        entities = await process_ai_overviews(features, entity_model=cfg.entity_model)
+        if entities is not None:
+            df = df.merge(entities, on="term", how="left")
+
+    if cfg.brands or cfg.competitors:
+        LOG.info("Identifying brand and competitor mentions AI overviews")
+        df = add_brand_mentions(df, brands=cfg.brands, competitors=cfg.competitors)
+
+    return df
+
+
+async def serps(keywords: Iterable[str], cfg: SerpConfig) -> DataFrame | None:
+    """Fetch and process SERP data for a list of keywords."""
+    LOG.info(f"Fetching SERP data for {len(keywords)} keywords with\n\n{cfg}")
+    response = await fetch_serps(tuple(keywords), cfg)
+
+    if response is None or len(response) == 0:
+        LOG.warning("No SERP results found.")
+        return None
+
+    LOG.info("Processing SERP data")
+    return await process_serps(response, cfg)

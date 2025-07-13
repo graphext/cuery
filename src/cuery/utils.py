@@ -16,7 +16,7 @@ import yaml
 from glom import glom
 from jinja2 import Environment, meta
 from pandas import isna
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 from tiktoken import Encoding, encoding_for_model, get_encoding
@@ -271,3 +271,20 @@ def customize_fields(model: BaseModelClass, class_name: str, **fields) -> BaseMo
         field_args[field_name] = (args.pop("annotation"), Field(**args))
 
     return create_model(class_name, **field_args, __base__=model)
+
+
+class HashableConfig(BaseModel):
+    """Base class for configurations. Hashable so we can cache API calls using them."""
+
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    def __hash__(self) -> int:
+        return self.model_dump_json().__hash__()
+
+    def __repr__(self) -> str:
+        name = self.__class__.__name__
+        params = self.model_dump_json(indent=2)
+        return f"{name}\n{'—' * len(name)}\n{params}\n"
+
+    def __str__(self) -> str:
+        return self.__repr__()

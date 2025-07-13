@@ -3,14 +3,26 @@
 import asyncio
 import os
 import urllib.parse
+from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 from apify_client import ApifyClientAsync
 from async_lru import alru_cache
-from pandas import DataFrame, NamedAgg
+from pandas import DataFrame, NamedAgg, Series
 
-from ..utils import LOG
+from ..utils import LOG, HashableConfig
+
+
+class TrafficConfig(HashableConfig):
+    """Configuration for fetching SERP data using Apify Google Search Scraper actor."""
+
+    batch_size: int = 100
+    """Number of keywords to fetch in a single batch."""
+    apify_token: str | Path | None = None
+    """Path to Apify API token file.
+    If not provided, will use the `APIFY_TOKEN` environment variable.
+    """
 
 
 def domain(url: str) -> str | None:
@@ -32,59 +44,58 @@ def domain(url: str) -> str | None:
     return domain
 
 
+async def fetch_batch(urls: list[str], client: ApifyClientAsync, **kwargs):
+    """Process a single batch of keywords."""
+    run_input = {"websites": urls, **kwargs}
+    actor = client.actor("tri_angle/fast-similarweb-scraper")
+    run = await actor.call(run_input=run_input)
+    if run is None:
+        LOG.error(f"Actor run failed for batch: {urls}... ")
+        return None
+
+    dataset_client = client.dataset(run["defaultDatasetId"])
+    return await dataset_client.list_items()
+
+
 @alru_cache(maxsize=3)
-async def fetch_domain_traffic(
-    urls: tuple[str, ...],  # type: ignore
-    batch_size: int = 100,
-    apify_token: str | Path | None = None,
-    **kwargs,
-) -> DataFrame:
+async def fetch_domain_traffic(urls: tuple[str, ...], cfg: TrafficConfig) -> DataFrame:
     """Fetch traffic data for a DataFrame of organic SERP results.
 
     Note that free similarweb crawlers only fetch data at the domain level, not for specific URLs!
 
     Actor: https://apify.com/tri_angle/fast-similarweb-scraper
     """
-    if isinstance(apify_token, str | Path):
-        with open(apify_token) as f:
+    if isinstance(cfg.apify_token, str | Path):
+        with open(cfg.apify_token) as f:
             token = f.read().strip()
     else:
         token = os.environ["APIFY_TOKEN"]
 
     client = ApifyClientAsync(token)
 
-    domains = [domain(url) for url in urls]
-    domains_unq = list({d for d in domains if d})
-    batches = [domains_unq[i : i + batch_size] for i in range(0, len(domains_unq), batch_size)]
-
-    async def process_batch(batch):
-        """Process a single batch of keywords."""
-        run_input = {"websites": batch, **kwargs}
-
-        actor = client.actor("tri_angle/fast-similarweb-scraper")
-        run = await actor.call(run_input=run_input)
-        if run is None:
-            LOG.error(f"Actor run failed for batch: {batch}... ")
-            return None
-
-        dataset_client = client.dataset(run["defaultDatasetId"])
-        return await dataset_client.list_items()
-
-    tasks = [process_batch(batch) for batch in batches]
+    # Get clean unique domain names from URLs
+    # Maintain original order despite deduplication and removal of empty domains
+    domains = Series(urls, name="domain").apply(domain)
+    unique = domains.dropna().drop_duplicates().reset_index(drop=True)
+    batches = [unique.iloc[i : i + cfg.batch_size] for i in range(0, len(unique), cfg.batch_size)]
+    tasks = [fetch_batch(list(batch), client) for batch in batches]
     batch_results = await asyncio.gather(*tasks)
 
-    result = []
-    for batch_result in batch_results:
-        if batch_result is not None:
-            result.extend(batch_result.items)
+    records = []
+    for result in batch_results:
+        if result is not None:
+            records.extend(result.items)
 
-    df = DataFrame.from_records(result)
-    idx = DataFrame({"url": urls, "domain": domains})
-    df = idx.merge(df.drop(columns=["url"]), left_on="domain", right_on="name", how="left")
-    return df.drop(columns=["name"])
+    data = DataFrame.from_records(records)
+    data = data.drop(columns=["url"])  # This is the url to Similarweb
+
+    # Reconstruct the original order of urls/domains, including duplicates and empty domains
+    result = DataFrame({"url": urls, "domain": domains})
+    result = result.merge(data, left_on="domain", right_on="name", how="left")
+    return result.drop(columns=["name"])
 
 
-def process_traffic(df: DataFrame) -> DataFrame:
+def normalize_traffic(df: DataFrame) -> DataFrame:
     """Process traffic data into flat DataFrame with relevant data only."""
     df["globalRank"] = pd.json_normalize(df.globalRank)
 
@@ -121,6 +132,7 @@ def aggregate_traffic(df: DataFrame, by: str) -> DataFrame:
     Note: for now we don't keep similarweb's categorization of domains or top keyword data.
     """
     aggs = {
+        "urls": NamedAgg("url", list),
         "globalRank_min": NamedAgg("globalRank", "min"),
         "globalRank_max": NamedAgg("globalRank", "max"),
         "visits_min": NamedAgg("visits", "min"),
@@ -144,32 +156,25 @@ def aggregate_traffic(df: DataFrame, by: str) -> DataFrame:
     return df.groupby(by).agg(**aggs).reset_index()
 
 
-async def add_keyword_traffic(kwds: DataFrame) -> DataFrame:
-    """Fetch and add traffic data to keywords DataFrame.
-
-    Note: each keyword has multiple top organic websites/domains in SERP results.
-    """
-    required_columns = ["keyword", "domains"]
-    if any(col not in kwds for col in required_columns):
-        LOG.warning(
-            f"Keywords DF must contain at least these columns: {required_columns}! "
-            "Will return original DataFrame without traffic data."
-        )
-        return kwds
-
+async def keyword_traffic(
+    kwds: Series | Iterable[str],
+    urls: Iterable[list | None],
+    cfg: TrafficConfig,
+) -> DataFrame | None:
+    """Fetch and aggregate traffic data for lists of urls associated with given keywords."""
     try:
-        kwds_expl = kwds[["keyword", "domains"]].explode(column="domains")
+        df = DataFrame({"keyword": Series(kwds), "url": Series(urls)})  # type: ignore
+        df = df.explode(column="url")
+        trf = await fetch_domain_traffic(tuple(df.url), cfg)
+        trf = normalize_traffic(trf)
 
-        trf = await fetch_domain_traffic(tuple(kwds_expl.domains))
-        trf = process_traffic(trf)
+        kwd_trf = df.merge(trf, on="url", how="left")
+        result = aggregate_traffic(kwd_trf, by="keyword")
 
-        kwds_trf = kwds_expl.merge(trf, left_on="domains", right_on="url", how="left")
-        agg_trf = aggregate_traffic(kwds_trf, by="keyword")
+        if isinstance(kwds, Series):
+            result = result.rename(columns={"keyword": kwds.name})
 
-        return kwds.merge(agg_trf, on="keyword", how="left")
+        return result
     except Exception as exc:
-        LOG.warning(
-            f"Failed to fetch traffic data for keywords: {exc}. "
-            "Will return original DataFrame without traffic data."
-        )
-        return kwds
+        LOG.error(f"Failed to fetch traffic data for keywords: {kwds}. Error: {exc}")
+        return None
