@@ -1,4 +1,18 @@
-"""Use Apify actors to fetch domain traffic data from Similarweb and other sources."""
+"""Domain traffic analysis and aggregation using Similarweb data via Apify actors.
+
+This module provides comprehensive website traffic analysis capabilities by integrating
+with Similarweb data through Apify's web scraping infrastructure. It enables large-scale
+collection of domain-level traffic metrics including visitor counts, engagement metrics,
+traffic sources, and global rankings. The module is particularly useful for competitive
+analysis, market research, and understanding traffic patterns across multiple domains.
+
+Key features include batch processing of domain URLs for efficient data collection,
+automatic domain extraction and normalization from various URL formats, traffic source
+breakdown (direct, search, social, referrals), and aggregation functions for keyword-based
+traffic analysis. The module handles rate limiting and error recovery to ensure reliable
+data collection, making it suitable for analyzing hundreds or thousands of domains
+in SEO and competitive intelligence workflows.
+"""
 
 import asyncio
 import os

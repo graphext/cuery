@@ -1,4 +1,17 @@
-"""High-level API to fetch SEO data from various sources and to enrich with AI.
+"""Unified SEO research platform integrating keyword data, SERP analysis, and traffic insights.
+
+This module serves as the high-level orchestrator for comprehensive SEO research workflows,
+combining data from Google Ads API, Apify web scraping actors, and AI-powered analysis
+tools. It provides a streamlined interface for conducting end-to-end SEO research that
+includes keyword discovery, search volume analysis, SERP competitor research, traffic
+estimation, and content strategy insights.
+
+The module integrates multiple data sources and analysis capabilities: Google Ads keyword
+planning for search volume and competition data, Apify actors for real-time SERP scraping
+and traffic analysis, and large language models for topic extraction and search intent
+classification. This unified approach enables comprehensive SEO audits, competitive
+analysis, and content planning in a single workflow, making it ideal for SEO professionals,
+content strategists, and digital marketers who need actionable insights at scale.
 
 Authentication
     To use all features and data sources, i.e. to have access to Google Ads, Apify, and AI models,

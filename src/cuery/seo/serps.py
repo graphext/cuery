@@ -1,4 +1,17 @@
-"""Fetch SERP results using Apify actors."""
+"""SERP data collection and analysis using Apify web scraping actors.
+
+This module provides comprehensive tools for fetching and analyzing Search Engine Results
+Page (SERP) data through Apify's Google Search Scraper actors. It enables large-scale
+SERP data collection with features like batch processing, geographic targeting, and
+intelligent result aggregation. The module also integrates AI-powered topic extraction
+and search intent classification to provide deeper insights into SERP content patterns.
+
+Key capabilities include fetching organic search results with metadata (titles, URLs,
+snippets), identifying brand and competitor presence in SERPs, extracting topics and
+search intent using language models, and aggregating results for keyword analysis.
+The module handles rate limiting, error recovery, and data normalization to ensure
+reliable SERP data collection at scale.
+"""
 
 import asyncio
 import json

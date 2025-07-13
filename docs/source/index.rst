@@ -415,3 +415,5 @@ To Do
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
+   seo

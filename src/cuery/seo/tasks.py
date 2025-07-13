@@ -1,19 +1,16 @@
-"""Keyword-SERP topic and intent analyzer.
+"""AI-powered SERP topic extraction and search intent classification.
 
-Analyzes Google SERP (Search Engine Results Page) data to extract topics and
-assign search intent. Each input row contains a keyword with its corresponding
-SERP results (domains, breadcrumbs, page titles).
+This module provides sophisticated analysis tools for Search Engine Results Page (SERP)
+data using large language models. It performs two-level analysis to extract meaningful
+insights from SERP content: hierarchical topic extraction that identifies themes and
+subtopics from aggregated SERP data, and search intent classification that categorizes
+keywords into informational, navigational, transactional, or commercial intent types.
 
-Two-level analysis is performed:
-
-1. Topic extraction and assignment using SERP content
-   - Extract a hierarchy of topics and subtopics from aggregated SERP data
-   - Assign the correct topic and subtopic to each keyword based on SERP results
-
-2. Search intent classification
-   - Classify each keyword into one of 4 fixed categories: informational,
-     navigational, transactional, commercial
-   - Based on SERP content patterns and domain analysis
+The analysis leverages domain patterns, page titles, and breadcrumb navigation to
+understand the semantic meaning and commercial context behind search queries. This
+enables SEO professionals to better understand search landscapes, identify content
+opportunities, and optimize for user intent. The module uses configurable language
+models and provides structured outputs suitable for further analysis and reporting.
 """
 
 import json

@@ -1,4 +1,14 @@
-"""Easier access to Google Ads API for keyword research.
+"""Google Ads API integration for comprehensive keyword research and analysis.
+
+This module provides a streamlined interface to the Google Ads API for keyword planning
+and research. It enables users to generate keyword ideas, retrieve historical search
+volume data, and analyze keyword performance metrics across different geographic regions
+and time periods. The module handles authentication, batching, and data processing to
+deliver clean, structured keyword data for SEO and content strategy development.
+
+Key features include keyword idea generation from seed keywords or landing pages,
+historical metrics retrieval with monthly breakdowns, geographic and language targeting,
+and automated data cleaning and aggregation for analysis workflows.
 
 Useful documentation:
     - Keyword ideas:
