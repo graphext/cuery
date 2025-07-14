@@ -425,7 +425,23 @@ To build and render:
 (cd docs/build/html && uv run python -m http.server)
 ```
 
+# Apify Actors
 
+Individual functionalities are wrapped in Apify actors, inside the `cuery/actors` subdirectory.
+
+To run a specific actor locally during development (assuming `apify-cli` is already installed):
+
+```
+cd actors/keywords
+cuery set-vars && apify run --purge --input-file=.actor/example_input.json
+```
+
+`cuery set-vars` will search for files containing secrets, tokens etc. in a local `~/Development/config/` folder,
+but you can pass a different folder (see `cuery set-vars --help`). It will then set the corresponding environment variables and local Apify secrets.
+
+You also need a local `.json` file containing the input to run the actor with and pass it via `--input-file`.
+
+The output will appear locally in the `./storage/datasets` folder.
 # To Do
 - Integrate web search API:
   - Depends on Instructor integration of OpenAI Responses API
