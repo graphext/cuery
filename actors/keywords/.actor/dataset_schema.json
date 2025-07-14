@@ -1,0 +1,336 @@
+{
+    "actorSpecification": 1,
+    "title": "SEO Keywords Dataset",
+    "description": "Fetch, expand and enrich keywords using Google Ads API. Generates detailed keyword metrics including search volumes and trends, CPC, competition data etc.",
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "description": "Essential SEO metrics, keyword performance data, and traffic insights",
+            "transformation": {
+                "fields": [
+                    "keyword",
+                    "avg_monthly_searches",
+                    "competition_index",
+                    "low_top_of_page_bid_micros",
+                    "high_top_of_page_bid_micros",
+                    "topic",
+                    "subtopic",
+                    "intent",
+                    "globalRank_min",
+                    "globalRank_max"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "keyword": {
+                        "label": "Keyword",
+                        "format": "text"
+                    },
+                    "avg_monthly_searches": {
+                        "label": "Avg Monthly Searches",
+                        "format": "number"
+                    },
+                    "competition_index": {
+                        "label": "Competition Index",
+                        "format": "number"
+                    },
+                    "low_top_of_page_bid_micros": {
+                        "label": "Low Bid (micros)",
+                        "format": "number"
+                    },
+                    "high_top_of_page_bid_micros": {
+                        "label": "High Bid (micros)",
+                        "format": "number"
+                    },
+                    "topic": {
+                        "label": "Topic",
+                        "format": "text"
+                    },
+                    "subtopic": {
+                        "label": "Subtopic",
+                        "format": "text"
+                    },
+                    "intent": {
+                        "label": "Search Intent",
+                        "format": "text"
+                    },
+                    "globalRank_min": {
+                        "label": "Min Global Rank",
+                        "format": "number"
+                    },
+                    "globalRank_max": {
+                        "label": "Max Global Rank",
+                        "format": "number"
+                    }
+                }
+            }
+        },
+        "detailed": {
+            "title": "Detailed Analysis",
+            "description": "Complete data including SERP analysis, traffic insights, and historical trends",
+            "transformation": {
+                "fields": [
+                    "keyword",
+                    "avg_monthly_searches",
+                    "competition",
+                    "competition_index",
+                    "low_top_of_page_bid_micros",
+                    "high_top_of_page_bid_micros",
+                    "search_volume",
+                    "search_volume_date",
+                    "num_results",
+                    "n_paidResults",
+                    "n_paidProducts",
+                    "topic",
+                    "subtopic",
+                    "intent",
+                    "relatedQueries",
+                    "peopleAlsoAsk",
+                    "aiOverview_content",
+                    "globalRank_min",
+                    "globalRank_max",
+                    "visits_min",
+                    "visits_max"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "keyword": {
+                        "label": "Keyword",
+                        "format": "text"
+                    },
+                    "avg_monthly_searches": {
+                        "label": "Avg Monthly Searches",
+                        "format": "number"
+                    },
+                    "competition": {
+                        "label": "Competition Level",
+                        "format": "number"
+                    },
+                    "competition_index": {
+                        "label": "Competition Index",
+                        "format": "number"
+                    },
+                    "low_top_of_page_bid_micros": {
+                        "label": "Low Top Page Bid (micros)",
+                        "format": "number"
+                    },
+                    "high_top_of_page_bid_micros": {
+                        "label": "High Top Page Bid (micros)",
+                        "format": "number"
+                    },
+                    "search_volume": {
+                        "label": "Historical Search Volume",
+                        "format": "text"
+                    },
+                    "num_results": {
+                        "label": "SERP Results Count",
+                        "format": "number"
+                    },
+                    "n_paidResults": {
+                        "label": "Paid Results",
+                        "format": "number"
+                    },
+                    "n_paidProducts": {
+                        "label": "Paid Products",
+                        "format": "number"
+                    },
+                    "topic": {
+                        "label": "AI Topic",
+                        "format": "text"
+                    },
+                    "subtopic": {
+                        "label": "AI Subtopic",
+                        "format": "text"
+                    },
+                    "intent": {
+                        "label": "Search Intent",
+                        "format": "text"
+                    },
+                    "aiOverview_content": {
+                        "label": "AI Overview",
+                        "format": "text"
+                    },
+                    "globalRank_min": {
+                        "label": "Min Global Rank",
+                        "format": "number"
+                    },
+                    "globalRank_max": {
+                        "label": "Max Global Rank",
+                        "format": "number"
+                    },
+                    "visits_min": {
+                        "label": "Min Monthly Visits",
+                        "format": "number"
+                    },
+                    "visits_max": {
+                        "label": "Max Monthly Visits",
+                        "format": "number"
+                    }
+                }
+            }
+        },
+        "serp_insights": {
+            "title": "SERP Insights",
+            "description": "Search engine results analysis and competitor intelligence",
+            "transformation": {
+                "fields": [
+                    "keyword",
+                    "titles",
+                    "descriptions",
+                    "domains",
+                    "emphasizedKeywords",
+                    "ai_overview_brand_company",
+                    "ai_overview_product_service",
+                    "ai_overview_technology",
+                    "num_results",
+                    "n_paidResults",
+                    "n_paidProducts"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "keyword": {
+                        "label": "Keyword",
+                        "format": "text"
+                    },
+                    "num_results": {
+                        "label": "Total Results",
+                        "format": "number"
+                    },
+                    "n_paidResults": {
+                        "label": "Paid Ads",
+                        "format": "number"
+                    },
+                    "n_paidProducts": {
+                        "label": "Shopping Ads",
+                        "format": "number"
+                    },
+                    "ai_overview_brand_company": {
+                        "label": "Brands Mentioned",
+                        "format": "text"
+                    },
+                    "ai_overview_product_service": {
+                        "label": "Products/Services",
+                        "format": "text"
+                    },
+                    "ai_overview_technology": {
+                        "label": "Technologies",
+                        "format": "text"
+                    }
+                }
+            }
+        },
+        "traffic_insights": {
+            "title": "Traffic Insights",
+            "description": "Website traffic data and user behavior metrics from Similarweb",
+            "transformation": {
+                "fields": [
+                    "keyword",
+                    "globalRank_min",
+                    "globalRank_max",
+                    "visits_min",
+                    "visits_max",
+                    "timeOnSite_min",
+                    "timeOnSite_max",
+                    "pagesPerVisit_min",
+                    "pagesPerVisit_max",
+                    "bounceRate_min",
+                    "bounceRate_max",
+                    "source_direct_min",
+                    "source_direct_max",
+                    "source_search_min",
+                    "source_search_max",
+                    "source_social_min",
+                    "source_social_max",
+                    "source_referrals_min",
+                    "source_referrals_max"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "keyword": {
+                        "label": "Keyword",
+                        "format": "text"
+                    },
+                    "globalRank_min": {
+                        "label": "Min Global Rank",
+                        "format": "number"
+                    },
+                    "globalRank_max": {
+                        "label": "Max Global Rank",
+                        "format": "number"
+                    },
+                    "visits_min": {
+                        "label": "Min Monthly Visits",
+                        "format": "number"
+                    },
+                    "visits_max": {
+                        "label": "Max Monthly Visits",
+                        "format": "number"
+                    },
+                    "timeOnSite_min": {
+                        "label": "Min Time on Site (sec)",
+                        "format": "number"
+                    },
+                    "timeOnSite_max": {
+                        "label": "Max Time on Site (sec)",
+                        "format": "number"
+                    },
+                    "pagesPerVisit_min": {
+                        "label": "Min Pages per Visit",
+                        "format": "number"
+                    },
+                    "pagesPerVisit_max": {
+                        "label": "Max Pages per Visit",
+                        "format": "number"
+                    },
+                    "bounceRate_min": {
+                        "label": "Min Bounce Rate",
+                        "format": "number"
+                    },
+                    "bounceRate_max": {
+                        "label": "Max Bounce Rate",
+                        "format": "number"
+                    },
+                    "source_direct_min": {
+                        "label": "Min Direct Traffic %",
+                        "format": "number"
+                    },
+                    "source_direct_max": {
+                        "label": "Max Direct Traffic %",
+                        "format": "number"
+                    },
+                    "source_search_min": {
+                        "label": "Min Search Traffic %",
+                        "format": "number"
+                    },
+                    "source_search_max": {
+                        "label": "Max Search Traffic %",
+                        "format": "number"
+                    },
+                    "source_social_min": {
+                        "label": "Min Social Traffic %",
+                        "format": "number"
+                    },
+                    "source_social_max": {
+                        "label": "Max Social Traffic %",
+                        "format": "number"
+                    },
+                    "source_referrals_min": {
+                        "label": "Min Referral Traffic %",
+                        "format": "number"
+                    },
+                    "source_referrals_max": {
+                        "label": "Max Referral Traffic %",
+                        "format": "number"
+                    }
+                }
+            }
+        }
+    }
+}

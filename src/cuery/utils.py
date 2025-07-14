@@ -43,7 +43,16 @@ def load_api_keys(path: str | Path | None = DEFAULT_PATH) -> dict:
         path = DEFAULT_PATH
 
     with open(path) as file:
-        return json.load(file)
+        api_keys = json.load(file)
+
+    env = {}
+    for k, v in api_keys.items():
+        if "_api_key" not in k.lower():
+            k = k + "_api_key"  # noqa: PLW2901
+
+        env[k.upper()] = v
+
+    return env
 
 
 def set_api_keys(keys: dict | str | Path | None = None):
@@ -52,8 +61,7 @@ def set_api_keys(keys: dict | str | Path | None = None):
         keys = load_api_keys(keys)
 
     for key, value in keys.items():
-        name = key.upper() + "_API_KEY"
-        os.environ[name] = value
+        os.environ[key.upper()] = value
 
 
 def resource_path(relpath: str | Path) -> Traversable:

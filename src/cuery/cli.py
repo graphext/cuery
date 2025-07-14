@@ -1,15 +1,18 @@
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
 import typer
+import yaml
 from rich.console import Console
 from rich.table import Table
 
-from cuery.builder.ui import launch
-from cuery.seo import SeoConfig
-from cuery.task import Task
+from .builder.ui import launch
+from .seo import SeoConfig
+from .task import Task
+from .utils import load_api_keys
 
 app = typer.Typer()
 
@@ -57,6 +60,43 @@ def generate_seo_schema(output: Path = Path("input_schema.json")):
     with open(output, "w") as fp:
         json.dump(schema, fp, indent=2)
     typer.echo(f"SEO schema written to {output}")
+
+
+DEFAULT_CONFIG_DIR = "~/Development/config"
+
+
+@app.command("set-vars")
+def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR)):
+    config_dir = cfg_dir.expanduser().resolve()
+    vars = {}
+
+    # Set Apify token
+    apify_token_path = config_dir / "apify_api_token.txt"
+    if apify_token_path.exists():
+        with open(apify_token_path) as f:
+            apify_token = f.read().strip()
+        vars["APIFY_TOKEN"] = apify_token
+
+    # Set Google Ads credentials
+    google_ads_yaml_path = config_dir / "google-ads.yaml"
+    if google_ads_yaml_path.exists():
+        with open(google_ads_yaml_path) as f:
+            google_ads_config = yaml.load(f, Loader=yaml.SafeLoader)
+            for key, value in google_ads_config.items():
+                vars[f"GOOGLE_ADS_{key.upper()}"] = str(value)
+
+    if key_path := vars.get("GOOGLE_ADS_JSON_KEY_FILE_PATH"):  # noqa: SIM102
+        with open(key_path) as f:
+            vars["GOOGLE_ADS_JSON_KEY"] = json.dumps(json.load(f))
+            vars.pop("GOOGLE_ADS_JSON_KEY_FILE_PATH")
+
+    vars |= load_api_keys(config_dir / "ai-api-keys.json")
+
+    for key, value in vars.items():
+        os.environ[key] = value
+        # Update apify local secrets via the command line
+        os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
+        os.system(f"apify secrets add {key} '{value}'")  # noqa: S605
 
 
 if __name__ == "__main__":
