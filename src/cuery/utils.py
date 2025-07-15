@@ -284,7 +284,7 @@ def customize_fields(model: BaseModelClass, class_name: str, **fields) -> BaseMo
 class HashableConfig(BaseModel):
     """Base class for configurations. Hashable so we can cache API calls using them."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
+    model_config = ConfigDict(use_attribute_docstrings=True, extra="forbid")
 
     def __hash__(self) -> int:
         return self.model_dump_json().__hash__()
