@@ -1,55 +1,21 @@
-# SEO Keywords Analysis Actor
+# Google Ads Keyword Planning Actor
 
-Analyze and expand keywords using the Google Ads API to generate comprehensive SEO keyword data. Features intelligent keyword expansion, SERP analysis, brand tracking, traffic data collection, and AI-powered insights for content planning and competitive analysis with detailed search volume and competition metrics.
+Analyze and expand keywords using the Google Ads API to generate comprehensive keyword research data. Features intelligent keyword expansion from seed terms or URLs, historical search volume analysis with trend calculations, and competition metrics for strategic SEO and PPC planning.
 
-## What does SEO Keywords Analysis Actor do?
+## What does Google Ads Keyword Planning Actor do?
 
-This Actor connects to the Google Ads API to provide comprehensive keyword analysis for SEO professionals:
+This Actor connects to the Google Ads API to provide comprehensive keyword planning data for SEO and PPC professionals:
 
-- ✅ **Expand seed keywords** into thousands of related keyword suggestions
-- ✅ **Generate keyword ideas** with configurable limits for comprehensive research
-- ✅ **Analyze search volumes** with up to 12 months of historical data  
-- ✅ **Extract competition metrics** including average CPC and competition scores
-- ✅ **SERP data analysis** with brand and competitor tracking
-- ✅ **Traffic data collection** using Similarweb scraper for competitive insights
-- ✅ **AI-powered insights** with topic extraction and intent classification
-- ✅ **Support multiple markets** with configurable language and geographic targeting
-- ✅ **Generate structured data** ready for SEO analysis, content planning, and reporting
+- ✅ **Expand seed keywords** into thousands of related keyword suggestions using Google's keyword planner
+- ✅ **Generate keyword ideas** from landing pages or websites with configurable limits
+- ✅ **Analyze search volumes** with up to 4 years of historical data and monthly breakdowns
+- ✅ **Calculate growth trends** including year-over-year, 3-month, and 1-month growth rates
+- ✅ **Extract competition metrics** including average CPC, competition scores, and bid estimates
+- ✅ **Perform trend analysis** using linear regression to identify keyword momentum
+- ✅ **Support multiple markets** with configurable language and country targeting
+- ✅ **Generate structured data** ready for SEO analysis, PPC planning, and content strategy
 
-**Perfect for**: SEO professionals, content marketers, digital agencies, PPC specialists, and businesses planning their content strategy or competitive analysis.
-
-## Why SEO Keywords Analysis Actor?
-
-- **Comprehensive data**: Get both current and historical search volume data
-- **Keyword idea generation**: Automatically expand seed keywords into comprehensive lists
-- **Multi-market support**: Analyze keywords across different countries and languages
-- **Competition insights**: Understand keyword difficulty and cost-per-click data
-- **SERP analysis**: Track brand visibility and competitor positioning in search results
-- **AI-powered insights**: Advanced topic extraction and intent classification
-- **Ready-to-use**: No API setup required - credentials are pre-configured
-- **Export flexibility**: Download data in JSON, CSV, or XML formats
-- **Scalable**: Analyze from a few keywords to thousands in a single run
-
-## How much will it cost to run the Actor?
-
-This Actor is **cost-effective** and transparent in its pricing:
-
-| Component | Cost | Details |
-|-----------|------|---------|
-| **Google Ads API** | Free | Requires approved Developer Token (pre-configured) |
-| **Apify platform** | ~$0.01-0.05 per 1000 keywords | Based on compute units consumed |
-| **Typical run** | $0.50-2.00 | For 10,000-50,000 keyword analysis |
-
-**Cost factors:**
-- Number of seed keywords provided
-- Historical data range requested (up to 12 months)
-- Geographic and language targeting complexity
-- Number of related keywords generated
-
-**Example costs:**
-- **Small project** (100 keywords): ~$0.10
-- **Medium project** (5,000 keywords): ~$0.50
-- **Large project** (50,000 keywords): ~$2.00
+**Perfect for**: SEO professionals, PPC specialists, content marketers, digital agencies, and businesses planning their keyword strategy and content optimization.
 
 ## Input
 
@@ -59,12 +25,12 @@ Configure your keyword analysis with these simple parameters:
 
 ```json
 {
-  "keywords": ["digital marketing", "seo", "web positioning"],
+  "keywords": ["digital marketing", "seo", "keyword research"],
   "ideas": false,
   "language": "en",
-  "geo_target": "us",
-  "metrics_start": "2024-07",
-  "metrics_end": "2025-07"
+  "country": "us",
+  "metrics_start": "2024-01",
+  "metrics_end": "2025-01"
 }
 ```
 
@@ -72,53 +38,28 @@ Configure your keyword analysis with these simple parameters:
 
 ```json
 {
-  "keywords": ["digital marketing", "seo", "web positioning"],
+  "keywords": ["content marketing", "blog writing"],
   "ideas": true,
   "max_ideas": 500,
-  "customer": "your-customer-id",
   "language": "en",
-  "geo_target": "us",
+  "country": "us",
+  "metrics_start": "2023-06",
+  "metrics_end": "2024-06"
+}
+```
+
+### Example with URL-based Keyword Ideas
+
+```json
+{
+  "url": "https://example.com/",
+  "whole_site": true,
+  "ideas": true,
+  "max_ideas": 300,
+  "language": "en",
+  "country": "us",
   "metrics_start": "2024-01",
-  "metrics_end": "2024-12"
-}
-```
-
-### Example with SERP Data Analysis
-
-```json
-{
-  "keywords": ["digital marketing", "seo", "web positioning"],
-  "ideas": true,
-  "max_ideas": 200,
-  "language": "en",
-  "geo_target": "us",
-  "country": "us",
-  "searchLanguage": "en",
-  "languageCode": "en",
-  "brands": ["your-brand", "known-brand"],
-  "competitors": ["competitor1", "competitor2"],
-  "topic_max_samples": 500,
-  "metrics_start": "2024-07",
-  "metrics_end": "2025-07"
-}
-```
-
-### Example with Traffic Data Collection
-
-```json
-{
-  "keywords": ["digital marketing", "seo", "web positioning"],
-  "ideas": true,
-  "max_ideas": 150,
-  "language": "en",
-  "geo_target": "us",
-  "fetch_traffic": true,
-  "country": "us",
-  "searchLanguage": "en",
-  "brands": ["your-brand"],
-  "competitors": ["competitor1", "competitor2"],
-  "metrics_start": "2024-07",
-  "metrics_end": "2025-07"
+  "metrics_end": "2025-01"
 }
 ```
 
@@ -126,28 +67,18 @@ Configure your keyword analysis with these simple parameters:
 
 | Field | Type | Description | Required | Default |
 |-------|------|-------------|----------|---------|
-| `keywords` | Array | List of seed keywords to expand and analyze | ✅ **Required** | - |
-| `ideas` | Boolean | Generate additional keyword ideas (only available for ≤20 keywords) | ❌ Optional | `false` |
-| `max_ideas` | Integer | Maximum keyword ideas to generate (only if `ideas` enabled and ≤20 keywords) | ❌ Optional | - |
-| `customer` | String | Google Ads Customer ID for API access | ❌ Optional | Uses environment variable |
-| `language` | String | Language code for targeting (e.g., "en", "es", "fr") | ❌ Optional | - |
-| `geo_target` | String | Geographic target code (e.g., "us", "es", "uk") | ❌ Optional | - |
-| `metrics_start` | String | Start date for historical metrics (YYYY-MM format) | ❌ Optional | - |
-| `metrics_end` | String | End date for historical metrics (YYYY-MM format) | ❌ Optional | - |
-| `batch_size` | Integer | Number of keywords to process in each batch | ❌ Optional | `100` |
-| `resultsPerPage` | Integer | Number of SERP results to fetch per page | ❌ Optional | `10` |
-| `maxPagesPerQuery` | Integer | Maximum number of SERP pages to fetch per query | ❌ Optional | `1` |
-| `country` | String | Country code for SERP data (e.g., "us", "uk") | ❌ Optional | - |
-| `searchLanguage` | String | Search language for SERP data (e.g., "en", "es") | ❌ Optional | - |
-| `languageCode` | String | Language code for SERP data processing | ❌ Optional | - |
-| `params` | Object | Additional parameters for Google Search Scraper | ❌ Optional | `{}` |
-| `brands` | Array | List of brand names to identify in SERP data | ❌ Optional | `[]` |
-| `competitors` | Array | List of competitor names to identify in SERP data | ❌ Optional | `[]` |
-| `topic_max_samples` | Integer | Maximum samples for topic extraction from SERP data | ❌ Optional | `500` |
-| `topic_model` | String | AI model for topic extraction | ❌ Optional | `"google/gemini-2.5-flash-preview-05-20"` |
-| `assignment_model` | String | AI model for intent classification | ❌ Optional | `"openai/gpt-4.1-mini"` |
-| `entity_model` | String | AI model for entity extraction from AI overviews | ❌ Optional | `"openai/gpt-4.1-mini"` |
-| `fetch_traffic` | Boolean | Fetch traffic data for keywords using Similarweb scraper | ❌ Optional | `false` |
+| `keywords` | Array | List of seed keywords to expand and analyze | Optional* | - |
+| `url` | String | Landing page or website URL for keyword ideas generation | Optional* | - |
+| `whole_site` | Boolean | Generate ideas for entire website (requires `url` to be domain only) | Optional | `false` |
+| `ideas` | Boolean | Generate additional keyword ideas (limited to ≤20 seed keywords) | Optional | `false` |
+| `max_ideas` | Integer | Maximum keyword ideas to generate (when `ideas` is enabled) | Optional | - |
+| `customer` | String | Google Ads Customer ID for API access | Optional | Uses environment variable |
+| `language` | String | Language code for targeting (e.g., "en", "es", "fr") | Optional | `"en"` |
+| `country` | String | Geographic target code (e.g., "us", "es", "uk") | Optional | `"us"` |
+| `metrics_start` | String | Start date for historical metrics (YYYY-MM format) | Optional | - |
+| `metrics_end` | String | End date for historical metrics (YYYY-MM format) | Optional | - |
+
+*Either `keywords` or `url` must be provided.
 
 ### Quick Reference
 
@@ -178,35 +109,26 @@ Configure your keyword analysis with these simple parameters:
 - `metrics_start` and `metrics_end` control the historical data period
 - **Format**: YYYY-MM (e.g., "2024-07" for July 2024)
 - **Limitations**: 
-  - Maximum 2-year range
-  - Cannot be more than 2 years in the past
+  - Maximum 4-year range
+  - Cannot be more than 4 years in the past
   - End date cannot be in the future
 - **Examples**:
-  - Last 12 months: `"2024-07"` to `"2025-07"`
+  - Last 12 months: `"2024-01"` to `"2025-01"`
   - Calendar year: `"2024-01"` to `"2024-12"`
-  - Recent 6 months: `"2024-12"` to `"2025-06"`
+  - Two-year analysis: `"2023-01"` to `"2025-01"`
 
 **Keyword Ideas Generation:**
-- Set `ideas: true` to generate additional keyword suggestions
+- Set `ideas: true` to generate additional keyword suggestions from Google's keyword planner
 - **Important**: Only available when providing 20 or fewer seed keywords
 - Use `max_ideas` to limit the number of generated keywords (recommended: 100-1000)
-- If more than 20 keywords are provided, idea generation will be automatically disabled with a warning
-- **Note**: Enabling ideas generation increases processing time but provides more comprehensive data
+- If more than 20 keywords are provided only the first 20 will be used
+- **Alternative**: Use `url` parameter to generate ideas from a landing page or website
+- **Whole Site Mode**: Set `whole_site: true` with domain-only URL to get site-wide keyword ideas
 
-**SERP Data Analysis:**
-- Configure `country`, `searchLanguage`, and `languageCode` for SERP analysis
-- Add `brands` and `competitors` arrays to identify them in search results
-- Adjust `resultsPerPage` and `maxPagesPerQuery` to control SERP data volume
-- **AI Models**: Configure topic extraction and intent classification models for advanced analysis
-
-### Customer ID Configuration
-
-The `customer` parameter is **optional** and works as follows:
-
-- **When provided**: Uses your specified Google Ads Customer ID to access keyword data from your Google Ads account
-- **When omitted**: Automatically uses Graphext's internal customer ID, which provides access to Google Ads API data without requiring your own Google Ads account
-
-💡 **Tip**: Most users can leave the customer field empty and use Graphext's internal access for comprehensive keyword data.
+**URL-based Keyword Generation:**
+- Provide a `url` parameter to generate keyword ideas from a specific landing page
+- For whole-site analysis, use domain-only URL (e.g., "example.com") and set `whole_site: true`
+- Works independently of the `keywords` parameter - you can use either or both
 
 ## Output
 
@@ -216,37 +138,28 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 
 ```json
 {
-  "keyword": "marketing digital",
+  "keyword": "digital marketing",
   "avg_monthly_searches": 14800,
   "competition": 3,
-  "competition_index": 50,
+  "competition_index": 0.62,
+  "average_cpc_micros": 7173598,
   "low_top_of_page_bid_micros": 1964646,
   "high_top_of_page_bid_micros": 7035752,
-  "search_volume": [12100, 12100, 18100, 18100, 14800, 12100, 18100, 18100, 18100, 14800, 14800],
-  "search_volume_date": ["2024-07-01T00:00:00", "2024-08-01T00:00:00", "2024-09-01T00:00:00"],
-  "search_volume_growth_3m": -18.23,
-  "search_volume_trend": 0.016,
-  "topic": "Digital Marketing",
-  "subtopic": "Digital Marketing Fundamentals", 
-  "intent": "informational",
-  "globalRank_min": 8.0,
-  "globalRank_max": 161101.0,
-  "visits_min": 275036,
-  "visits_max": 3803816246,
-  "timeOnSite_min": 65.64,
-  "timeOnSite_max": 497.60,
-  "pagesPerVisit_min": 1.77,
-  "pagesPerVisit_max": 10.01,
-  "bounceRate_min": 0.24,
-  "bounceRate_max": 0.69,
-  "source_direct_min": 0.13,
-  "source_direct_max": 0.62,
-  "source_search_min": 0.08,
-  "source_search_max": 0.81,
-  "source_social_min": 0.002,
-  "source_social_max": 0.020,
-  "source_referrals_min": 0.010,
-  "source_referrals_max": 0.381
+  "concepts": [
+    "google keyword tool",
+    "blog",
+    "free keyword tool",
+    "google",
+    "word",
+    "keyword planner",
+    "used"
+  ],
+  "concept_groups": ["Site", "Tool"],
+  "search_volume": [12100, 12100, 18100, 18100, 14800, 12100, 18100, 18100, 18100, 14800, 14800, 12100],
+  "search_volume_date": ["2024-01-01T00:00:00", "2024-02-01T00:00:00", "2024-03-01T00:00:00", "2024-04-01T00:00:00"],
+  "search_volume_growth_yoy": -5.23,
+  "search_volume_growth_3m": 8.16,
+  "search_volume_trend": 0.016
 }
 ```
 
@@ -254,21 +167,20 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 
 | Field | Type | Description | Use Case |
 |-------|------|-------------|----------|
-| `keyword` | String | The keyword or phrase | Content targeting |
+| `keyword` | String | The keyword or phrase analyzed | Content targeting and SEO planning |
 | `avg_monthly_searches` | Number | Average monthly search volume | Traffic potential estimation |
-| `average_cpc` | Number | Average cost per click (local currency) | PPC budget planning |
-| `competition_score` | Number | Competition level (1=Low, 2=Medium, 3=High) | Keyword difficulty assessment |
-| `competition` | Number | Numeric competition score (33, 66, 100) | Detailed competition analysis |
-| `search_volume_YYYY_MM` | Number | Historical monthly search volumes | Seasonal trend analysis |
-| `globalRank_min/max` | Number | Global website ranking range | Site authority assessment |
-| `visits_min/max` | Number | Monthly visits range | Traffic volume analysis |
-| `timeOnSite_min/max` | Number | Time on site range (seconds) | User engagement analysis |
-| `pagesPerVisit_min/max` | Number | Pages per visit range | Site stickiness metrics |
-| `bounceRate_min/max` | Number | Bounce rate range (0-1) | Content quality indicator |
-| `source_direct_min/max` | Number | Direct traffic percentage range | Brand awareness metrics |
-| `source_search_min/max` | Number | Search traffic percentage range | SEO performance indicator |
-| `source_social_min/max` | Number | Social traffic percentage range | Social media impact |
-| `source_referrals_min/max` | Number | Referral traffic percentage range | Link building success |
+| `average_cpc_micros` | Number | Average cost per click | Ad placement difficulty |
+| `competition` | Number | Competition level (1=Low, 2=Medium, 3=High) | Keyword difficulty assessment |
+| `competition_index` | Number | Numeric competition score (0-1 scale) | Detailed competition analysis |
+| `low_top_of_page_bid_micros` | Number | Lower bound of top-of-page bid estimate (micros) | PPC budget planning minimum |
+| `high_top_of_page_bid_micros` | Number | Upper bound of top-of-page bid estimate (micros) | PPC budget planning maximum |
+| `concepts` | Array | Semantic category of keyword | Keyword grouping |
+| `concept_groups` | Array | Semantic category of keyword | Keyword grouping |
+| `search_volume` | Array | Historical monthly search volumes (chronological) | Seasonal trend analysis |
+| `search_volume_date` | Array | Corresponding dates for search volume data | Timeline correlation |
+| `search_volume_growth_yoy` | Number | Year-over-year growth percentage | Annual trend assessment |
+| `search_volume_growth_3m` | Number | 3-month growth percentage | Quarterly trend analysis |
+| `search_volume_trend` | Number | Linear regression trend coefficient | Overall momentum direction |
 
 ### Export & Integration
 
@@ -279,40 +191,43 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 - **RSS** - Feed-based integrations
 
 **Dataset Features:**
-- Up to 12 months of historical data per keyword
-- Real-time search volume and competition metrics
-- Website traffic and user behavior insights from Similarweb
-- Competitive traffic analysis with min/max ranges
+- Up to 4 years of historical search volume data per keyword
+- Real-time competition metrics and bid estimates from Google Ads
+- Advanced trend calculations including growth rates and momentum analysis
+- Monthly breakdowns with corresponding dates for timeline analysis
 - Structured for immediate analysis and visualization
-- Compatible with popular SEO and analytics tools
+- Compatible with popular SEO and PPC tools
 
 ## Getting Started
 
-### How to run SEO Keywords Analysis Actor
+### How to run Google Ads Keyword Planning Actor
 
-1. **📝 Enter your keywords**: Add your seed keywords in the input field
+1. **📝 Enter your keywords or URL**: Add your seed keywords or provide a landing page URL
 2. **🔧 Configure settings** (optional): 
    - **Customer ID**: Leave empty to use Graphext's internal customer, or provide your own Google Ads Customer ID
-   - **Language & Geography**: Set your target language and geographic market
+   - **Language & Country**: Set your target language and country
+   - **Historical Range**: Configure date range for trend analysis
 3. **▶️ Start the Actor**: Click "Start" and let it analyze your keywords
 4. **📊 Download results**: Export your data in JSON, CSV, or XML format
 
 ### Real-World Examples
 
-**🎯 SEO Content Strategy with Ideas Generation**
+**🎯 Content Strategy with Keyword Expansion**
 *Scenario: Blog content planning for a marketing agency*
 ```json
 {
-  "keywords": ["content marketing", "blog writing", "seo copywriting", "digital strategy"],
+  "keywords": ["content marketing", "blog writing", "seo copywriting"],
   "ideas": true,
   "max_ideas": 300,
   "language": "en",
-  "geo_target": "us"
+  "country": "us",
+  "metrics_start": "2023-06",
+  "metrics_end": "2024-06"
 }
 ```
-*Expected output: ~2,000-5,000 related keywords with search volumes*
+*Expected output: ~300-500 related keywords with 12 months of trend data*
 
-**🏪 Local Business Research with SERP Analysis**  
+**🏪 Local Business Keyword Research**  
 *Scenario: Spanish restaurant chain expansion*
 ```json
 {
@@ -320,47 +235,56 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
   "ideas": true,
   "max_ideas": 200,
   "language": "es",
-  "geo_target": "es",
   "country": "es",
-  "searchLanguage": "es",
-  "competitors": ["competitor-restaurant-1", "competitor-restaurant-2"]
+  "metrics_start": "2024-01",
+  "metrics_end": "2025-01"
 }
 ```
-*Expected output: ~1,500-3,000 location-based keywords with competitor analysis*
+*Expected output: ~200-400 location-based keywords with competition data*
 
-**🛒 E-commerce Optimization with Brand Tracking**
-*Scenario: Online fashion store in the UK*
+**🛒 E-commerce PPC Planning**
+*Scenario: Online fashion store keyword research*
 ```json
 {
-  "keywords": ["buy shoes online", "fashion trends", "women clothing"],
+  "keywords": ["buy shoes online", "women fashion", "designer clothing"],
   "ideas": true,
   "max_ideas": 500,
   "language": "en",
-  "geo_target": "uk",
   "country": "uk",
-  "searchLanguage": "en",
-  "brands": ["your-fashion-brand"],
-  "competitors": ["zara", "h&m", "asos"],
-  "resultsPerPage": 20,
-  "fetch_traffic": true
+  "metrics_start": "2024-01",
+  "metrics_end": "2025-01"
 }
 ```
-*Expected output: ~3,000-8,000 product-related keywords with brand visibility analysis and traffic data*
+*Expected output: ~500-800 product-related keywords with bid estimates and trend analysis*
+
+**🌐 URL-based Keyword Discovery**
+*Scenario: Analyzing competitor landing pages*
+```json
+{
+  "url": "https://competitor.com/services/digital-marketing",
+  "ideas": true,
+  "max_ideas": 200,
+  "language": "en",
+  "country": "us",
+  "metrics_start": "2024-01",
+  "metrics_end": "2025-01"
+}
+```
+*Expected output: ~200-300 keywords related to the landing page content*
 
 ### Tips for Best Results
 
-- **Use specific seed keywords**: More targeted seeds = better suggestions
-- **Enable keyword ideas generation**: Set `ideas: true` for comprehensive keyword expansion (maximum 20 keywords)
+- **Use specific seed keywords**: More targeted seeds = better keyword suggestions
+- **Enable keyword ideas generation**: Set `ideas: true` for comprehensive keyword expansion (maximum 20 seed keywords)
 - **Optimize idea limits**: Use `max_ideas: 100-1000` for balanced results and processing time
 - **Stay within keyword limits**: Use 20 or fewer keywords for idea generation, unlimited for basic analysis
-- **Try different language/geo combinations**: Discover market-specific opportunities  
-- **Include brand and competitor terms**: Understand the competitive landscape with SERP analysis
+- **Try different language/country combinations**: Discover market-specific opportunities  
 - **Mix broad and specific terms**: Get both high-level and long-tail keyword data
-- **Configure SERP analysis**: Add brands and competitors to track market positioning
-- **Enable traffic data collection**: Set `fetch_traffic: true` for comprehensive competitive insights using Similarweb data
-- **Adjust batch sizes**: Use smaller `batch_size` values for large keyword sets to avoid timeouts
+- **Include historical data**: Set date ranges to analyze trends and seasonality
+- **Use URL mode**: Generate ideas from competitor pages or your own landing pages
+- **Consider whole-site analysis**: Use domain URLs with `whole_site: true` for comprehensive site analysis
 
-## Connect SEO Keywords Analysis Actor to your workflows
+## Connect Google Ads Keyword Planning Actor to your workflows
 
 ### 🔌 Apify API Integration
 
@@ -373,7 +297,7 @@ curl -X POST https://api.apify.com/v2/acts/[ACTOR_ID]/runs \
     "ideas": true,
     "max_ideas": 200,
     "language": "en",
-    "geo_target": "us"
+    "country": "us"
   }'
 ```
 
@@ -391,12 +315,9 @@ run_input = {
     "ideas": True,
     "max_ideas": 300,
     "language": "en", 
-    "geo_target": "us",
     "country": "us",
-    "searchLanguage": "en",
-    "brands": ["your-brand"],
-    "competitors": ["competitor1", "competitor2"],
-    "fetch_traffic": True
+    "metrics_start": "2024-01",
+    "metrics_end": "2025-01"
 }
 
 # Run the Actor and wait for it to finish
@@ -441,7 +362,7 @@ Automatically process results when the Actor finishes:
 **"No results for my keywords"**
 - ✅ Verify keywords are in the target language
 - ✅ Try broader or more popular seed keywords
-- ✅ Check if the language/geographic combination is valid
+- ✅ Check if the language/country combination is valid
 
 **"Keywords format error"**  
 - ✅ Ensure keywords are provided as an array: `["keyword1", "keyword2"]`
@@ -450,7 +371,7 @@ Automatically process results when the Actor finishes:
 
 **"Language/Geographic code not recognized"**
 - ✅ Use standard ISO codes: `"en"` for English, `"us"` for United States
-- ✅ Check that language and geo_target use consistent formatting
+- ✅ Check that language and country use consistent formatting
 - ✅ Refer to the Quick Reference section above for valid codes
 - ✅ Try common codes like `"en"` (English) or `"us"` (USA)
 
@@ -464,20 +385,23 @@ Automatically process results when the Actor finishes:
 - ✅ Check that `ideas` is set to `true` in your input
 - ✅ Verify `max_ideas` is set to a reasonable number (100-1000)
 - ✅ If you have more than 20 keywords, the system automatically disables idea generation
+- ✅ Try using `url` parameter instead for URL-based keyword generation
 
-**"SERP data errors"**
-- ✅ Ensure `country` and `searchLanguage` are properly configured
-- ✅ Verify that geographic codes match between `geo_target` and `country`
-- ✅ Use consistent language codes across all language-related fields
+**"URL-based keyword generation not working"**
+- ✅ Ensure the URL is accessible and returns a valid webpage
+- ✅ Use complete URLs including https:// for landing pages
+- ✅ For whole-site analysis, use domain-only format (e.g., "example.com") and set `whole_site: true`
+- ✅ Check that the website has sufficient content for keyword extraction
 
-**"Too many results or timeout"**
-- ✅ Reduce `batch_size` from default 100 to 50 or lower
-- ✅ Decrease `max_ideas` to limit keyword expansion
-- ✅ Lower `resultsPerPage` and `maxPagesPerQuery` for SERP analysis
-- ✅ Process keywords in smaller batches by splitting your seed keywords
+**"No historical data returned"**
+- ✅ Ensure both `metrics_start` and `metrics_end` are provided
+- ✅ Use valid date range within the last 4 years
+- ✅ Check that keywords have sufficient search volume for historical data
+- ✅ Try broader or more popular keywords
 
 **"Actor run failed or timed out"**
-- ✅ Reduce the number of seed keywords (try 10-50 keywords max)
+- ✅ Reduce the number of seed keywords (try 10-20 keywords max for idea generation)
+- ✅ Decrease `max_ideas` to limit keyword expansion
 - ✅ Try simpler, more common keywords first
 - ✅ Wait a few minutes and try again
 
@@ -487,14 +411,14 @@ Automatically process results when the Actor finishes:
 - ✅ **Ensure access** if using your own ID, make sure it has Google Ads API access enabled
 
 **"Invalid date range error"**
-- ✅ Use YYYY-MM format: `"2024-07"` not `"July 2024"`
+- ✅ Use YYYY-MM format: `"2024-01"` not `"January 2024"`
 - ✅ Ensure start date is before end date
-- ✅ Keep within last 2 years (Google Ads API limitation)
+- ✅ Keep within last 4 years (Google Ads API limitation)
 - ✅ Don't use future dates for end date
 - ✅ Maximum 2-year range between start and end dates
 
 **"Google Ads API date error"**
-- ✅ Try more recent dates (within last 12-18 months)
+- ✅ Try more recent dates (within last 18-24 months)
 - ✅ Use current month or previous month as end date
 - ✅ Check that date format is exactly YYYY-MM
 - ✅ Verify month is valid (01-12, not 13 or 00)
@@ -516,11 +440,12 @@ Automatically process results when the Actor finishes:
 
 **Performance optimization:**
 - Use more specific seed keywords for faster processing
-- Limit geographic scope when possible
+- Limit historical date ranges when possible  
 - Consider running multiple smaller batches instead of one large batch
+- Use URL-based generation for very specific keyword discovery
 
 ---
 
-*Made with ❤️ by Graphext for the SEO community*
+*Made with ❤️ by Graphext for the SEO and PPC community*
 
-**Ready to supercharge your keyword research?** Start analyzing keywords now and discover new opportunities for your SEO strategy!
+**Ready to supercharge your keyword research?** Start analyzing keywords now and discover new opportunities with Google's authoritative keyword data!
