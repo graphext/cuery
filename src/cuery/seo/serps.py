@@ -43,11 +43,11 @@ class SerpConfig(HashableConfig):
     """Number of results to fetch per page."""
     maxPagesPerQuery: int = 1
     """Maximum number of pages to fetch per query."""
-    country: str | None = None
+    country: str = "us"
     """Country code for SERP data (e.g., 'us' for United States)."""
-    searchLanguage: str | None = None
+    searchLanguage: str = ""
     """Search language for SERP data (e.g., 'en' for English)."""
-    languageCode: str | None = None
+    languageCode: str = ""
     """Language code for SERP data (e.g., 'en' for English)."""
     params: dict[str, Any] | None = Field(default_factory=dict)
     """Additional parameters to pass to the Apify actor."""
