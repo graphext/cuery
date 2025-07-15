@@ -68,7 +68,7 @@ DEFAULT_CONFIG_DIR = "~/Development/config"
 @app.command("set-vars")
 def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR)):
     config_dir = cfg_dir.expanduser().resolve()
-    vars = {}
+    vars: dict[str, str] = {}
 
     # Set Apify token
     apify_token_path = config_dir / "apify_api_token.txt"
@@ -83,6 +83,11 @@ def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR)):
             vars[f"GOOGLE_ADS_{key.upper()}"] = str(value)
 
     if key_path := vars.get("GOOGLE_ADS_JSON_KEY_FILE_PATH"):  # noqa: SIM102
+        # Convert relative path to absolute path relative to config directory
+        key_path = Path(key_path).expanduser()
+        if not key_path.is_absolute():
+            key_path = config_dir / key_path
+        key_path = key_path.resolve()
         with open(key_path) as f:
             vars["GOOGLE_ADS_JSON_KEY"] = json.dumps(json.load(f))
             vars.pop("GOOGLE_ADS_JSON_KEY_FILE_PATH")

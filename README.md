@@ -433,7 +433,7 @@ To run a specific actor locally during development (assuming `apify-cli` is alre
 
 ```
 cd actors/keywords
-cuery set-vars && apify run --purge --input-file=.actor/example_input.json
+uv run python -m cuery.cli set-vars && uv run apify run --purge --input-file=.actor/example_input.json
 ```
 
 `cuery set-vars` will search for files containing secrets, tokens etc. in a local `~/Development/config/` folder,
