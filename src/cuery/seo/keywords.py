@@ -75,7 +75,7 @@ class GoogleKwdConfig(HashableConfig):
     """Whether to expand initial keywords with Google Keyword Planner's idea generator.
     Otherwise, will fetch historical metrics for the provided keywords only.
     """
-    max_ideas: int | None = None
+    max_ideas: int = Field(100, le=10_000)
     """Maximum number of additional keyword ideas to fetch (if `ideas` is True)."""
     language: str = "en"
     """The language to use for keyword data (e.g., 'en' for English)."""

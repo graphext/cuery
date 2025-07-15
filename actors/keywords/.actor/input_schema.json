@@ -6,7 +6,6 @@
     "properties": {
         "keywords": {
             "title": "Seed Keywords",
-            "sectionCaption": "Configuration for Google Ads API access.",
             "type": "array",
             "description": "The (initial) keywords to fetch data for. These keywords will be used to generate related keyword suggestions (if ideas is True) with search volume and competition data.\n\n**Important Limitations:**\n• Maximum 20 keywords for keyword idea generation (when `ideas` is enabled)\n• No limit for basic keyword analysis (when `ideas` is disabled)\n• If more than 20 keywords are provided with `ideas` enabled, idea generation will be automatically disabled\n\n**Tips:**\n• Use 2-5 seed keywords for best results with idea generation\n• Include both broad and specific terms\n• Use keywords relevant to your niche\n• Avoid very generic terms (e.g., 'marketing' alone)\n\n**Examples:**\n• ['seo', 'search engine optimization', 'organic traffic']\n• ['digital marketing', 'social media marketing', 'content marketing']\n• ['web development', 'react developer', 'javascript programming']\n\n**Note:** Either keywords or page (or both) must be provided.",
             "editor": "stringList",
@@ -40,7 +39,10 @@
             "title": "Maximum Keyword Ideas",
             "type": "integer",
             "description": "Maximum number of additional keyword ideas to fetch (if ideas is True). This limits the number of related keywords returned based on the seed keywords.\n\n**Important:**\n• Only effective when `ideas` is enabled and you have 20 or fewer seed keywords\n• If `ideas` is disabled, this setting has no effect\n• If more than 20 seed keywords are provided, idea generation is automatically disabled\n• Recommended range: 100-1000 ideas for balanced results and processing time",
-            "editor": "number"
+            "editor": "number",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 10000
         },
         "language": {
             "title": "Language Code",
