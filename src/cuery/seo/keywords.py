@@ -48,7 +48,7 @@ from google.ads.googleads.v20.services.services.keyword_plan_idea_service.pagers
 )
 from numpy import ndarray
 from pandas import DataFrame, Series
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from .. import resources, utils
 from ..context import AnyContext
@@ -99,6 +99,18 @@ class GoogleKwdConfig(HashableConfig):
     If not provided, will use the `GOOGLE_ADS_CUSTOMER_ID` or `GOOGLE_ADS_LOGIN_CUSTOMER_ID`
     environment variable.
     """
+
+    @field_validator("ideas")
+    @classmethod
+    def validate_ideas(cls, ideas, info: ValidationInfo):
+        if not ideas and not info.data["keywords"] and info.data["url"]:
+            LOG.warning(
+                "Idea generation is disabled, no keywords are provided, but a URL is set. "
+                "Will enable idea generation automatically (ideas: true)."
+            )
+            return True
+
+        return ideas
 
     @field_validator("language")
     @classmethod
