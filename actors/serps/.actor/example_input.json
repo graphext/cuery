@@ -1,0 +1,26 @@
+{
+    "keywords": [
+        "data analysis",
+        "data science",
+        "machine learning",
+        "artificial intelligence"
+    ],
+    "batch_size": 25,
+    "resultsPerPage": 10,
+    "maxPagesPerQuery": 1,
+    "country": "us",
+    "searchLanguage": "en",
+    "languageCode": "en",
+    "top_n": 10,
+    "brands": [
+        "graphext"
+    ],
+    "competitors": [
+        "powerbi",
+        "tableau",
+        "qlik",
+        "looker",
+        "google data studio"
+    ],
+    "topic_max_samples": 100
+}

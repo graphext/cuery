@@ -565,4 +565,6 @@ async def serps(cfg: SerpConfig, keywords: Iterable[str] | None = None) -> DataF
         return None
 
     LOG.info("Processing SERP data")
-    return await process_serps(response, cfg)
+    df = await process_serps(response, cfg)
+    LOG.info(f"Got keyword dataframe:\n{df}")
+    return df

@@ -2,11 +2,11 @@
 FROM apify/actor-python:3.13
 
 RUN pip install uv
-RUN uv pip install --system "cuery[seo]==0.9.7"
+RUN uv pip install --system "cuery[seo]==0.10.0"
 
 COPY . ./
 
 RUN useradd --create-home apify && chown -R apify:apify .
 USER apify
 
-CMD ["python", "-m", "cuery.actors.keywords"]
+CMD ["python", "-m", "cuery.actors.serps"]
