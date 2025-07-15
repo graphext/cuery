@@ -72,18 +72,15 @@ def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR)):
 
     # Set Apify token
     apify_token_path = config_dir / "apify_api_token.txt"
-    if apify_token_path.exists():
-        with open(apify_token_path) as f:
-            apify_token = f.read().strip()
-        vars["APIFY_TOKEN"] = apify_token
+    with open(apify_token_path) as f:
+        vars["APIFY_TOKEN"] = f.read().strip()
 
     # Set Google Ads credentials
     google_ads_yaml_path = config_dir / "google-ads.yaml"
-    if google_ads_yaml_path.exists():
-        with open(google_ads_yaml_path) as f:
-            google_ads_config = yaml.load(f, Loader=yaml.SafeLoader)
-            for key, value in google_ads_config.items():
-                vars[f"GOOGLE_ADS_{key.upper()}"] = str(value)
+    with open(google_ads_yaml_path) as f:
+        google_ads_config = yaml.load(f, Loader=yaml.SafeLoader)
+        for key, value in google_ads_config.items():
+            vars[f"GOOGLE_ADS_{key.upper()}"] = str(value)
 
     if key_path := vars.get("GOOGLE_ADS_JSON_KEY_FILE_PATH"):  # noqa: SIM102
         with open(key_path) as f:
