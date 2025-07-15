@@ -464,7 +464,9 @@ def keywords(cfg: GoogleKwdConfig) -> DataFrame:
         )
 
     LOG.info("Processing metrics response into DataFrame.")
-    return process_keywords(response, collect_volumes=cfg.ideas)
+    df = process_keywords(response, collect_volumes=True)
+    LOG.info(f"Got keyword dataframe:\n{df}")
+    return df
 
 
 SYSTEM_PROMPT = dedent("""
