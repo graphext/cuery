@@ -451,7 +451,12 @@ cuery set-vars && apify run --purge --input-file=.actor/example_input.json
 ```
 
 `cuery set-vars` will search for files containing secrets, tokens etc. in a local `~/Development/config/` folder,
-but you can pass a different folder (see `cuery set-vars --help`). It will then set the corresponding environment variables and local Apify secrets.
+but you can pass a different folder (see `cuery set-vars --help`). It will then set the corresponding environment
+variables and local Apify secrets. The files required in the folder are:
+
+- `apify_api_token.txt`: Apify token to execute actors via API
+- `google-ads.yaml`: Google Ads credentials. This will contain a key to another local file, which will be handled automatically.
+- `ai-api-keys.json`: A json file with keys "Google", "OpenAI", "Perplexity", "Anthropic" etc. and values for corresponding API keys.
 
 You also need a local `.json` file containing the input to run the actor with and pass it via `--input-file`.
 

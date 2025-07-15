@@ -35,6 +35,8 @@ from .tasks import EntityExtractor, SerpTopicAndIntentAssigner, SerpTopicExtract
 class SerpConfig(HashableConfig):
     """Configuration for fetching SERP data using Apify Google Search Scraper actor."""
 
+    keywords: tuple[str, ...] | None = None
+    """Keywords to fetch SERP data for. If None, pass keywords manually in calling functions."""
     batch_size: int = 100
     """Number of keywords to fetch in a single batch."""
     resultsPerPage: int = 100
@@ -83,7 +85,10 @@ async def fetch_batch(keywords: list[str], client: ApifyClientAsync, **params):
 
 
 @alru_cache(maxsize=3)
-async def fetch_serps(keywords: tuple[str, ...], cfg: SerpConfig) -> list[dict]:
+async def fetch_serps(
+    cfg: SerpConfig,
+    keywords: tuple[str, ...] | None = None,
+) -> list[dict]:
     """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor."""
     if isinstance(cfg.apify_token, str | Path):
         with open(cfg.apify_token) as f:
@@ -100,7 +105,16 @@ async def fetch_serps(keywords: tuple[str, ...], cfg: SerpConfig) -> list[dict]:
     )
     actor_params = {p: getattr(cfg, p) for p in actor_param_names} | (cfg.params or {})
 
+    if cfg.keywords and keywords:
+        LOG.warning("Both cfg.keywords and keywords are provided, using cfg.keywords.")
+
+    keywords = cfg.keywords or keywords
+    if not keywords:
+        raise ValueError("No keywords provided for SERP data fetching!")
+
     keywords_list = list(keywords)
+    LOG.info(f"Fetching SERP data for {len(keywords)} keywords")
+
     keyword_batches = [
         keywords_list[i : i + cfg.batch_size] for i in range(0, len(keywords_list), cfg.batch_size)
     ]
@@ -540,10 +554,11 @@ async def process_serps(
     return df
 
 
-async def serps(keywords: Iterable[str], cfg: SerpConfig) -> DataFrame | None:
+async def serps(cfg: SerpConfig, keywords: Iterable[str] | None = None) -> DataFrame | None:
     """Fetch and process SERP data for a list of keywords."""
-    LOG.info(f"Fetching SERP data for {len(keywords)} keywords with\n\n{cfg}")
-    response = await fetch_serps(tuple(keywords), cfg)
+    LOG.info(f"Fetching SERP data with config:\n{cfg}")
+    keywords = tuple(keywords) if keywords else None
+    response = await fetch_serps(cfg=cfg, keywords=keywords)
 
     if response is None or len(response) == 0:
         LOG.warning("No SERP results found.")
