@@ -24,6 +24,7 @@ Useful documentation:
 
 """
 
+import base64
 import json
 import os
 import tempfile
@@ -150,6 +151,21 @@ class GoogleKwdConfig(HashableConfig):
         return self
 
 
+def encode_json_b64(value):
+    """Encode a JSON key as a base64 string.
+
+    Can be used e.g. to store complex objects in environment variables.
+    """
+    b64 = base64.b64encode(json.dumps(value).encode("utf-8"))
+    return b64.decode("ascii")
+
+
+def decode_json_b64(value):
+    """Decode a base64-encoded JSON key string."""
+    str_val = value.encode("ascii")
+    return json.loads(base64.b64decode(str_val).decode("utf-8"))
+
+
 def config_from_env() -> dict:
     """Load Google Ads API configuration from environment variables."""
     vars = (
@@ -173,7 +189,11 @@ def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClie
 
     if isinstance(config, dict):
         if json_key := config.pop("json_key", None):
-            json_key = json.loads(json_key)
+            try:
+                json_key = json.loads(json_key)
+            except json.JSONDecodeError:
+                LOG.warning("Failed to decode JSON key. Will try base64 decoding.")
+                json_key = decode_json_b64(json_key)
             with tempfile.NamedTemporaryFile("w", suffix=".json") as fp:
                 json.dump(json_key, fp)
                 fp.flush()
