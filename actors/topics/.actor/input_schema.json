@@ -1,0 +1,44 @@
+{
+    "title": "SEO Keyword Topic & Intent Classifier",
+    "description": "Classify keywords and their SERP data into topics and search intent using AI. Analyzes organic search results to extract topic hierarchies and categorize search intent as informational, navigational, transactional, or commercial.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "dataset_id": {
+            "title": "Apify Dataset ID",
+            "type": "string",
+            "description": "Dataset ID of input dataset in Apify platform",
+            "editor": "textfield"
+        },
+        "max_samples": {
+            "title": "Maximum Samples for Topic Extraction",
+            "type": "integer",
+            "description": "Maximum number of keyword samples to use for extracting the topic hierarchy. A smaller sample is used to build the topic structure, then all keywords are classified against this structure.\n\n**Important:**\n• Larger samples provide more comprehensive topic coverage but increase processing time and costs\n• Smaller samples are faster but may miss some topic nuances\n• Recommended: 100-500 for most datasets\n• For datasets with < 500 keywords, this can equal the total number\n\n**Processing Note:** Topic extraction is the most resource-intensive step, so this parameter directly impacts processing time and API costs.",
+            "editor": "number",
+            "default": 500,
+            "minimum": 10,
+            "maximum": 2000
+        },
+        "n_topics": {
+            "title": "Maximum Top-Level Topics",
+            "type": "integer",
+            "description": "Maximum number of top-level topics to extract from the keyword data.\n\n**Guidelines:**\n• 5-15 topics work well for most keyword sets\n• Too few topics create overly broad categories\n• Too many topics create overly granular, overlapping categories\n• Consider your keyword diversity when setting this\n\n**Examples:**\n• E-commerce site: 8-12 topics (product categories, support, brand)\n• Blog content: 6-10 topics (main content themes)\n• Service business: 5-8 topics (service types, locations, resources)",
+            "editor": "number",
+            "default": 10,
+            "minimum": 3,
+            "maximum": 20
+        },
+        "n_subtopics": {
+            "title": "Maximum Subtopics per Topic",
+            "type": "integer",
+            "description": "Maximum number of subtopics to extract within each top-level topic.\n\n**Guidelines:**\n• 3-8 subtopics per topic provide good granularity\n• Subtopics should represent distinct subcategories within each main topic\n• More subtopics provide finer classification but may create overlap\n\n**Examples:**\n• 'Digital Marketing' topic might have subtopics: 'SEO', 'PPC', 'Social Media', 'Content Marketing', 'Email Marketing'\n• 'E-commerce' topic might have: 'Product Pages', 'Checkout', 'Customer Service', 'Reviews'",
+            "editor": "number",
+            "default": 5,
+            "minimum": 2,
+            "maximum": 10
+        }
+    },
+    "required": [
+        "dataset_id"
+    ]
+}

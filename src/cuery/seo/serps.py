@@ -355,15 +355,9 @@ async def topic_and_intent(
     max_retries: int = 5,
 ) -> DataFrame | None:
     """Classify keywords and their top N organic results into topics and intent."""
-    n_samples_max = min(max_samples, len(df))
-
     try:
-        extractor = SerpTopicExtractor()
-        topic_intent = await extractor(
-            df=df.sample(n=n_samples_max),
-            model=topic_model,
-            max_retries=max_retries,
-        )
+        extractor = SerpTopicExtractor(max_samples=max_samples, model=topic_model)  # type: ignore
+        topic_intent = await extractor(df, max_retries=max_retries)
         LOG.info("Extracted topic hierarchy")
         LOG.info(json.dumps(topic_intent.to_dict(), indent=2, ensure_ascii=False))
 

@@ -1,7 +1,7 @@
 {
 	"actorSpecification": 1,
-	"name": "seo-keyword-planner",
-	"title": "SEO Keyword Planner",
+	"name": "keyword-planner",
+	"title": "Keyword Planner",
 	"description": "Fetch, expand and enrich keywords using Google Ads API. Generates detailed keyword metrics including search volumes and trends, CPC, competition data etc.",
 	"version": "1.0",
 	"buildTag": "latest",

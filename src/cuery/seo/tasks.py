@@ -24,11 +24,11 @@ from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
 from ..topics.oneshot import TopicAssignment, Topics, make_assignment_model, make_topic_model
-from ..utils import dedent
+from ..utils import HashableConfig, dedent
 
 SERP_TOPICS_PROMPT = dedent("""
 From the keyword SERP data below, extract a two-level nested list of topics.
-Each entry contains a keyword and its top search results (domains, breadcrumbs, page titles).
+Each entry contains a keyword and its associated search results data.
 The output should be a JSON object with top-level topics as keys and lists of subtopics as values.
 The top-level should not contain more than $n_topics topics, and each top-level
 should not contain more than $n_subtopics subtopics.
@@ -37,6 +37,7 @@ Focus on the semantic meaning and commercial intent behind the keywords based on
 - Domain patterns (e.g., e-commerce sites, informational sites, brand sites)
 - Page title content and structure
 - Breadcrumb navigation patterns
+- Any other available search result attributes
 
 Make sure top-level topics are generalizable and capture broad search themes.
 Subtopics should represent more specific search categories within each theme.
@@ -44,28 +45,30 @@ $extra
 
 # Keyword SERP Data
 
-{% for keyword in keywords %}
-**Keyword:** {{ keyword["term"] }}
+## Keywords
 
-**Top Domains:**
+{% for keyword in keywords -%}
+{{ keyword["term"] }}{% if not loop.last %}, {% endif %}
+{%- endfor %}
 
-{% for domain in keyword["domains"] %}
-{{ domain }}, 
+{% if keywords %}
+{% for attr_name in keywords[0].keys() | list %}
+{% if attr_name != "term" %}
+
+## {{ attr_name.replace('_', ' ').title() }}
+
+{% for keyword in keywords -%}
+{% if keyword[attr_name] is iterable and keyword[attr_name] is not string -%}
+{%- for item in keyword[attr_name] -%}
+{{ item | trim }} |
+{% endfor -%}
+{% elif keyword[attr_name] -%}
+{{ keyword[attr_name] }}
+{% endif -%}
+{% endfor -%}
+{% endif %}
 {% endfor %}
-
-**Page Titles:**
-
-{% for title in keyword["titles"] %}
-{{ title }}, 
-{% endfor %}
-
-**Breadcrumbs:**
-
-{% for breadcrumb in keyword["breadcrumbs"] %}
-{{ breadcrumb }}, 
-{% endfor %}
-
-{% endfor %}
+{% endif %}
 """)
 
 SERP_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
@@ -146,49 +149,44 @@ class Entity(Response):
     ] = Field(..., description="The category/type of the entity")
 
 
-class SerpTopicExtractor:
+class SerpTopicExtractor(HashableConfig):
     """Extract topics from keyword SERP data."""
 
-    def __init__(
-        self,
-        n_topics: int = 10,
-        n_subtopics: int = 5,
-        extra: str | None = None,
-    ):
+    n_topics: int = Field(10, ge=1, le=20)
+    """Maximum number of top-level topics to extract (maximum 20)."""
+    n_subtopics: int = Field(5, ge=2, le=10)
+    """Maximum number of subtopics per top-level topic (At least 2, maximum 10)."""
+    extra: str = ""
+    """Additional use-case specific instructions or context for the topic extraction."""
+    max_samples: int = 500
+    """Maximum number of samples to use for topic extraction."""
+    model: str = Field("google/gemini-2.5-flash-preview-05-20", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    """Model to use for topic extraction."""
+
+    _task: Task | None = None
+
+    async def __call__(self, df: DataFrame, model: str | None = None, **kwds) -> Topics:
+        """Extract topics from SERP data DataFrame."""
+        model = model or self.model
+
         prompt_args = {
-            "n_topics": n_topics,
-            "n_subtopics": n_subtopics,
-            "extra": extra or "",
+            "n_topics": self.n_topics,
+            "n_subtopics": self.n_subtopics,
+            "extra": self.extra or "",
         }
+
+        # Configure the prompt and task
         prompt = Template(SERP_TOPICS_PROMPT).substitute(prompt_args)
         prompt = Prompt.from_string(prompt)
-        response = make_topic_model(n_topics, n_subtopics)
-        self.task = Task(prompt=prompt, response=response)
+        response_cls = make_topic_model(self.n_topics, self.n_subtopics)
+        self._task = Task(prompt=prompt, response=response_cls)
 
-    def _format_serp_data(self, df: DataFrame, n_keywords: int) -> list[dict]:
-        """Format DataFrame of SERP data for topic extraction prompt."""
-
-        def flatten(s):
-            return [
-                item
-                for sublist in s
-                if sublist is not None
-                for item in sublist
-                if item is not None
-            ]
-
-        grouped = (
-            df.groupby("term")
-            .agg({"title": list, "domain": list, "breadcrumb": flatten})
-            .reset_index()
-        )
-
-        return grouped.iloc[:n_keywords].to_dict(orient="records")
-
-    async def __call__(self, df: DataFrame, model: str, **kwds) -> Topics:
-        """Extract topics from SERP data DataFrame."""
+        # Configure the context
+        samples_max = min(self.max_samples, len(df))
+        df = df.sample(n=samples_max, random_state=42)
         context = {"keywords": df.to_dict(orient="records")}
-        responses = await self.task.call(context=context, model=model, **kwds)
+
+        responses = await self._task.call(context=context, model=model, **kwds)
         return responses[0]  # type: ignore
 
 

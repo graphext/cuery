@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.10.1"
+version = "0.11.0"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
