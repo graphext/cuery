@@ -24,7 +24,7 @@ from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
 from ..topics.oneshot import TopicAssignment, Topics, make_assignment_model, make_topic_model
-from ..utils import HashableConfig, dedent
+from ..utils import LOG, HashableConfig, dedent
 
 SERP_TOPICS_PROMPT = dedent("""
 From the keyword SERP data below, extract a two-level nested list of topics.
@@ -152,6 +152,10 @@ class Entity(Response):
 class SerpTopicExtractor(HashableConfig):
     """Extract topics from keyword SERP data."""
 
+    text_column: str = "term"
+    """Column name in the DataFrame containing the main texts."""
+    extra_columns: list[str] = Field(default_factory=list)
+    """List of additional columns to include in the context for topic extraction."""
     n_topics: int = Field(10, ge=1, le=20)
     """Maximum number of top-level topics to extract (maximum 20)."""
     n_subtopics: int = Field(5, ge=2, le=10)
@@ -182,10 +186,15 @@ class SerpTopicExtractor(HashableConfig):
         self._task = Task(prompt=prompt, response=response_cls)
 
         # Configure the context
-        samples_max = min(self.max_samples, len(df))
-        df = df.sample(n=samples_max, random_state=42)
+        df = df.sample(n=min(self.max_samples, len(df)), random_state=42)
+        df = df.rename(columns={self.text_column: "term"})
+        columns = ["term"]
+        if self.extra_columns:
+            columns.extend(col for col in self.extra_columns if col in df.columns)
+        df = df[columns]
         context = {"keywords": df.to_dict(orient="records")}
 
+        LOG.info(f"Extracting topics with columns: {columns}")
         responses = await self._task.call(context=context, model=model, **kwds)
         return responses[0]  # type: ignore
 

@@ -10,6 +10,20 @@
             "description": "Dataset ID of input dataset in Apify platform",
             "editor": "textfield"
         },
+        "text_column": {
+            "title": "Text Column",
+            "type": "string",
+            "description": "Name of the column in the dataset containing the main text to analyze for topics.",
+            "editor": "textfield",
+            "default": "term"
+        },
+        "extra_columns": {
+            "title": "Additional Columns",
+            "type": "array",
+            "description": "List of additional columns to include in the context for topic extraction. These can provide extra context for the AI model to better classify topics.",
+            "editor": "stringList",
+            "default": []
+        },
         "max_samples": {
             "title": "Maximum Samples for Topic Extraction",
             "type": "integer",
