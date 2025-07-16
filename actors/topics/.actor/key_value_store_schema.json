@@ -1,0 +1,14 @@
+{
+    "actorKeyValueStoreSchemaVersion": 1,
+    "title": "Key-Value Store Schema",
+    "collections": {
+        "topics": {
+            "title": "Topics",
+            "description": "Stores the extracted topic hierarchy for each dataset.",
+            "keyPrefix": "topics-",
+            "contentTypes": [
+                "application/json"
+            ]
+        }
+    }
+}

@@ -22,7 +22,11 @@ async def main():
 
         LOG.info("Extracted topic hierarchy")
         LOG.info(json.dumps(topics.to_dict(), indent=2))
-        await Actor.set_value("topics", topics.to_dict())
+        await Actor.set_value(
+            f"topics-{dataset_id}",
+            topics.to_dict(),
+            content_type="application/json",
+        )
 
 
 if __name__ == "__main__":
