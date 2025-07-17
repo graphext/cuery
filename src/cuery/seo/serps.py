@@ -29,7 +29,7 @@ from pandas import DataFrame, NamedAgg, Series
 from pydantic import Field
 
 from ..utils import LOG, HashableConfig
-from .tasks import EntityExtractor, SerpTopicAndIntentAssigner, SerpTopicExtractor
+from .tools import EntityExtractor, SerpIntentAssigner, SerpTopicAssigner, SerpTopicExtractor
 
 
 class SerpConfig(HashableConfig):
@@ -294,10 +294,10 @@ def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
         "emphasizedKeywords": NamedAgg("emphasizedKeywords", lambda ser: list(set(flatten(ser)))),
     }
 
-    agg = df.groupby("term").agg(**agg_funcs).reset_index()
+    agg = df.groupby("term").agg(**agg_funcs).reset_index()  # type: ignore[call-overload]
 
     top = df.groupby("term").head(top_n)
-    topagg = top.groupby("term").agg(**top_agg_funcs).reset_index()
+    topagg = top.groupby("term").agg(**top_agg_funcs).reset_index()  # type: ignore[call-overload]
 
     return agg.merge(topagg, on="term", how="left")
 
@@ -350,21 +350,45 @@ def add_ranks(
 async def topic_and_intent(
     df: DataFrame,
     max_samples: int,
-    topic_model: str,
-    assignment_model: str,
+    topic_model: str = "google/gemini-2.5-flash-preview-05-20",
+    assignment_model: str = "openai/gpt-4.1-mini",
     max_retries: int = 5,
 ) -> DataFrame | None:
     """Classify keywords and their top N organic results into topics and intent."""
-    try:
-        extractor = SerpTopicExtractor(max_samples=max_samples, model=topic_model)  # type: ignore
-        topic_intent = await extractor(df, max_retries=max_retries)
-        LOG.info("Extracted topic hierarchy")
-        LOG.info(json.dumps(topic_intent.to_dict(), indent=2, ensure_ascii=False))
+    text_column = "term"
+    extra_columns = ["titles", "domains", "breadcrumbs"]
 
-        assigner = SerpTopicAndIntentAssigner(topic_intent)
-        classified = await assigner(df=df, model=assignment_model, n_concurrent=100)
-        clf = classified.to_pandas()
-        return clf[["term", "topic", "subtopic", "intent"]]
+    try:
+        extractor = SerpTopicExtractor(
+            text_column=text_column,
+            extra_columns=extra_columns,
+            n_topics=10,
+            n_subtopics=5,
+            max_samples=max_samples,
+            model=topic_model,
+        )
+        topics = await extractor(df, max_retries=max_retries)
+        LOG.info("Extracted topic hierarchy")
+        LOG.info(json.dumps(topics.to_dict(), indent=2, ensure_ascii=False))
+
+        topic_assigner = SerpTopicAssigner(
+            topics=topics,
+            text_column=text_column,
+            extra_columns=extra_columns,
+            model=assignment_model,
+        )
+        term_topics = await topic_assigner(df=df, n_concurrent=100)
+        term_topics = term_topics[["term", "topic", "subtopic"]]
+
+        intent_assigner = SerpIntentAssigner(
+            text_column=text_column,
+            extra_columns=extra_columns,
+            model=assignment_model,
+        )
+        term_intents = await intent_assigner(df=df, n_concurrent=100)
+        term_intents = term_intents[["term", "intent"]]
+
+        return term_topics.merge(term_intents, on="term", how="left")
     except Exception as exc:
         LOG.error(f"Error during topic and intent extraction: {exc}")
         LOG.exception("Stack trace:")

@@ -3,7 +3,7 @@ import json
 
 from apify import Actor
 
-from ..seo.tasks import SerpTopicExtractor
+from ..seo.tools import SerpTopicExtractor
 from ..utils import LOG
 from .utils import fetch_dataset
 
