@@ -1,0 +1,24 @@
+{
+    "actorSpecification": 1,
+    "title": "SERP Intent Classifier",
+    "description": "Classify search intent for keywords based on their SERP results using AI. Categorizes keywords into informational, navigational, transactional, or commercial intent.",
+    "views": {
+        "intents": {
+            "title": "Intent Classifications",
+            "description": "Keywords with assigned search intent categories",
+            "transformation": {
+                "fields": [
+                    "intent"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "intent": {
+                        "format": "text"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "actorSpecification": 1,
+    "name": "topic-assigner",
+    "title": "SERP Topic Assigner",
+    "description": "Assign predefined topics and subtopics to keywords based on their SERP results using AI classification.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "dockerfile": "./Dockerfile",
+    "dockerContextDir": "../..",
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "main": "python -m cuery.actors.assign_topic",
+    "readme": "./README.md",
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 4096,
+    "usesStandbyMode": false
+}

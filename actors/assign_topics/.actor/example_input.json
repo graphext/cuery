@@ -1,0 +1,35 @@
+{
+    "dataset_id": "5Rrc6BnTBi7nZfpvF",
+    "topics": {
+        "Technology": [
+            "AI/ML",
+            "Web Development",
+            "Mobile Apps",
+            "Cloud Computing"
+        ],
+        "Marketing": [
+            "SEO",
+            "Social Media",
+            "Content Marketing",
+            "Email Marketing"
+        ],
+        "Business": [
+            "Finance",
+            "Operations",
+            "Strategy",
+            "Human Resources"
+        ],
+        "Health": [
+            "Fitness",
+            "Nutrition",
+            "Mental Health",
+            "Medical Research"
+        ]
+    },
+    "text_column": "term",
+    "extra_columns": [
+        "titles",
+        "domains",
+        "breadcrumbs"
+    ]
+}

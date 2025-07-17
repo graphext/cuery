@@ -1,0 +1,38 @@
+{
+    "title": "SERP Intent Classifier",
+    "description": "Classify search intent for keywords based on their SERP results using AI. Categorizes keywords into informational, navigational, transactional, or commercial intent.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "dataset_id": {
+            "title": "Dataset ID",
+            "type": "string",
+            "description": "The ID of the dataset containing the keyword SERP data to be classified for search intent. The dataset should contain keywords with their corresponding SERP data including titles, domains, and breadcrumbs.",
+            "editor": "textfield"
+        },
+        "text_column": {
+            "title": "Text Column",
+            "type": "string",
+            "description": "The name of the column containing the main text/keyword to classify for intent.",
+            "editor": "textfield",
+            "default": "term"
+        },
+        "extra_columns": {
+            "title": "Extra Columns",
+            "type": "array",
+            "description": "Additional columns from the SERP data to include in the intent classification context (e.g., titles, domains, breadcrumbs). These provide context about the search results to improve intent classification accuracy.",
+            "items": {
+                "type": "string"
+            },
+            "editor": "stringList",
+            "default": [
+                "titles",
+                "domains",
+                "breadcrumbs"
+            ]
+        }
+    },
+    "required": [
+        "dataset_id"
+    ]
+}
