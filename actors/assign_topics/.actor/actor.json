@@ -1,7 +1,7 @@
 {
     "actorSpecification": 1,
-    "name": "topic-assigner",
-    "title": "SERP Topic Assigner",
+    "name": "topic-classifier",
+    "title": "SERP Topic Classifier",
     "description": "Assign predefined topics and subtopics to keywords based on their SERP results using AI classification.",
     "version": "1.0",
     "buildTag": "latest",

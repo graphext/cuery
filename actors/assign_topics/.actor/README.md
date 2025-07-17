@@ -1,4 +1,4 @@
-# SERP Topic Assigner
+# SERP Topic Classifier
 
 This Apify actor assigns predefined topics and subtopics to keywords based on their Search Engine Results Page (SERP) data using AI classification. It takes a dataset of keywords with SERP data and a predefined topic hierarchy to classify each keyword into appropriate topic categories.
 
