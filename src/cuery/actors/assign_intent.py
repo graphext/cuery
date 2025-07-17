@@ -19,9 +19,9 @@ async def main():
 
         assigner = SerpIntentAssigner(**config)
         result = await assigner(df, max_retries=MAX_RETRIES)
-        LOG.info(f"Assigned topics:\n{result}")
+        LOG.info(f"Assigned intent:\n{result}")
 
-        records = json.loads(df.to_json(orient="records", date_format="iso", index=False))
+        records = json.loads(result.to_json(orient="records", date_format="iso", index=False))
         await Actor.push_data(records)
 
 
