@@ -15,5 +15,10 @@
     "readme": "./README.md",
     "minMemoryMbytes": 256,
     "maxMemoryMbytes": 4096,
-    "usesStandbyMode": false
+    "usesStandbyMode": false,
+    "environmentVariables": {
+        "OPENAI_API_KEY": "@OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY": "@ANTHROPIC_API_KEY",
+        "GOOGLE_API_KEY": "@GOOGLE_API_KEY"
+    }
 }

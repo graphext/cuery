@@ -27,9 +27,6 @@
             "title": "Extra Columns",
             "type": "array",
             "description": "Additional columns from the SERP data to include in the classification context (e.g., titles, domains, breadcrumbs).",
-            "items": {
-                "type": "string"
-            },
             "editor": "stringList",
             "default": [
                 "titles",

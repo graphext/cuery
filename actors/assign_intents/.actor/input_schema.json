@@ -21,9 +21,6 @@
             "title": "Extra Columns",
             "type": "array",
             "description": "Additional columns from the SERP data to include in the intent classification context (e.g., titles, domains, breadcrumbs). These provide context about the search results to improve intent classification accuracy.",
-            "items": {
-                "type": "string"
-            },
             "editor": "stringList",
             "default": [
                 "titles",
