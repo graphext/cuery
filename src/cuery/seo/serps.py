@@ -139,7 +139,6 @@ def process_toplevel_keys(row: dict):
         "#debug",
         "#error",
         "htmlSnapshotUrl",
-        "url",
         "hasNextPage",
         "resultsTotal",
         "serpProviderCode",
