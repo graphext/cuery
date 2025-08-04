@@ -79,7 +79,10 @@ class GoogleKwdConfig(HashableConfig):
     max_ideas: int = Field(100, le=10_000)
     """Maximum number of additional keyword ideas to fetch (if `ideas` is True)."""
     language: str = "en"
-    """The language to use for keyword data (e.g., 'en' for English)."""
+    """The resource name of the language to target. Each keyword belongs to some set of languages;
+    a keyword is included if language is one of its languages. If not set, all keywords will be
+    included. (e.g., 'en' for English).
+    """
     country: str = "us"
     """The geographical target for keyword data (e.g., 'us' for United States)."""
     metrics_start: str | None = None
@@ -398,9 +401,10 @@ def add_trend_columns(df: DataFrame) -> DataFrame:
     return df
 
 
-def process_keywords(
+def process_keywords(  # noqa: PLR0912
     response: GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse,
     collect_volumes: bool = True,
+    zeros_to_nans: bool = True,
 ) -> DataFrame:
     """Process Google Ads API keyword response into a DataFrame."""
 
@@ -460,6 +464,19 @@ def process_keywords(
     if collect_volumes:
         df = collect_volume_columns(df)
         df = add_trend_columns(df)
+
+    # Convert micros to dollars/euros, and 0s to NaNs
+    for col in (
+        "average_cpc_micros",
+        "low_top_of_page_bid_micros",
+        "high_top_of_page_bid_micros",
+    ):
+        if col in df.columns:
+            name = col.replace("_micros", "")
+            df[name] = df[col] / 1_000_000
+            if zeros_to_nans:
+                df[name] = df[name].replace(0, np.nan)
+            df = df.drop(columns=col)
 
     return df
 
