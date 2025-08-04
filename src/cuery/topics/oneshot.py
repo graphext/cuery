@@ -17,7 +17,7 @@ from collections.abc import Iterable
 from typing import ClassVar, Literal, Self
 
 from Levenshtein import distance as ldist
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 
 from .. import utils
 from ..context import AnyContext
@@ -70,10 +70,12 @@ class Topic(Response):
     topic: str = Field(..., description="The top-level topic.")
     subtopics: list[str] = Field(..., description="A list of subtopics under the top-level topic.")
 
+    _MIN_LDIST: ClassVar[int] = 2
+    """Minimum Levenshtein distance between subtopics and subtopics->parent topic."""
+
     @model_validator(mode="after")
     def validate_subtopics(self) -> Self:
         # Topic titles should be at least N character edits apart
-        min_ldist = 2
 
         subtopics = [st.lower() for st in self.subtopics]
         errors = []
@@ -83,7 +85,7 @@ class Topic(Response):
 
         for i, st in enumerate(subtopics):
             # Subtopics should not be too similar to their parent topic
-            if ldist(st, self.topic.lower()) < min_ldist:
+            if ldist(st, self.topic.lower()) < self._MIN_LDIST:
                 errors.append(f"Subtopic '{st}' too similar to parent topic '{self.topic}'.")
 
             # Subtopics should not be too similar to each other
@@ -91,7 +93,7 @@ class Topic(Response):
                 other = subtopics[j]
 
                 # Check Levenshtein distance for similarity
-                if ldist(st.replace(" ", ""), other.replace(" ", "")) < min_ldist:
+                if ldist(st.replace(" ", ""), other.replace(" ", "")) < self._MIN_LDIST:
                     errors.append(sim_err(st, other))
 
                 # Check for permutations of words
@@ -110,6 +112,17 @@ class Topics(Response):
     topics: list[Topic] = Field(
         ..., description="A list of top-level topics with their subtopics."
     )
+
+    @field_validator("topics", mode="before")
+    @classmethod
+    def validate_topics(cls, topics) -> list:
+        """Validate that the topics are a list of dictionaries with topic and subtopics."""
+        if isinstance(topics, dict):
+            topics = [
+                {"topic": topic, "subtopics": subtopics} for topic, subtopics in topics.items()
+            ]
+
+        return topics
 
     def to_dict(self) -> dict[str, list[str]]:
         """Convert the response to a dictionary."""
@@ -135,9 +148,10 @@ class TopicAssignment(Response):
         return self
 
 
-def make_topic_model(n_topics: int, n_subtopics: int) -> type[Topics]:
+def make_topic_model(n_topics: int, n_subtopics: int, min_ldist: int = 2) -> type[Topics]:
     """Create a specific response model for a list of N topics with M subtopics."""
     TopicK = customize_fields(Topic, "TopicK", subtopics={"max_length": n_subtopics})
+    TopicK._MIN_LDIST = min_ldist
     return customize_fields(
         Topics, "TopicsN", topics={"max_length": n_topics, "annotation": list[TopicK]}
     )
