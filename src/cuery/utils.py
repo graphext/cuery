@@ -92,7 +92,7 @@ def dedent(text):
     """Dedent a string, removing leading whitespace like yaml blocks."""
     text = cleandoc(text)
     paragraphs = text.split("\n\n")
-    paragraphs = [p.replace("\n", " ") for p in paragraphs]
+    paragraphs = [p.replace("\n", " ") if not p.startswith("-") else p for p in paragraphs]
     return "\n\n".join(paragraphs).strip()
 
 
