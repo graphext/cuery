@@ -141,6 +141,29 @@ The intent should be one of: informational, navigational, transactional, or comm
 """)
 
 
+PURCHASE_PROBABILITY_PROMPT = dedent("""
+Assign a purchase probability score (integer between 0 and 10) to the (Google) search keyword and
+associated SERP data below (Keyword section). The score should reflect the likelihood of a user
+completing a purchase or taking a commercial action based on the keyword within the next 30 days.
+
+# Keyword: "{{keyword["term"]}}"
+
+{% for attr_name in keyword.keys() | list -%}
+{% if attr_name != "term" -%}
+
+{{ attr_name }}:
+{% if keyword[attr_name] is iterable and keyword[attr_name] is not string -%}
+{%- for item in keyword[attr_name] -%}
+{{ item | trim }}{% if not loop.last %} | {% endif %}
+{%- endfor %}
+{% elif keyword[attr_name] -%}
+{{ keyword[attr_name] }}
+{% endif %}
+
+{% endif -%}
+{% endfor -%}
+""")
+
 ENTITY_EXTRACTION_PROMPT = """
 # Instructions
 From the "AI Overview Data" section below, which contains AI overviews from Google SERPs,
@@ -181,6 +204,14 @@ class SerpIntentAssignment(Response):
 
     intent: Literal["informational", "navigational", "transactional", "commercial"] = Field(
         ..., description="The primary search intent category"
+    )
+
+
+class PurchaseProbability(Response):
+    """Purchase probability score for SERP keyword data."""
+
+    score: int = Field(
+        ..., ge=0, le=10, description="Probability score (0-10) of a purchase action"
     )
 
 
@@ -391,3 +422,44 @@ class EntityExtractor(HashableConfig):
 
         LOG.info(f"Assigning entities row-wise with columns: {df.columns.tolist()}")
         return await self._task(context=context, model=model, **kwds)
+
+
+class PurchaseProbAssigner(HashableConfig):
+    """Classify intent for keywords based on their SERP results."""
+
+    text_column: str = "term"
+    """Column name in the DataFrame containing the main texts."""
+    extra_columns: list[str] = Field(default_factory=list)
+    """List of additional columns to include in the context."""
+    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")
+    """Model to use for purchase probability estimation."""
+
+    _task: Task | None = None
+
+    async def __call__(self, df: DataFrame, model: str | None = None, **kwds) -> DataFrame:
+        """Estimate purchase probability for each keyword in the DataFrame."""
+        model = model or self.model
+        prompt = Prompt.from_string(PURCHASE_PROBABILITY_PROMPT)
+        self._task = Task(prompt=prompt, response=PurchaseProbability)
+
+        # Keep only configured columns
+        columns = [self.text_column] + [col for col in self.extra_columns if col in df.columns]
+        df = df[columns]
+        df = df.rename(columns={self.text_column: "term"})
+
+        # Convert DataFrame to context format (one dict per row)
+        context = [{"keyword": record} for record in df.to_dict(orient="records")]
+
+        LOG.info(f"Assigning purchase probabilities row-wise with columns: {columns}")
+        response = await self._task(context=context, model=model, **kwds)
+
+        result = response.to_pandas(explode=False)
+        result = pd.concat(
+            [
+                result.drop(columns="keyword"),
+                pd.json_normalize(result["keyword"]),  # type: ignore
+            ],
+            axis=1,
+        )
+
+        return result.rename(columns={"term": self.text_column})
