@@ -27,7 +27,7 @@ from ..task import Task
 from ..topics.oneshot import TopicAssignment, Topics, make_assignment_model, make_topic_model
 from ..utils import LOG, HashableConfig, dedent
 
-SERP_TOPICS_PROMPT = dedent("""
+TOPICS_PROMPT = dedent("""
 From the keyword SERP data below, extract a two-level nested list of topics.
 Each entry contains a keyword and its associated search results data.
 The output should be a JSON object with top-level topics as keys and lists of subtopics as values.
@@ -72,7 +72,7 @@ $extra
 {% endif %}
 """)
 
-SERP_TOPIC_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
+TOPIC_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
 You're task is to use the following hierarchy of topics and subtopics (in json format),
 to assign the correct topic and subtopic to each keyword based on its SERP results.
 
@@ -84,7 +84,7 @@ the keyword.
 %(topics)s
 """)
 
-SERP_TOPIC_ASSIGNMENT_PROMPT_USER = dedent("""
+TOPIC_ASSIGNMENT_PROMPT_USER = dedent("""
 Assign the correct topic and subtopic to the following keyword based on its SERP results.
 
 # Keyword: "{{keyword["term"]}}"
@@ -105,7 +105,7 @@ Assign the correct topic and subtopic to the following keyword based on its SERP
 {% endfor -%}
 """)
 
-SERP_INTENT_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
+INTENT_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
 You're task is to classify the search intent for each keyword based on its SERP results.
 
 Use these search intent definitions:
@@ -118,7 +118,7 @@ Consider the keyword term itself, as well as any other provided attribute associ
 the keyword.
 """)
 
-SERP_INTENT_ASSIGNMENT_PROMPT_USER = dedent("""
+INTENT_ASSIGNMENT_PROMPT_USER = dedent("""
 Classify the search intent for the following keyword based on its SERP results.
 The intent should be one of: informational, navigational, transactional, or commercial.
 
@@ -140,28 +140,40 @@ The intent should be one of: informational, navigational, transactional, or comm
 {% endfor -%}
 """)
 
-ENTITY_EXTRACTION_PROMPT = dedent("""
-From the Google SERP AI Overview data and Source Titles below, extract entities that are relevant
-to SEO analysis. Focus on identifying 3 kinds of entities: brand mentions and company names;
-products and services; and technologies, tools, and platforms. Categorize other entities as
-"other".
+
+ENTITY_EXTRACTION_PROMPT = """
+# Instructions
+From the "AI Overview Data" section below, which contains AI overviews from Google SERPs,
+extract entities that are relevant to SEO analysis. Focus on identifying 3 kinds of entities:
+
+- brand mentions and company names (label "brand_company")
+- products and services (label "product_service")
+- technologies and tools (label "technology")
+
+Categorize other entities as "other".
 
 For each entity, provide the entity name/text as it appears, and the type/category of entity.
-Pay special attention to URLs etc. in the source titles, which may refer to brands, companies or
+Pay special attention to URLs, which may refer to brands, companies or
 products. Ensure to report the names of entities always in lowercase and singular form, even if
 they appear in plural or uppercase in the source titles, to avoid inconsistencies in the output.
 
 # AI Overview Data
 
-{{ aiOverview_content }}
+{% for attr_name in aio.keys() | list -%}
 
-## Source Titles:
+## {{ attr_name }}
 
-{% for title in aiOverview_source_titles %}
-- {{ title }}
+{% if aio[attr_name] is iterable and aio[attr_name] is not string -%}
+{%- for item in aio[attr_name] -%}
+- {{ item | trim }}
 
 {% endfor %}
-""")
+{% elif aio[attr_name] -%}
+{{ aio[attr_name] }}
+{% endif %}
+
+{% endfor -%}
+"""
 
 
 class SerpIntentAssignment(Response):
@@ -177,8 +189,8 @@ class Entity(Response):
 
     name: str = Field(..., description="The entity name or text as it appears")
     type: Literal[
-        "brand_or_company",
-        "product_or_service",
+        "brand_company",
+        "product_service",
         "technology",
         "other",
     ] = Field(..., description="The category/type of the entity")
@@ -203,6 +215,8 @@ class SerpTopicExtractor(HashableConfig):
     """Maximum number of top-level topics to extract (maximum 20)."""
     n_subtopics: int = Field(5, ge=2, le=10)
     """Maximum number of subtopics per top-level topic (At least 2, maximum 10)."""
+    min_ldist: int = Field(2, ge=1)
+    """Minimum Levenshtein distance between topic labels."""
     extra: str = ""
     """Additional use-case specific instructions or context for the topic extraction."""
     max_samples: int = 500
@@ -223,9 +237,9 @@ class SerpTopicExtractor(HashableConfig):
         }
 
         # Configure the prompt and task
-        prompt = Template(SERP_TOPICS_PROMPT).substitute(prompt_args)
+        prompt = Template(TOPICS_PROMPT).substitute(prompt_args)
         prompt = Prompt.from_string(prompt)
-        response_cls = make_topic_model(self.n_topics, self.n_subtopics)
+        response_cls = make_topic_model(self.n_topics, self.n_subtopics, min_ldist=self.min_ldist)
         self._task = Task(prompt=prompt, response=response_cls)
 
         # Configure the context
@@ -274,9 +288,9 @@ class SerpTopicAssigner(HashableConfig):
             messages=[
                 {
                     "role": "system",
-                    "content": SERP_TOPIC_ASSIGNMENT_PROMPT_SYSTEM % {"topics": topics_json},
+                    "content": TOPIC_ASSIGNMENT_PROMPT_SYSTEM % {"topics": topics_json},
                 },
-                {"role": "user", "content": SERP_TOPIC_ASSIGNMENT_PROMPT_USER},
+                {"role": "user", "content": TOPIC_ASSIGNMENT_PROMPT_USER},
             ],  # type: ignore
             required=["keyword"],
         )
@@ -325,9 +339,9 @@ class SerpIntentAssigner(HashableConfig):
             messages=[
                 {
                     "role": "system",
-                    "content": SERP_INTENT_ASSIGNMENT_PROMPT_SYSTEM,
+                    "content": INTENT_ASSIGNMENT_PROMPT_SYSTEM,
                 },
-                {"role": "user", "content": SERP_INTENT_ASSIGNMENT_PROMPT_USER},
+                {"role": "user", "content": INTENT_ASSIGNMENT_PROMPT_USER},
             ],  # type: ignore
             required=["keyword"],
         )
@@ -356,13 +370,24 @@ class SerpIntentAssigner(HashableConfig):
         return result.rename(columns={"term": self.text_column})
 
 
-class EntityExtractor:
-    """Extract SEO-relevant entities from Google SERP AI Overview data."""
+class EntityExtractor(HashableConfig):
+    """ "Extract SEO-relevant entities from Google SERP AI Overview data."""
 
-    def __init__(self, **kwds):
-        """Initialize the EntityExtractor with predefined prompt and response model."""
+    columns: list[str]
+    """List of columns to include in the context for entity extraction."""
+    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    """Model to use for topic extraction."""
+
+    _task: Task | None = None
+
+    async def __call__(self, df: DataFrame, model: str | None = None, **kwds) -> ResponseSet:
+        model = model or self.model
+
         prompt = Prompt.from_string(ENTITY_EXTRACTION_PROMPT)
-        self.task = Task(prompt=prompt, response=Entities, **kwds)
+        self._task = Task(prompt=prompt, response=Entities)
 
-    async def __call__(self, df: DataFrame, model: str, **kwds) -> ResponseSet:
-        return await self.task(context=df, model=model, **kwds)
+        df = df[[col for col in self.columns if col in df.columns]]
+        context = [{"aio": record} for record in df.to_dict(orient="records")]
+
+        LOG.info(f"Assigning entities row-wise with columns: {df.columns.tolist()}")
+        return await self._task(context=context, model=model, **kwds)
