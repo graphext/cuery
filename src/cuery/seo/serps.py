@@ -61,6 +61,8 @@ class SerpConfig(HashableConfig):
     """Maximum number of samples to use for topic and intent extraction from SERP data."""
     topic_model: str | None = "google/gemini-2.5-flash-preview-05-20"
     """Model to use for topic extraction from SERP organic results."""
+    topic_min_ldist: int = 2
+    """Minimum Levenshtein distance between topic labels."""
     assignment_model: str | None = "openai/gpt-4.1-mini"
     """Model to use for intent classification from SERP organic results."""
     entity_model: str | None = "openai/gpt-4.1-mini"
@@ -174,9 +176,15 @@ def process_ai_overview(row: dict):
     """Keep only content and source titles."""
     aio = row.pop("aiOverview", {})
     items = {
-        "aiOverview_content": aio.get("content", None),
-        "aiOverview_source_titles": [s["title"] for s in aio.get("sources", [])] or None,
+        "aio_content": aio.get("content", None),
+        "aio_source_titles": [s["title"] for s in aio.get("sources", [])] or None,
+        "aio_source_descs": [s["description"] for s in aio.get("sources", [])] or None,
+        "aio_source_urls": [s["url"] for s in aio.get("sources", [])] or None,
     }
+    items["aio_sources"] = [
+        s["title"] + " – " + s["description"] + " " + s["url"] for s in aio.get("sources", [])
+    ] or None
+
     row.update(**items)
 
 
@@ -288,6 +296,7 @@ def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
     # These apply to only the top N results
     top_agg_funcs = {
         "titles": NamedAgg("title", list),
+        "urls": NamedAgg("url", list),
         "descriptions": NamedAgg("description", list),
         "domains": NamedAgg("domain", lambda ser: list(set(ser))),
         "breadcrumbs": NamedAgg("breadcrumb", lambda ser: list(set(flatten(ser)))),
@@ -319,25 +328,27 @@ def add_ranks(
     df: DataFrame,
     brands: str | list[str] | None,
     competitors: str | list[str] | None,
+    columns: tuple[str, ...] | list[str] = ("titles", "domains", "descriptions"),
 ) -> DataFrame:
     """Calculate brand and competitor ranks in organic search results."""
+    missing = [col for col in columns if col not in df.columns]
+    if missing:
+        LOG.warning(f"Columns {missing} not found in DataFrame! Will not add ranks for these.")
+        columns = [col for col in columns if col not in missing]
+
     if brands is not None:
-        df["title_rank_brand"] = df.titles.apply(lambda x: token_rank(brands, x))
-        df["domain_rank_brand"] = df.domains.apply(lambda x: token_rank(brands, x))
-        df["description_rank_brand"] = df.descriptions.apply(lambda x: token_rank(brands, x))
+        for col in columns:
+            df[f"{col}_rank_brand"] = df[col].apply(lambda x: token_rank(brands, x))
 
     if competitors is not None:
         # First position of any(!) competitor
-        df["title_rank_competition"] = df.titles.apply(lambda x: token_rank(competitors, x))
-        df["description_rank_competition"] = df.descriptions.apply(
-            lambda x: token_rank(competitors, x)
-        )
-        df["domain_rank_competition"] = df.domains.apply(lambda x: token_rank(competitors, x))
+        for col in columns:
+            df[f"{col}_rank_competition"] = df[col].apply(lambda x: token_rank(competitors, x))
 
         # Specific ranks for each individual competitor
         for name in competitors:
             c_ranks = []
-            for col in ("titles", "descriptions", "domains"):
+            for col in columns:
                 rank = df[col].apply(lambda x, name=name: token_rank(name, x))
                 c_ranks.append(rank)
 
@@ -347,16 +358,21 @@ def add_ranks(
     return df
 
 
-async def topic_and_intent(
+async def topic_and_intent(  # noqa: PLR0913
     df: DataFrame,
     max_samples: int,
     topic_model: str = "google/gemini-2.5-flash-preview-05-20",
     assignment_model: str = "openai/gpt-4.1-mini",
     max_retries: int = 5,
+    text_column: str = "term",
+    extra_columns: list[str] | None = None,
+    topics_instructions: str = "",
+    min_ldist: int = 2,
 ) -> DataFrame | None:
     """Classify keywords and their top N organic results into topics and intent."""
-    text_column = "term"
-    extra_columns = ["titles", "domains", "breadcrumbs"]
+
+    if extra_columns is None:
+        extra_columns = ["titles", "domains", "breadcrumbs"]
 
     try:
         extractor = SerpTopicExtractor(
@@ -364,6 +380,8 @@ async def topic_and_intent(
             extra_columns=extra_columns,
             n_topics=10,
             n_subtopics=5,
+            min_ldist=min_ldist,
+            extra=topics_instructions,
             max_samples=max_samples,
             model=topic_model,
         )
@@ -378,7 +396,7 @@ async def topic_and_intent(
             model=assignment_model,
         )
         term_topics = await topic_assigner(df=df, n_concurrent=100)
-        term_topics = term_topics[["term", "topic", "subtopic"]]
+        term_topics = term_topics[[text_column, "topic", "subtopic"]]
 
         intent_assigner = SerpIntentAssigner(
             text_column=text_column,
@@ -386,30 +404,43 @@ async def topic_and_intent(
             model=assignment_model,
         )
         term_intents = await intent_assigner(df=df, n_concurrent=100)
-        term_intents = term_intents[["term", "intent"]]
+        term_intents = term_intents[[text_column, "intent"]]
 
-        return term_topics.merge(term_intents, on="term", how="left")
+        return term_topics.merge(term_intents, on=text_column, how="left")
     except Exception as exc:
         LOG.error(f"Error during topic and intent extraction: {exc}")
         LOG.exception("Stack trace:")
         return None
 
 
-async def process_ai_overviews(
+async def extract_aio_entities(
     df: DataFrame,
     entity_model: str = "openai/gpt-4.1-mini",
+    id_column: str = "term",
 ) -> DataFrame | None:
     """Process AI overviews in SERP data and extract entities."""
-    if "aiOverview_content" in df.columns and df["aiOverview_content"].notna().any():
+    if "aio_content" in df.columns and df["aio_content"].notna().any():
+        aio_columns = [
+            "aio_content",
+            "aio_source_titles",
+            "aio_source_descs",
+            "aio_source_urls",
+        ]
+        aio_columns = [col for col in aio_columns if col in df.columns]
+        LOG.info(f"Extracting entities from columns: {aio_columns}")
+
         try:
             # Todo: extract brand and competitor ranks
-            ai_df = df[df.aiOverview_content.notna()].copy().reset_index()
-            entity_extractor = EntityExtractor()
-            entities = await entity_extractor(df=ai_df, model=entity_model, n_concurrent=100)
+            ai_df = df[df.aio_content.notna()].copy().reset_index()
+            entity_extractor = EntityExtractor(
+                model=entity_model,
+                columns=aio_columns,
+            )
+            entities = await entity_extractor(df=ai_df, n_concurrent=100)
             ent_df = entities.to_pandas(explode=False)
 
-            for kind in ("brand/company", "product/service", "technology"):
-                ent_df[f"ai_overview_{kind}"] = ent_df.entities.apply(
+            for kind in ("brand_company", "product_service", "technology", "other"):
+                ent_df[f"aio_ents_{kind}"] = ent_df.entities.apply(
                     lambda es, kind=kind: [
                         e.name
                         for e in es
@@ -422,10 +453,9 @@ async def process_ai_overviews(
                     else None
                 )
 
-            ent_df["term"] = ai_df["term"]
-            return ent_df.drop(
-                columns=["aiOverview_content", "aiOverview_source_titles", "entities"]
-            )
+            ent_df = ent_df[[col for col in ent_df.columns if col.startswith("aio_ents_")]]
+            ent_df[id_column] = ai_df[id_column]
+            return ent_df
         except Exception as exc:
             LOG.error(f"Error processing AI overviews: {exc}")
             return None
@@ -496,34 +526,15 @@ def add_brand_mentions(
     whole_word: bool = True,
 ) -> DataFrame:
     """Identify brand mentions in AI overviews using regex."""
-    if "aiOverview_content" in df.columns:
-        if brands:
-            df["aiOverview_brand_mentions"] = mentioned_brands(
-                df["aiOverview_content"],
-                brands=brands,
-                whole_word=whole_word,
-            )
-        if competitors:
-            df["aiOverview_competitor_mentions"] = mentioned_brands(
-                df["aiOverview_content"],
-                brands=competitors,
-                whole_word=whole_word,
-            )
-
-    if "aiOverview_source_titles" in df.columns:
-        if brands:
-            df["aiOverview_source_mentions"] = mentioned_brands(
-                df["aiOverview_source_titles"],
-                brands=brands,
-                whole_word=True,
-            )
-        if competitors:
-            df["aiOverview_source_competitor_mentions"] = mentioned_brands(
-                df["aiOverview_source_titles"],
-                brands=competitors,
-                whole_word=True,
-            )
-
+    for col in ("aio_content", "aio_sources"):
+        if col in df:
+            for tag, names in zip(("brand", "competitor"), (brands, competitors), strict=True):
+                if names:
+                    df[f"{col}_{tag}_mentions"] = mentioned_brands(
+                        df[col],
+                        brands=names,
+                        whole_word=whole_word,
+                    )
     return df
 
 
@@ -545,7 +556,11 @@ async def process_serps(
 
     df = features.merge(orgagg, on="term", how="left")
 
-    # Topics and intent
+    if cfg.brands or cfg.competitors:
+        LOG.info("Identifying brand and competitor mentions in AI overviews")
+        df = add_brand_mentions(df, brands=cfg.brands, competitors=cfg.competitors)
+
+    # AI topics and intent
     if cfg.topic_model is not None and cfg.assignment_model is not None:
         LOG.info("Extracting topics and intents from keywords and top organic results")
         topics = await topic_and_intent(
@@ -561,13 +576,9 @@ async def process_serps(
     # AI overview entities
     if cfg.entity_model is not None:
         LOG.info("Extracting entities from AI overviews")
-        entities = await process_ai_overviews(features, entity_model=cfg.entity_model)
+        entities = await extract_aio_entities(features, entity_model=cfg.entity_model)
         if entities is not None:
             df = df.merge(entities, on="term", how="left")
-
-    if cfg.brands or cfg.competitors:
-        LOG.info("Identifying brand and competitor mentions AI overviews")
-        df = add_brand_mentions(df, brands=cfg.brands, competitors=cfg.competitors)
 
     return df
 
@@ -575,7 +586,7 @@ async def process_serps(
 async def serps(cfg: SerpConfig, keywords: Iterable[str] | None = None) -> DataFrame | None:
     """Fetch and process SERP data for a list of keywords."""
     LOG.info(f"Fetching SERP data with config:\n{cfg}")
-    keywords = tuple(keywords) if keywords else None
+    keywords = tuple(keywords) if keywords is not None else None
     response = await fetch_serps(cfg=cfg, keywords=keywords)
 
     if response is None or len(response) == 0:
@@ -584,5 +595,5 @@ async def serps(cfg: SerpConfig, keywords: Iterable[str] | None = None) -> DataF
 
     LOG.info("Processing SERP data")
     df = await process_serps(response, cfg)
-    LOG.info(f"Got keyword dataframe:\n{df}")
+    LOG.info(f"Got SERPs dataframe:\n{df}")
     return df
