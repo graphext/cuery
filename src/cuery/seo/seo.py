@@ -47,8 +47,6 @@ Authentication
             cuery.utils.set_api_keys(llm_keys)
 """
 
-from warnings import warn
-
 from pandas import DataFrame
 
 from ..utils import LOG, HashableConfig
@@ -74,15 +72,12 @@ async def seo_data(cfg: SeoConfig) -> DataFrame:
     if df is None or len(df) == 0:
         raise ValueError("No keywords were fetched from Google Ads API!")
 
-    LOG.info(f"Got keyword dataframe:\n{df}")
-
     if cfg.serp_cfg:
-        srp = await serps(df.keyword, cfg.serp_cfg)
+        srp = await serps(cfg=cfg.serp_cfg, keywords=df.keyword)
         if srp is None or len(srp) == 0:
             LOG.warning("The SERP actor has failed! Will return keyword metrics only.")
             return df
 
-        LOG.info(f"Got SERPs dataframe:\n{srp}")
         df = df.merge(srp, how="left", left_on="keyword", right_on="term")
 
         if cfg.traffic_cfg:
