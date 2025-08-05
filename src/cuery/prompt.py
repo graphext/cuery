@@ -7,7 +7,7 @@ required variables
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, model_validator
 
 from .pretty import (
     Console,
@@ -20,7 +20,7 @@ from .pretty import (
     Syntax,
     Text,
 )
-from .utils import get_config, jinja_vars
+from .utils import LOG, get_config, jinja_vars
 
 ROLE_STYLES = {
     "system": "bold cyan",
@@ -62,6 +62,15 @@ class Prompt(BaseModel):
 
     messages: list[Message] = Field(min_length=1)
     required: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_required(self):
+        if not self.required:
+            self.required = [v for message in self.messages for v in jinja_vars(message.content)]
+            if self.required:
+                LOG.info(f"Found required variables in prompt: {self.required}.")
+
+        return self
 
     def __iter__(self):
         yield from (dict(message) for message in self.messages)
