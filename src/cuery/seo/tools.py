@@ -24,7 +24,7 @@ from pydantic import Field
 from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
-from ..topics.oneshot import TopicAssignment, Topics, make_assignment_model, make_topic_model
+from ..tools.topics import TopicAssignment, Topics, make_assignment_model, make_topic_model
 from ..utils import LOG, HashableConfig, dedent
 
 TOPICS_PROMPT = dedent("""
