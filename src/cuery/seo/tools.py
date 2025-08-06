@@ -24,7 +24,7 @@ from pydantic import Field
 from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
-from ..tools.topics import TopicAssignment, Topics, make_assignment_model, make_topic_model
+from ..tools.topics import TopicLabel, Topics, make_assignment_model, make_topic_model
 from ..utils import LOG, HashableConfig, dedent
 
 TOPICS_PROMPT = dedent("""
@@ -325,7 +325,7 @@ class SerpTopicAssigner(HashableConfig):
             ],  # type: ignore
             required=["keyword"],
         )
-        response = make_assignment_model(topics, TopicAssignment)  # type: ignore
+        response = make_assignment_model(topics, TopicLabel)  # type: ignore
         self._task = Task(prompt=prompt, response=response)  # type: ignore
 
         # Keep only configured columns
