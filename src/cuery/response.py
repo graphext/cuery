@@ -147,6 +147,11 @@ def with_cost(usage: DataFrame, model: str) -> DataFrame:
 ResponseClass = type[Response]
 
 
+def transpose(dicts: list[dict]) -> dict[str, list]:
+    """Transpose a list of dictionaries into a dictionary of lists."""
+    return {k: [dic[k] for dic in dicts] for k in dicts[0]}
+
+
 class ResponseSet:
     """A collection of responses
 
@@ -183,6 +188,7 @@ class ResponseSet:
         else:
             contexts = ({} for _ in responses)
 
+        # ToDo: deduplicate code below
         records = []
         if explode and self.iterfield is not None:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
@@ -193,13 +199,37 @@ class ResponseSet:
                         records.append(ctx | {self.iterfield: item})
         else:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
-                records.append(ctx | dict(response))
+                if self.iterfield is not None:
+                    items = []
+                    for item in getattr(response, self.iterfield):
+                        if isinstance(item, Response):
+                            items.append(dict(item))
+                        else:
+                            items.append(item)
+                    records.append(ctx | {self.iterfield: items})
+                else:
+                    records.append(ctx | dict(response))
 
         return records
 
-    def to_pandas(self, explode: bool = True) -> DataFrame:
+    def to_pandas(
+        self,
+        explode: bool = True,
+        normalize: bool = True,
+        prefix: str | None = None,
+    ) -> DataFrame:
         """Convert list of responses to DataFrame."""
-        return DataFrame.from_records(self.to_records(explode=explode))
+        df = DataFrame.from_records(self.to_records(explode=explode))
+
+        if not explode and normalize and self.iterfield is not None:
+            # Convert single column with list of dicts to one list column per key
+            df[self.iterfield] = df[self.iterfield].apply(transpose)
+            response_df = pd.json_normalize(df.pop(self.iterfield))
+            prefix = prefix if prefix is not None else self.iterfield
+            response_df.columns = [f"{prefix}_{col}" for col in response_df]
+            df = pd.concat([df, response_df], axis=1)
+
+        return df
 
     def usage(self) -> DataFrame:
         """Get the token usage for all responses."""
