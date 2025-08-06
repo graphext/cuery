@@ -66,7 +66,8 @@ DEFAULT_CONFIG_DIR = "~/Development/config"
 
 
 @app.command("set-vars")
-def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR)):
+def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR), apify_secrets: bool = True):
+    """Set environment variables from configuration files."""
     config_dir = cfg_dir.expanduser().resolve()
     vars = {}
 
@@ -91,9 +92,11 @@ def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR)):
 
     for key, value in vars.items():
         os.environ[key] = value
-        # Update apify local secrets via the command line
-        os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
-        os.system(f"apify secrets add {key} '{value}'")  # noqa: S605
+
+        if apify_secrets:
+            # Update apify local secrets via the command line
+            os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
+            os.system(f"apify secrets add {key} '{value}'")  # noqa: S605
 
 
 if __name__ == "__main__":
