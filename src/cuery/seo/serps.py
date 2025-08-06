@@ -43,12 +43,18 @@ class SerpConfig(HashableConfig):
     """Number of results to fetch per page."""
     maxPagesPerQuery: int = 1
     """Maximum number of pages to fetch per query."""
-    country: str = "us"
-    """Country code for SERP data (e.g., 'us' for United States)."""
+    countryCode: str = "us"
+    """Specifies the country used for the search and the Google Search domain (e.g. google.es for
+    Spain). By default, the actor uses United States (google.com).
+    """
     searchLanguage: str = ""
-    """Search language for SERP data (e.g., 'en' for English)."""
+    """Restricts search results to pages in a specific language. For example, choosing 'German'
+    results in pages only in German. Passed to Google Search as the lr URL query parameter.
+    """
     languageCode: str = ""
-    """Language code for SERP data (e.g., 'en' for English)."""
+    """Language of the Google Search interface, not the search results themselves. Passed to
+    Google Search as the hl URL query parameter.
+    """
     params: dict[str, Any] | None = Field(default_factory=dict)
     """Additional parameters to pass to the Apify actor."""
     top_n: int = 10
@@ -101,7 +107,7 @@ async def fetch_serps(
     actor_param_names = (
         "resultsPerPage",
         "maxPagesPerQuery",
-        "country",
+        "countryCode",
         "searchLanguage",
         "languageCode",
     )
@@ -568,6 +574,8 @@ async def process_serps(
             topic_model=cfg.topic_model,
             assignment_model=cfg.assignment_model,
             max_retries=6,
+            text_column="term",
+            extra_columns=["titles", "descriptions"],
         )
         if topics is not None:
             df = df.merge(topics, on="term", how="left")
