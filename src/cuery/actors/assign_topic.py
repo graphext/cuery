@@ -3,7 +3,7 @@ import json
 
 from apify import Actor
 
-from ..seo.tools import SerpTopicAssigner
+from ..tools.flex.topics import TopicAssigner
 from ..utils import LOG
 from .utils import fetch_dataset
 
@@ -17,8 +17,8 @@ async def main():
         dataset_id = config.pop("dataset_id")
         df = await fetch_dataset(Actor, id=dataset_id)
 
-        assigner = SerpTopicAssigner(**config)
-        result = await assigner(df, max_retries=MAX_RETRIES)
+        assigner = TopicAssigner(records=df, **config)
+        result = await assigner(max_retries=MAX_RETRIES)
         LOG.info(f"Assigned topics:\n{result}")
 
         records = json.loads(result.to_json(orient="records", date_format="iso", index=False))

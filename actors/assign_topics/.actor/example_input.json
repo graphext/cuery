@@ -1,5 +1,5 @@
 {
-    "dataset_id": "5Rrc6BnTBi7nZfpvF",
+    "dataset_id": "y3wzszG9DojmcAbOs",
     "topics": {
         "Technology": [
             "AI/ML",
@@ -26,10 +26,8 @@
             "Medical Research"
         ]
     },
-    "text_column": "term",
-    "extra_columns": [
-        "titles",
-        "domains",
-        "breadcrumbs"
+    "attrs": [
+        "term",
+        "titles"
     ]
 }

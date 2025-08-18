@@ -98,6 +98,8 @@ def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR), apify_secrets: bool =
             os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
             os.system(f"apify secrets add {key} '{value}'")  # noqa: S605
 
+    print(f"Environment variables set: {list(vars.keys())}")
+
 
 if __name__ == "__main__":
     app()

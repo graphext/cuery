@@ -1,9 +1,9 @@
 {
     "actorSpecification": 1,
     "name": "topic-classifier",
-    "title": "SERP Topic Classifier",
-    "description": "Assign predefined topics and subtopics to keywords based on their SERP results using AI classification.",
-    "version": "1.0",
+    "title": "Topic Classifier",
+    "description": "Assign predefined topics and subtopics to data records (row) using AI classification.",
+    "version": "2.0",
     "buildTag": "latest",
     "dockerfile": "./Dockerfile",
     "dockerContextDir": "../..",

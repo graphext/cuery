@@ -415,10 +415,7 @@ The simplest way to publish a new version is to update the version spec in `pypr
 ./publish.sh
 ```
 
-Note that this will look for a PyPi publishing token at `~/Development/config/pypi-publish-token.txt`.
-To manually build, or if you have the token somewhere else, you can also simply do the following. Note
-that this will build the package in `./dist`. If that folder already exists remove it before building
-a new version:
+Note that this will look for a PyPi publishing token at `~/Development/config/pypi-publish-token.txt`. To manually build, or if you have the token somewhere else, you can also simply do the following. Note that this will build the package in `./dist`:
 
 ```bash
 rm -r dist/
