@@ -446,7 +446,8 @@ Individual functionalities are wrapped in Apify actors, inside the `cuery/actors
 To run a specific actor locally during development (assuming `apify-cli` is already installed):
 
 ```
-(cuery set-vars && cd actors/keywords && apify run --purge --input-file=.actor/example_input.json)
+cd actors/keywords
+uv run python -m cuery.cli set-vars && uv run apify run --purge --input-file=.actor/example_input.json
 ```
 
 `cuery set-vars` will search for files containing secrets, tokens etc. in a local `~/Development/config/` folder,
