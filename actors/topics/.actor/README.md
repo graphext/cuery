@@ -1,115 +1,124 @@
-# SEO Keyword Topic & Intent Classifier
+# General Topic Extractor
 
-This Apify actor classifies keywords and their Search Engine Results Page (SERP) data into topics and search intent categories using AI. It analyzes organic search results to extract hierarchical topic structures and categorizes search intent as informational, navigational, transactional, or commercial.
+This Apify actor extracts hierarchical topic structures from data records with arbitrary attributes using AI. It serves as a wrapper around `cuery.tools.flex.topics.TopicExtractor` and is designed for general topic extraction from any type of structured data.
 
 ## Features
 
-- **Topic Extraction**: Analyzes SERP data to create a hierarchical topic structure with main topics and subtopics
-- **Intent Classification**: Categorizes keywords into four search intent types:
-  - **Informational**: Users seeking information, answers, or knowledge
-  - **Navigational**: Users looking for specific websites or pages  
-  - **Transactional**: Users intending to complete an action or purchase
-  - **Commercial**: Users researching products/services before purchasing
-- **AI-Powered Analysis**: Uses advanced language models to understand semantic meaning and commercial context
-- **Scalable Processing**: Efficiently handles large keyword datasets with intelligent sampling
-- **Flexible Model Selection**: Choose from multiple AI models based on your quality and cost requirements
+- **Hierarchical Topic Extraction**: Creates a two-level nested topic structure with main topics and subtopics
+- **Flexible Data Input**: Works with data records/DataFrames containing arbitrary attributes/columns
+- **AI-Powered Analysis**: Uses advanced language models to understand semantic patterns in your data
+- **Scalable Processing**: Efficiently handles large datasets with intelligent sampling
+- **Configurable Topic Structure**: Control the number of top-level topics and subtopics
+- **Domain-Agnostic**: Works with any type of data - not limited to SEO or specific domains
+- **Context-Aware**: Supports custom instructions to provide domain-specific context
+
+## Purpose
+
+**This actor has one main purpose: to extract a hierarchical topic structure from your data.**
+
+The actor extracts topics using generic AI instructions that don't assume any specific context about your data. For best results, you should provide additional context via the `instructions` parameter to help the AI understand your specific domain and requirements.
 
 ## Input
 
-The actor requires aggregated SERP data for keywords, typically obtained from the SEO SERP Scraper actor. Each keyword should include:
-
-- `term`: The keyword/search term
-- `titles`: Array of page titles from top organic results
-- `domains`: Array of unique domains from organic results  
-- `breadcrumbs`: Array of breadcrumb navigation elements
+The actor requires an Apify dataset containing records with arbitrary attributes. You can specify which attributes to use for topic extraction, or use all available attributes.
 
 ### Example Input
 
 ```json
 {
-  "keywords_data": [
-    {
-      "term": "digital marketing",
-      "titles": ["Digital Marketing Guide", "Best Digital Marketing Tools"],
-      "domains": ["hubspot.com", "moz.com", "searchengineland.com"],
-      "breadcrumbs": ["marketing", "tools", "guides"]
-    }
-  ],
-  "max_samples": 500,
-  "topic_model": "google/gemini-2.5-flash-preview-05-20", 
-  "assignment_model": "openai/gpt-4.1-mini",
-  "n_topics": 10,
-  "n_subtopics": 5
+  "dataset_id": "your-dataset-id",
+  "model": "openai/gpt-4.1",
+  "attrs": ["title", "description", "category"],
+  "n_topics": 8,
+  "n_subtopics": 4,
+  "instructions": "Extract topics from e-commerce product data focusing on product categories and features",
+  "max_samples": 300
+}
+```
+
+### SEO Use Case Example
+
+For SEO keyword topic extraction, you might use instructions similar to this:
+
+```json
+{
+  "dataset_id": "your-dataset-id",
+  "instructions": "Data records represent Google search keywords and associated SERP data. Make sure to create topics relevant in the context of SEO keywords research, focusing on the semantic meaning of keywords and SERPS, commercial intent etc.",
+  "attrs": ["keyword", "titles", "domains"]
 }
 ```
 
 ## Output
 
-The actor outputs a dataset with topic and intent classifications for each keyword:
+The actor outputs a hierarchical topic structure as a JSON object with key-value store entry:
 
 ```json
-[
-  {
-    "term": "digital marketing",
-    "topic": "Marketing & Advertising",
-    "subtopic": "Digital Marketing Strategy", 
-    "intent": "informational"
-  }
-]
+{
+  "Marketing & Advertising": [
+    "Digital Marketing Strategy",
+    "Social Media Marketing", 
+    "Content Marketing",
+    "Email Marketing"
+  ],
+  "E-commerce": [
+    "Product Management",
+    "Shopping Experience",
+    "Payment Systems"
+  ],
+  "Technology": [
+    "Web Development",
+    "Mobile Apps",
+    "Analytics Tools"
+  ]
+}
 ```
+
+The output is stored in the actor's key-value store with the key format: `topics-{dataset_id}`
 
 ## Configuration
 
 ### Core Parameters
 
-- **keywords_data**: Array of keyword SERP data objects (required)
-- **max_samples**: Maximum keywords to sample for topic extraction (default: 500)
-- **topic_model**: AI model for topic hierarchy extraction (default: google/gemini-2.5-flash-preview-05-20)
-- **assignment_model**: AI model for keyword classification (default: openai/gpt-4.1-mini)
+- **dataset_id**: Apify dataset ID containing your input data (required)
+- **model**: AI model for topic extraction (default: openai/gpt-3.5-turbo)
+- **attrs**: List of record attributes to use for topic extraction (optional - uses all if not specified)
+- **instructions**: Additional context and instructions for the AI model (highly recommended)
 
 ### Topic Structure
 
-- **n_topics**: Maximum top-level topics (default: 10, range: 3-20)
-- **n_subtopics**: Maximum subtopics per topic (default: 5, range: 2-10)
+- **n_topics**: Maximum top-level topics (default: 10, range: 1-20)
+- **n_subtopics**: Maximum subtopics per topic (default: 5, range: 1-10)
+- **min_ldist**: Minimum Levenshtein distance between topic labels to avoid similar names (default: 2)
 
 ### Processing
 
-- **max_retries**: Retry attempts for failed API calls (default: 5)
+- **max_samples**: Maximum records to sample for topic extraction (default: 500)
+- **record_format**: Format for records in AI prompt - "attr_wise" or "rec_wise" (default: attr_wise)
 
 ## Supported AI Models
 
-### Topic Extraction Models
-- `google/gemini-2.5-flash-preview-05-20` (default) - Fast and cost-effective
-- `openai/gpt-4.1-mini` - Good balance of quality and speed
-- `openai/gpt-4.1-pro` - Highest quality but more expensive
-- `anthropic/claude-3-5-sonnet` - Excellent for complex domains
+The actor supports any AI model by OpenAI, Google or Anthropic. The format should follow these examples:
 
-### Assignment Models  
-- `openai/gpt-4.1-mini` (default) - Excellent for classification
-- `google/gemini-2.5-flash-preview-05-20` - Faster alternative
-- `openai/gpt-4.1-pro` - Best accuracy for difficult cases
-- `anthropic/claude-3-5-sonnet` - Good for nuanced intent classification
+- `openai/gpt-3.5-turbo` (default)
+- `openai/gpt-4.1`
+- `google/gemini-2.5-flash`
+- `anthropic/claude-3-5-sonnet`
+- Any other model following the `provider/model` format
 
 ## Use Cases
 
-- **SEO Content Strategy**: Understand topic coverage and identify content gaps
-- **Search Intent Optimization**: Align content with user search intent
-- **Keyword Grouping**: Organize large keyword lists into meaningful categories
-- **Competitive Analysis**: Analyze topic focus of competitor keywords
-- **Content Planning**: Guide content creation based on search patterns
+- **Content Analysis**: Understand topic distribution in articles, blog posts, or documents
+- **SEO Research**: Organize keywords into meaningful topic hierarchies (with appropriate instructions)
+- **Product Categorization**: Extract topics from product descriptions and features
+- **Customer Feedback Analysis**: Identify themes in reviews, support tickets, or surveys
+- **Research Organization**: Structure academic papers, reports, or research data
+- **Social Media Analysis**: Categorize posts, comments, or discussions by topic
+- **Market Research**: Analyze survey responses or interview transcripts
 
-## Performance Tips
+## Tips for Best Results
 
-- Use 100-500 samples for topic extraction to balance quality and speed
-- Choose faster models for large datasets (1000+ keywords)
-- Group similar keywords before processing to improve topic coherence
-- Consider domain-specific context when interpreting results
-
-## Requirements
-
-The actor requires API keys for the selected AI models:
-- OpenAI API key for GPT models
-- Google API key for Gemini models  
-- Anthropic API key for Claude models
-
-Set these as environment variables in your Apify account settings.
+1. **Provide Context**: Use the `instructions` parameter to give the AI context about your data domain
+2. **Select Relevant Attributes**: Choose the most relevant columns/attributes for topic extraction
+3. **Adjust Topic Numbers**: Start with default values and adjust based on your data complexity
+4. **Sample Size**: Use appropriate `max_samples` - more samples give better coverage but cost more
+5. **Domain-Specific Instructions**: For specialized domains like SEO, provide more specific instructions

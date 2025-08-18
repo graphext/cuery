@@ -1,6 +1,6 @@
 {
-    "title": "SEO Keyword Topic & Intent Classifier",
-    "description": "Classify keywords and their SERP data into topics and search intent using AI. Analyzes organic search results to extract topic hierarchies and categorize search intent as informational, navigational, transactional, or commercial.",
+    "title": "Topic Extractor",
+    "description": "Extract hierarchical topic structures from data records with arbitrary attributes using AI. Uses cuery.tools.flex.topics.TopicExtractor to analyze any type of structured data and create two-level nested topic structures for classification.",
     "type": "object",
     "schemaVersion": 1,
     "properties": {
@@ -10,46 +10,71 @@
             "description": "Dataset ID of input dataset in Apify platform",
             "editor": "textfield"
         },
-        "text_column": {
-            "title": "Text Column",
+        "model": {
+            "title": "LLM Model",
             "type": "string",
-            "description": "Name of the column in the dataset containing the main text to analyze for topics.",
+            "description": "The LLM provider and model to use for topic extraction. Format: provider/model (e.g., 'openai/gpt-4', 'anthropic/claude-3-sonnet')",
             "editor": "textfield",
-            "default": "term"
+            "default": "openai/gpt-3.5-turbo",
+            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
         },
-        "extra_columns": {
-            "title": "Additional Columns",
+        "attrs": {
+            "title": "Record Attributes",
             "type": "array",
-            "description": "List of additional columns to include in the context for topic extraction. These can provide extra context for the AI model to better classify topics.",
-            "editor": "stringList",
-            "default": []
-        },
-        "max_samples": {
-            "title": "Maximum Samples for Topic Extraction",
-            "type": "integer",
-            "description": "Maximum number of keyword samples to use for extracting the topic hierarchy. A smaller sample is used to build the topic structure, then all keywords are classified against this structure.\n\n**Important:**\n• Larger samples provide more comprehensive topic coverage but increase processing time and costs\n• Smaller samples are faster but may miss some topic nuances\n• Recommended: 100-500 for most datasets\n• For datasets with < 500 keywords, this can equal the total number\n\n**Processing Note:** Topic extraction is the most resource-intensive step, so this parameter directly impacts processing time and API costs.",
-            "editor": "number",
-            "default": 500,
-            "minimum": 10,
-            "maximum": 2000
+            "description": "List of record attributes/columns to use for topic extraction. If null, all attributes are used. This allows focusing on specific fields in your data.",
+            "editor": "stringList"
         },
         "n_topics": {
             "title": "Maximum Top-Level Topics",
             "type": "integer",
-            "description": "Maximum number of top-level topics to extract from the keyword data.\n\n**Guidelines:**\n• 5-15 topics work well for most keyword sets\n• Too few topics create overly broad categories\n• Too many topics create overly granular, overlapping categories\n• Consider your keyword diversity when setting this\n\n**Examples:**\n• E-commerce site: 8-12 topics (product categories, support, brand)\n• Blog content: 6-10 topics (main content themes)\n• Service business: 5-8 topics (service types, locations, resources)",
+            "description": "Approximate number of top-level topics to extract (maximum 20).\n\n**Guidelines:**\n• 5-15 topics work well for most datasets\n• Too few topics create overly broad categories\n• Too many topics create overly granular, overlapping categories\n• Consider your data diversity when setting this\n\n**Examples:**\n• E-commerce site: 8-12 topics (product categories, support, brand)\n• Blog content: 6-10 topics (main content themes)\n• Service business: 5-8 topics (service types, locations, resources)",
             "editor": "number",
             "default": 10,
-            "minimum": 3,
+            "minimum": 1,
             "maximum": 20
         },
         "n_subtopics": {
             "title": "Maximum Subtopics per Topic",
             "type": "integer",
-            "description": "Maximum number of subtopics to extract within each top-level topic.\n\n**Guidelines:**\n• 3-8 subtopics per topic provide good granularity\n• Subtopics should represent distinct subcategories within each main topic\n• More subtopics provide finer classification but may create overlap\n\n**Examples:**\n• 'Digital Marketing' topic might have subtopics: 'SEO', 'PPC', 'Social Media', 'Content Marketing', 'Email Marketing'\n• 'E-commerce' topic might have: 'Product Pages', 'Checkout', 'Customer Service', 'Reviews'",
+            "description": "Approximate number of subtopics per top-level topic (minimum 1, maximum 10).\n\n**Guidelines:**\n• 3-8 subtopics per topic provide good granularity\n• Subtopics should represent distinct subcategories within each main topic\n• More subtopics provide finer classification but may create overlap\n\n**Examples:**\n• 'Digital Marketing' topic might have subtopics: 'SEO', 'PPC', 'Social Media', 'Content Marketing', 'Email Marketing'\n• 'E-commerce' topic might have: 'Product Pages', 'Checkout', 'Customer Service', 'Reviews'",
             "editor": "number",
             "default": 5,
-            "minimum": 2,
+            "minimum": 1,
             "maximum": 10
+        },
+        "instructions": {
+            "title": "Additional Instructions",
+            "type": "string",
+            "description": "Additional use-case specific instructions or context for the topic extraction. This helps the AI model understand your specific domain or requirements.\n\n**Important**: The default AI instructions are domain-agnostic and don't know anything about your data context. For best results, provide relevant context here.\n\n**Examples:**\n• SEO keywords: 'Data records represent Google search keywords and associated SERP data. Focus on semantic meaning and commercial intent.'\n• Product data: 'Extract topics from e-commerce product information focusing on categories, features, and use cases.'\n• Customer feedback: 'Analyze customer support tickets and reviews to identify common themes and issues.'",
+            "editor": "textarea",
+            "default": ""
+        },
+        "min_ldist": {
+            "title": "Minimum Levenshtein Distance",
+            "type": "integer",
+            "description": "Minimum Levenshtein distance between topic labels to avoid very similar topic names. Higher values enforce more distinct topic labels.",
+            "editor": "number",
+            "default": 2,
+            "minimum": 1
+        },
+        "max_samples": {
+            "title": "Maximum Samples for Topic Extraction",
+            "type": "integer",
+            "description": "Maximum number of samples to use for topic extraction. A smaller sample is used to build the topic structure.\n\n**Important:**\n• Larger samples provide more comprehensive topic coverage but increase processing time and costs\n• Smaller samples are faster but may miss some topic nuances\n• Recommended: 100-500 for most datasets\n• For datasets with < 500 records, this can equal the total number\n\n**Processing Note:** Topic extraction is the most resource-intensive step, so this parameter directly impacts processing time and API costs.",
+            "editor": "number",
+            "default": 500,
+            "minimum": 10
+        },
+        "record_format": {
+            "title": "Record Format",
+            "type": "string",
+            "description": "Format of the records in the prompt sent to the LLM.\n\n• **attr_wise**: Each attribute on a separate line (good for structured data)\n• **rec_wise**: All attributes in a single block (more compact)",
+            "editor": "select",
+            "enum": [
+                "attr_wise",
+                "rec_wise"
+            ],
+            "default": "attr_wise"
         }
     },
     "required": [

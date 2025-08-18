@@ -445,7 +445,7 @@ Individual functionalities are wrapped in Apify actors, inside the `cuery/actors
 
 To run a specific actor locally during development (assuming `apify-cli` is already installed):
 
-```
+``` bash
 (cuery set-vars && cd actors/keywords && apify run --purge --input-file=.actor/example_input.json)
 ```
 
@@ -460,6 +460,7 @@ variables and local Apify secrets. The files required in the folder are:
 You also need a local `.json` file containing the input to run the actor with and pass it via `--input-file`.
 
 The output will appear locally in the `./storage/datasets` folder.
+
 # To Do
 - Integrate web search API:
   - Depends on Instructor integration of OpenAI Responses API

@@ -3,7 +3,7 @@ import json
 
 from apify import Actor
 
-from ..seo.tools import SerpTopicExtractor
+from ..tools.flex import TopicExtractor
 from ..utils import LOG
 from .utils import fetch_dataset
 
@@ -17,8 +17,8 @@ async def main():
         dataset_id = config.pop("dataset_id")
         df = await fetch_dataset(Actor, id=dataset_id)
 
-        extractor = SerpTopicExtractor(**config)
-        topics = await extractor(df, max_retries=MAX_RETRIES)
+        extractor = TopicExtractor(records=df, **config)
+        topics = await extractor(max_retries=8)
 
         LOG.info("Extracted topic hierarchy")
         LOG.info(json.dumps(topics.to_dict(), indent=2))

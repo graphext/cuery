@@ -2,7 +2,7 @@
     "actorSpecification": 1,
     "name": "topic-extractor",
     "title": "Topic Extractor",
-    "description": "Extracts a two-level nested topic hierarchy from a list of keywords using AI.",
+    "description": "Extracts hierarchical topic structures from data records with arbitrary attributes using AI.",
     "version": "1.0",
     "buildTag": "latest",
     "dockerfile": "./Dockerfile",
