@@ -1,0 +1,42 @@
+{
+    "title": "SERP Topic Classifier",
+    "description": "Assign predefined topics and subtopics to keywords based on their SERP results using AI classification.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "dataset_id": {
+            "title": "Dataset ID",
+            "type": "string",
+            "description": "The ID of the dataset containing the keyword SERP data to be classified. The dataset should contain keywords with their corresponding SERP data including titles, domains, and breadcrumbs.",
+            "editor": "textfield"
+        },
+        "topics": {
+            "title": "Topic Hierarchy",
+            "type": "object",
+            "description": "A JSON object defining the topic hierarchy for classification. Each key represents a main topic, and the corresponding value is an array of subtopics.\n\nExample format:\n{\n  \"Technology\": [\"AI/ML\", \"Web Development\", \"Mobile Apps\"],\n  \"Marketing\": [\"SEO\", \"Social Media\", \"Content Marketing\"]\n}\n\nThe classifier will assign one topic and subtopic to each keyword based on its SERP content.",
+            "editor": "json"
+        },
+        "text_column": {
+            "title": "Text Column",
+            "type": "string",
+            "description": "The name of the column containing the main text/keyword to classify.",
+            "editor": "textfield",
+            "default": "term"
+        },
+        "extra_columns": {
+            "title": "Extra Columns",
+            "type": "array",
+            "description": "Additional columns from the SERP data to include in the classification context (e.g., titles, domains, breadcrumbs).",
+            "editor": "stringList",
+            "default": [
+                "titles",
+                "domains",
+                "breadcrumbs"
+            ]
+        }
+    },
+    "required": [
+        "dataset_id",
+        "topics"
+    ]
+}

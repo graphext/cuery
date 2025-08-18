@@ -90,9 +90,21 @@ def load_yaml(path: str | Path) -> dict:
 
 def dedent(text):
     """Dedent a string, removing leading whitespace like yaml blocks."""
+
+    def is_markdown_list_item(line):
+        """Check if a line is a markdown list item."""
+        line = line.strip()
+
+        # Unordered lists
+        if line.startswith(("- ", "* ", "+ ")):
+            return True
+
+        # Ordered lists: Detect a number or single letter followed by a dot and space
+        return bool(re.match(r"^\d+\. |^[a-zA-Z]\. ", line))
+
     text = cleandoc(text)
     paragraphs = text.split("\n\n")
-    paragraphs = [p.replace("\n", " ") for p in paragraphs]
+    paragraphs = [p.replace("\n", " ") if not is_markdown_list_item(p) else p for p in paragraphs]
     return "\n\n".join(paragraphs).strip()
 
 
@@ -284,7 +296,7 @@ def customize_fields(model: BaseModelClass, class_name: str, **fields) -> BaseMo
 class HashableConfig(BaseModel):
     """Base class for configurations. Hashable so we can cache API calls using them."""
 
-    model_config = ConfigDict(use_attribute_docstrings=True)
+    model_config = ConfigDict(use_attribute_docstrings=True, extra="forbid")
 
     def __hash__(self) -> int:
         return self.model_dump_json().__hash__()

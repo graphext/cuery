@@ -234,7 +234,7 @@ The tasks module provides intelligent analysis of SERP data:
 
 .. code-block:: python
 
-    from cuery.seo.tasks import SerpTopicExtractor, SerpTopicAndIntentAssigner
+    from cuery.seo.tools import SerpTopicExtractor, SerpTopicAndIntentAssigner
 
     # Extract topics from SERP data
     topic_extractor = SerpTopicExtractor(

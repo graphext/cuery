@@ -1,0 +1,106 @@
+{
+    "title": "SERP Data Collector",
+    "description": "Fetch and analyze Search Engine Results Page (SERP) data using Apify Google Search Scraper. Provides comprehensive SERP analysis with AI-powered topic extraction and search intent classification.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "keywords": {
+            "title": "Keywords",
+            "type": "array",
+            "description": "Keywords to fetch SERP data for. The system will collect organic search results, paid results, and AI overviews for each keyword.\n\n**Examples:**\n• ['digital marketing', 'seo tools', 'content marketing']\n• ['web development', 'react framework', 'javascript tutorials']\n• ['e-commerce platform', 'online store builder']",
+            "editor": "stringList",
+            "prefill": [
+                "seo",
+                "digital marketing",
+                "seo tools",
+                "content marketing",
+                "marketing tools",
+                "keyword research"
+            ]
+        },
+        "batch_size": {
+            "title": "Batch Size",
+            "type": "integer",
+            "description": "Number of keywords to process in a single batch. Larger batches may be more efficient but could hit rate limits.",
+            "editor": "number",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 1000
+        },
+        "resultsPerPage": {
+            "title": "Results Per Page",
+            "type": "integer",
+            "description": "Number of search results to fetch per page for each keyword.",
+            "editor": "number",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 100
+        },
+        "country": {
+            "title": "Country Code",
+            "type": "string",
+            "description": "Country code for SERP data targeting (e.g., 'us' for United States, 'uk' for United Kingdom, 'de' for Germany).",
+            "editor": "textfield",
+            "default": "us",
+            "prefill": "us"
+        },
+        "searchLanguage": {
+            "title": "Search Language",
+            "type": "string",
+            "description": "Search for documents in the given language (e.g., 'en' for English, 'es' for Spanish, 'fr' for French). To not restrict language, don't provide or pass an empty string.",
+            "editor": "textfield",
+            "default": ""
+        },
+        "languageCode": {
+            "title": "Language Code",
+            "type": "string",
+            "description": "Scrape results with the interface in this language (e.g., 'en' for English, 'es' for Spanish). To not restrict language, don't provide or pass an empty string.",
+            "editor": "textfield",
+            "default": ""
+        },
+        "top_n": {
+            "title": "Top N Results",
+            "type": "integer",
+            "description": "Number of top organic results to consider for aggregation per keyword. This affects brand/competitor ranking analysis.",
+            "editor": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100,
+            "prefill": 10
+        },
+        "brands": {
+            "title": "Brand Names",
+            "type": "array",
+            "description": "List of brand names to identify and track in SERP data. The system will calculate brand rankings and mentions in organic results and AI overviews.",
+            "editor": "stringList",
+            "prefill": [
+                "semrush"
+            ]
+        },
+        "competitors": {
+            "title": "Competitor Names",
+            "type": "array",
+            "description": "List of competitor names to identify and track in SERP data. The system will calculate competitor rankings and mentions in organic results and AI overviews.",
+            "editor": "stringList",
+            "default": [
+                "ahrefs",
+                "moz",
+                "serpstat",
+                "se ranking",
+                "spyfu"
+            ]
+        },
+        "topic_max_samples": {
+            "title": "Topic Max Samples",
+            "type": "integer",
+            "description": "Maximum number of samples to use for AI-powered topic and intent extraction from SERP data. Higher values provide more comprehensive analysis but increase processing time.",
+            "editor": "number",
+            "default": 500,
+            "minimum": 10,
+            "maximum": 1000
+        }
+    },
+    "required": [
+        "keywords"
+    ]
+}

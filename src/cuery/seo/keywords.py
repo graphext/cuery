@@ -24,6 +24,7 @@ Useful documentation:
 
 """
 
+import base64
 import json
 import os
 import tempfile
@@ -47,7 +48,7 @@ from google.ads.googleads.v20.services.services.keyword_plan_idea_service.pagers
 )
 from numpy import ndarray
 from pandas import DataFrame, Series
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from .. import resources, utils
 from ..context import AnyContext
@@ -75,10 +76,13 @@ class GoogleKwdConfig(HashableConfig):
     """Whether to expand initial keywords with Google Keyword Planner's idea generator.
     Otherwise, will fetch historical metrics for the provided keywords only.
     """
-    max_ideas: int | None = None
+    max_ideas: int = Field(100, le=10_000)
     """Maximum number of additional keyword ideas to fetch (if `ideas` is True)."""
     language: str = "en"
-    """The language to use for keyword data (e.g., 'en' for English)."""
+    """The resource name of the language to target. Each keyword belongs to some set of languages;
+    a keyword is included if language is one of its languages. If not set, all keywords will be
+    included. (e.g., 'en' for English).
+    """
     country: str = "us"
     """The geographical target for keyword data (e.g., 'us' for United States)."""
     metrics_start: str | None = None
@@ -98,6 +102,18 @@ class GoogleKwdConfig(HashableConfig):
     If not provided, will use the `GOOGLE_ADS_CUSTOMER_ID` or `GOOGLE_ADS_LOGIN_CUSTOMER_ID`
     environment variable.
     """
+
+    @field_validator("ideas")
+    @classmethod
+    def validate_ideas(cls, ideas, info: ValidationInfo):
+        if not ideas and not info.data["keywords"] and info.data["url"]:
+            LOG.warning(
+                "Idea generation is disabled, no keywords are provided, but a URL is set. "
+                "Will enable idea generation automatically (ideas: true)."
+            )
+            return True
+
+        return ideas
 
     @field_validator("language")
     @classmethod
@@ -150,6 +166,21 @@ class GoogleKwdConfig(HashableConfig):
         return self
 
 
+def encode_json_b64(value):
+    """Encode a JSON key as a base64 string.
+
+    Can be used e.g. to store complex objects in environment variables.
+    """
+    b64 = base64.b64encode(json.dumps(value).encode("utf-8"))
+    return b64.decode("ascii")
+
+
+def decode_json_b64(value):
+    """Decode a base64-encoded JSON key string."""
+    str_val = value.encode("ascii")
+    return json.loads(base64.b64decode(str_val).decode("utf-8"))
+
+
 def config_from_env() -> dict:
     """Load Google Ads API configuration from environment variables."""
     vars = (
@@ -173,7 +204,11 @@ def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClie
 
     if isinstance(config, dict):
         if json_key := config.pop("json_key", None):
-            json_key = json.loads(json_key)
+            try:
+                json_key = json.loads(json_key)
+            except json.JSONDecodeError:
+                LOG.warning("Failed to decode JSON key. Will try base64 decoding.")
+                json_key = decode_json_b64(json_key)
             with tempfile.NamedTemporaryFile("w", suffix=".json") as fp:
                 json.dump(json_key, fp)
                 fp.flush()
@@ -366,9 +401,10 @@ def add_trend_columns(df: DataFrame) -> DataFrame:
     return df
 
 
-def process_keywords(
+def process_keywords(  # noqa: PLR0912
     response: GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse,
     collect_volumes: bool = True,
+    zeros_to_nans: bool = True,
 ) -> DataFrame:
     """Process Google Ads API keyword response into a DataFrame."""
 
@@ -429,6 +465,19 @@ def process_keywords(
         df = collect_volume_columns(df)
         df = add_trend_columns(df)
 
+    # Convert micros to dollars/euros, and 0s to NaNs
+    for col in (
+        "average_cpc_micros",
+        "low_top_of_page_bid_micros",
+        "high_top_of_page_bid_micros",
+    ):
+        if col in df.columns:
+            name = col.replace("_micros", "")
+            df[name] = df[col] / 1_000_000
+            if zeros_to_nans:
+                df[name] = df[name].replace(0, np.nan)
+            df = df.drop(columns=col)
+
     return df
 
 
@@ -444,7 +493,9 @@ def keywords(cfg: GoogleKwdConfig) -> DataFrame:
         )
 
     LOG.info("Processing metrics response into DataFrame.")
-    return process_keywords(response, collect_volumes=cfg.ideas)
+    df = process_keywords(response, collect_volumes=True)
+    LOG.info(f"Got keyword dataframe:\n{df}")
+    return df
 
 
 SYSTEM_PROMPT = dedent("""

@@ -409,8 +409,20 @@ pre-commit install
 
 # Publish
 
+The simplest way to publish a new version is to update the version spec in `pyproject.toml` and then from the root of the repo execute:
+
 ```bash
-uv build
+./publish.sh
+```
+
+Note that this will look for a PyPi publishing token at `~/Development/config/pypi-publish-token.txt`.
+To manually build, or if you have the token somewhere else, you can also simply do the following. Note
+that this will build the package in `./dist`. If that folder already exists remove it before building
+a new version:
+
+```bash
+rm -r dist/
+uv build 
 uv publish --token `cat /path/to/token.txt`
 ```
 
@@ -418,7 +430,9 @@ uv publish --token `cat /path/to/token.txt`
 
 Cuery uses [Sphinx](https://sphinx-autoapi.readthedocs.io/en/latest/) with the [AutoApi extension](https://sphinx-autoapi.readthedocs.io/en/latest/index.html) and the [PyData theme](https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html).
 
-To build and render:
+Commits automatically trigger the update of the documentation at https://cuery.readthedocs.io/en/latest/.
+
+To build and render locally simply use `./docs.sh` or manually:
 
 ``` bash
 (cd docs && uv run make clean html)
@@ -437,7 +451,12 @@ uv run python -m cuery.cli set-vars && uv run apify run --purge --input-file=.ac
 ```
 
 `cuery set-vars` will search for files containing secrets, tokens etc. in a local `~/Development/config/` folder,
-but you can pass a different folder (see `cuery set-vars --help`). It will then set the corresponding environment variables and local Apify secrets.
+but you can pass a different folder (see `cuery set-vars --help`). It will then set the corresponding environment
+variables and local Apify secrets. The files required in the folder are:
+
+- `apify_api_token.txt`: Apify token to execute actors via API
+- `google-ads.yaml`: Google Ads credentials. This will contain a key to another local file, which will be handled automatically.
+- `ai-api-keys.json`: A json file with keys "Google", "OpenAI", "Perplexity", "Anthropic" etc. and values for corresponding API keys.
 
 You also need a local `.json` file containing the input to run the actor with and pass it via `--input-file`.
 

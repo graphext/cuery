@@ -1,0 +1,136 @@
+{
+    "actorSpecification": 1,
+    "title": "SEO SERP collector",
+    "description": "Fetch and process Google SERPS for a given list of keywords/search terms.",
+    "views": {
+        "serps": {
+            "title": "SERPs",
+            "description": "Aggregated Google search engine results pages (SERPs) for given keywords",
+            "transformation": {
+                "fields": [
+                    "term",
+                    "relatedQueries",
+                    "peopleAlsoAsk",
+                    "aiOverview_content",
+                    "aiOverview_source_titles",
+                    "n_paidResults",
+                    "n_paidProducts",
+                    "num_results",
+                    "titles",
+                    "descriptions",
+                    "domains",
+                    "breadcrumbs",
+                    "emphasizedKeywords",
+                    "title_rank_brand",
+                    "domain_rank_brand",
+                    "description_rank_brand",
+                    "title_rank_competition",
+                    "description_rank_competition",
+                    "domain_rank_competition",
+                    "topic",
+                    "subtopic",
+                    "intent",
+                    "ai_overview_brand/company",
+                    "ai_overview_product/service",
+                    "ai_overview_technology",
+                    "aiOverview_brand_mentions",
+                    "aiOverview_competitor_mentions",
+                    "aiOverview_source_mentions",
+                    "aiOverview_source_competitor_mentions"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "term": {
+                        "format": "text"
+                    },
+                    "relatedQueries": {
+                        "format": "array"
+                    },
+                    "peopleAlsoAsk": {
+                        "format": "array"
+                    },
+                    "aiOverview_content": {
+                        "format": "text"
+                    },
+                    "aiOverview_source_titles": {
+                        "format": "array"
+                    },
+                    "n_paidResults": {
+                        "format": "number"
+                    },
+                    "n_paidProducts": {
+                        "format": "number"
+                    },
+                    "num_results": {
+                        "format": "number"
+                    },
+                    "titles": {
+                        "format": "array"
+                    },
+                    "descriptions": {
+                        "format": "array"
+                    },
+                    "domains": {
+                        "format": "array"
+                    },
+                    "breadcrumbs": {
+                        "format": "array"
+                    },
+                    "emphasizedKeywords": {
+                        "format": "array"
+                    },
+                    "title_rank_brand": {
+                        "format": "number"
+                    },
+                    "domain_rank_brand": {
+                        "format": "number"
+                    },
+                    "description_rank_brand": {
+                        "format": "number"
+                    },
+                    "title_rank_competition": {
+                        "format": "number"
+                    },
+                    "description_rank_competition": {
+                        "format": "number"
+                    },
+                    "domain_rank_competition": {
+                        "format": "number"
+                    },
+                    "topic": {
+                        "format": "text"
+                    },
+                    "subtopic": {
+                        "format": "text"
+                    },
+                    "intent": {
+                        "format": "text"
+                    },
+                    "ai_overview_brand/company": {
+                        "format": "array"
+                    },
+                    "ai_overview_product/service": {
+                        "format": "array"
+                    },
+                    "ai_overview_technology": {
+                        "format": "array"
+                    },
+                    "aiOverview_brand_mentions": {
+                        "format": "array"
+                    },
+                    "aiOverview_competitor_mentions": {
+                        "format": "array"
+                    },
+                    "aiOverview_source_mentions": {
+                        "format": "array"
+                    },
+                    "aiOverview_source_competitor_mentions": {
+                        "format": "array"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -5,3 +5,4 @@ Specifically:
 - use maximum line length = 99
 - use modern type hint (no explicit Union/Optional etc.)
 - use double quotes for strings
+- No white space in blank lines
