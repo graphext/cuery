@@ -5,9 +5,11 @@ rendering to rich text, handling Jinja templating for dynamic content, and valid
 required variables
 """
 
+from contextlib import suppress
 from pathlib import Path
+from string import Template
 
-from pydantic import BaseModel, Field, ValidationInfo, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .pretty import (
     Console,
@@ -63,13 +65,40 @@ class Prompt(BaseModel):
     messages: list[Message] = Field(min_length=1)
     required: list[str] = Field(default_factory=list)
 
+    @field_validator(
+        "messages",
+        mode="before",
+        json_schema_input_type=list[Message] | list[str] | str,
+    )
+    @classmethod
+    def validate_messages(cls, messages) -> list:
+        """Allow init from other types."""
+        if isinstance(messages, str):
+            messages = [Message(content=messages)]
+        elif isinstance(messages, list) and all(isinstance(m, str) for m in messages):
+            messages = [Message(content=str(msg)) for msg in messages]
+
+        return messages
+
+    def check_required(self):
+        detected = [v for message in self.messages for v in jinja_vars(message.content)]
+        detected = list(set(detected))
+        if self.required:
+            unk = [v for v in self.required if v not in detected]
+            if unk:
+                LOG.warning(f"Configured variables {unk} not found in prompt! Will ignore.")
+
+            new = [v for v in detected if v not in self.required]
+            if new:
+                LOG.info(f"Detected new required variables in prompt: {detected}.")
+
+        self.required = detected
+        return self
+
     @model_validator(mode="after")
     def validate_required(self):
-        if not self.required:
-            self.required = [v for message in self.messages for v in jinja_vars(message.content)]
-            if self.required:
-                LOG.info(f"Found required variables in prompt: {self.required}.")
-
+        """Validate that all required variables are present in the prompt."""
+        self.check_required()
         return self
 
     def __iter__(self):
@@ -86,6 +115,14 @@ class Prompt(BaseModel):
         messages = [Message(content=p)]
         required = jinja_vars(p)
         return cls(messages=messages, required=required)
+
+    def substitute(self, **kwds):
+        for message in self.messages:
+            with suppress(Exception):
+                message.content = Template(message.content).substitute(**kwds)
+
+        self.check_required()
+        return self
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         group = []

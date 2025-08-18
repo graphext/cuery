@@ -14,45 +14,42 @@ Two-level topic extraction is performed using two steps:
 
 import json
 from collections.abc import Iterable
+from functools import cached_property
 from typing import ClassVar, Literal, Self
 
 from Levenshtein import distance as ldist
 from pydantic import field_validator, model_validator
 
-from .. import utils
-from ..context import AnyContext
-from ..prompt import Prompt
-from ..response import Field, Response, ResponseClass, ResponseSet
-from ..task import Task
+from .. import AnyContext, Field, Prompt, Response, ResponseClass, Tool, utils
 from ..utils import customize_fields, dedent
 
 TOPICS_PROMPT = dedent("""
 From the list of texts below (separated by line breaks), extract a two-level nested list of topics.
 The output should be a JSON object with top-level topics as keys and lists of subtopics as values.
-The top-level should not contain more than %(n_topics)s topics, and each top-level
-should not contain more than %(n_subtopics)s subtopics. The texts come from a dataset of
-'%(domain)s', so the topics should be relevant to that domain. Make sure top-level topics are
+The top-level should not contain more than ${n_topics} topics, and each top-level
+should not contain more than ${n_subtopics} subtopics. Make sure top-level topics are
 generalizable and not too specific, so they can be used as a hierarchy for the subtopics. Make
 sure also that subtopics are not redundant (no similar ones within the the same top-level topic).
 Create fewer topics and subtopics if needed, i.e. when otherwise top-level categories or subtopics
 would be too similar.
-%(extra)s
+
+${instructions}
 
 # Texts
 
 {{texts}}
 """)
 
-ASSIGNMENT_PROMPT_SYSTEM = dedent("""
+LABEL_PROMPT_SYSTEM = dedent("""
 You're task is to use the following hierarchy of topics and subtopics (in json format),
 to assign the correct topic and subtopic to each text in the input.
 
 # Topics
 
-%(topics)s
+${topics}
 """)
 
-ASSIGNMENT_PROMPT_USER = dedent("""
+LABEL_PROMPT_USER = dedent("""
 Assign the correct topic and subtopic to the following text.
 
 # Text
@@ -60,17 +57,17 @@ Assign the correct topic and subtopic to the following text.
 {{text}}
 """)
 
-MULTI_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
+MULTI_LABEL_PROMPT_SYSTEM = dedent("""
 You're task is to use the following hierarchy of topics and subtopics (in json format),
 to assign one or more relevant topics and subtopics to each text in the input.
 A text can be assigned multiple topics and subtopics if it covers multiple themes.
 
 # Topics
 
-%(topics)s
+${topics}
 """)
 
-MULTI_ASSIGNMENT_PROMPT_USER = dedent("""
+MULTI_LABEL_PROMPT_USER = dedent("""
 Assign one or more relevant topics and subtopics to the following text.
 Consider all themes covered in the text and assign appropriate topic-subtopic pairs.
 
@@ -86,8 +83,10 @@ class Topic(Response):
     Validates that subtopics are sufficiently distinct from each other and from the parent topic.
     """
 
-    topic: str = Field(..., description="The top-level topic.")
-    subtopics: list[str] = Field(..., description="A list of subtopics under the top-level topic.")
+    topic: str
+    """The top-level topic."""
+    subtopics: list[str]
+    """A list of subtopics under the top-level topic."""
 
     _MIN_LDIST: ClassVar[int] = 2
     """Minimum Levenshtein distance between subtopics and subtopics->parent topic."""
@@ -128,9 +127,8 @@ class Topic(Response):
 class Topics(Response):
     """A response containing a two-level nested list of topics."""
 
-    topics: list[Topic] = Field(
-        ..., description="A list of top-level topics with their subtopics."
-    )
+    topics: list[Topic]
+    """A list of top-level topics with their subtopics."""
 
     @field_validator("topics", mode="before")
     @classmethod
@@ -152,9 +150,12 @@ class TopicLabel(Response):
     """Base class for topic and subtopic assignment(!) with validation of correspondence."""
 
     topic: str
+    """A specific top-level label."""
     subtopic: str
+    """A specific subtopic label."""
 
     mapping: ClassVar[dict[str, list]] = {}
+    """The allowed topic hierarchy."""
 
     @model_validator(mode="after")
     def is_subtopic(self) -> Self:
@@ -170,45 +171,29 @@ class TopicLabel(Response):
 class MultiTopicLabels(Response):
     """Base class for multiple topic and subtopic assignment with validation of correspondence."""
 
-    labels: list[TopicLabel] = Field(
-        ..., description="A list of topic-subtopic assignments for the text.", min_length=1
-    )
-
-    mapping: ClassVar[dict[str, list]] = {}
-
-    # @model_validator(mode="after")
-    # def validate_assignments(self) -> Self:
-    #     """Validate that each assignment has valid topic-subtopic correspondence."""
-    #     for assignment in self.assignments:
-    #         # Validate that subtopic belongs to topic using the mapping
-    #         allowed = self.mapping.get(assignment.topic, [])
-    #         if assignment.subtopic not in allowed:
-    #             raise ValueError(
-    #                 f"Subtopic '{assignment.subtopic}' is not a valid subtopic "
-    #                 f"for topic '{assignment.topic}'. Allowed subtopics are: {allowed}."
-    #             )
-    #     return self
+    labels: list[TopicLabel] = Field(..., min_length=1)
+    """A list of topic-subtopic assignments for the text."""
 
 
 def make_topic_model(n_topics: int, n_subtopics: int, min_ldist: int = 2) -> type[Topics]:
     """Create a specific response model for a list of N topics with M subtopics."""
     TopicK = customize_fields(Topic, "TopicK", subtopics={"max_length": n_subtopics})
     TopicK._MIN_LDIST = min_ldist
+
     return customize_fields(
-        Topics, "TopicsN", topics={"max_length": n_topics, "annotation": list[TopicK]}
+        Topics,
+        "TopicsN",
+        topics={"max_length": n_topics, "annotation": list[TopicK]},
     )
 
 
-def make_assignment_model(
-    topics: dict[str, list[str]],
-    base: ResponseClass = TopicLabel,
-) -> type[TopicLabel]:
+def make_label_model(topics: dict[str, list[str]]) -> type[TopicLabel]:
     """Create a Pydantic model class for topics and subtopic assignment."""
     tops = list(topics)
     subs = [topic for subtopics in topics.values() for topic in subtopics]
 
     cls = utils.customize_fields(
-        base,
+        TopicLabel,
         "CustomTopicLabel",
         topic={"annotation": Literal[*tops]},
         subtopic={"annotation": Literal[*subs]},
@@ -218,110 +203,114 @@ def make_assignment_model(
     return cls
 
 
-def make_multi_assignment_model(
+def make_multi_label_model(
     topics: dict[str, list[str]],
-    base: ResponseClass = MultiTopicLabels,
+    max_assignments: int = 3,
 ) -> type[MultiTopicLabels]:
     """Create a Pydantic model class for multiple topics and subtopic assignment."""
-    # First create the single assignment model
-    single_assignment_cls = make_assignment_model(topics, TopicLabel)
+    single_assignment_cls = make_label_model(topics)
 
-    # Then create the multi-assignment model with the single assignment as list items
-    cls = utils.customize_fields(
-        base,
+    return utils.customize_fields(
+        MultiTopicLabels,
         "CustomMultiTopicLabels",
-        labels={"annotation": list[single_assignment_cls]},
+        labels={"annotation": list[single_assignment_cls], "max_length": max_assignments},
     )
 
-    cls.mapping = topics
-    return cls
 
-
-class TopicExtractor:
+class TopicExtractor(Tool):
     """Enforce the topic-subtopic hierarchy directly via response model."""
 
-    def __init__(
-        self,
-        domain: str | None = None,
-        n_topics: int = 10,
-        n_subtopics: int = 5,
-        extra: str | None = None,
-    ):
-        prompt_args = {
-            "n_topics": n_topics,
-            "n_subtopics": n_subtopics,
-            "domain": domain or "",
-            "extra": extra or "",
-        }
-        prompt = Prompt.from_string(TOPICS_PROMPT % prompt_args)
-        response = make_topic_model(n_topics, n_subtopics)
-        self.task = Task(prompt=prompt, response=response)
+    n_topics: int = 10
+    """The number of top-level topics to extract."""
+    n_subtopics: int = 5
+    """The number of subtopics to extract for each topic."""
+    instructions: str = ""
+    """Prompt instructions to add with details for the topic extraction."""
+    texts: Iterable[str | float | None]
+    """The texts to extract topics from."""
+    max_dollars: float | None = None
+    """The maximum to spend on the query."""
+    max_tokens: float | None = None
+    """The maximum number of tokens to spend."""
+    max_texts: float | None = None
+    """The maximum number of texts to process."""
 
-    async def __call__(
-        self,
-        texts: Iterable[str],
-        model: str,
-        max_dollars: float | None = None,
-        max_tokens: float | None = None,
-        max_texts: float | None = None,
-        **kwds,
-    ) -> Topics:
-        """Extracts a two-level topic hierarchy from a list of texts."""
+    @cached_property
+    def response_model(self) -> ResponseClass:
+        return make_topic_model(self.n_topics, self.n_subtopics)
+
+    @cached_property
+    def prompt(self) -> Prompt:
+        prompt_args = {
+            "n_topics": self.n_topics,
+            "n_subtopics": self.n_subtopics,
+            "instructions": self.instructions,
+        }
+        return Prompt.from_string(TOPICS_PROMPT).substitute(**prompt_args)
+
+    @cached_property
+    def context(self) -> dict:
         text = utils.concat_up_to(
-            texts,
-            model=model,
-            max_dollars=max_dollars,
-            max_tokens=max_tokens,
-            max_texts=max_texts,
+            self.texts,
+            model=self.model,
+            max_dollars=self.max_dollars,
+            max_tokens=self.max_tokens,
+            max_texts=self.max_texts,
             separator="\n",
         )
-        context = {"texts": text}
-        responses = await self.task.call(context=context, model=model, **kwds)
+        return {"texts": text}
+
+    async def __call__(self, **kwds) -> Topics:
+        """Extracts a two-level topic hierarchy from a list of texts."""
+        responses = await super().__call__(**kwds)
         return responses[0]  # type: ignore
 
 
-class TopicAssigner:
+class TopicAssigner(Tool):
     """Enforce correct topic-subtopic assignment via a Pydantic model."""
 
-    def __init__(self, topics: Topics | dict[str, list[str]]):
-        if isinstance(topics, Topics):
-            topics = topics.to_dict()
+    topics: Topics
+    """The topic hierarchy to assign topics from."""
+    texts: Iterable[str | float | None]
+    """The texts to assign topics to."""
 
-        topics_json = json.dumps(topics, indent=2)
+    SYSTEM_PROMPT: ClassVar[str] = LABEL_PROMPT_SYSTEM
+    USER_PROMPT: ClassVar[str] = LABEL_PROMPT_USER
+
+    @field_validator("topics", mode="before", json_schema_input_type=dict[str, list[str]] | Topics)
+    @classmethod
+    def validate_topics(cls, topics) -> Topics:
+        if isinstance(topics, dict):
+            topics = Topics(topics=topics)  # type: ignore
+
+        return topics
+
+    @cached_property
+    def prompt(self) -> Prompt:
         prompt = Prompt(
             messages=[
-                {"role": "system", "content": ASSIGNMENT_PROMPT_SYSTEM % {"topics": topics_json}},
-                {"role": "user", "content": ASSIGNMENT_PROMPT_USER},
+                {"role": "system", "content": self.SYSTEM_PROMPT},
+                {"role": "user", "content": self.USER_PROMPT},
             ],  # type: ignore
-            required=["text"],
         )
-        response = make_assignment_model(topics)  # type: ignore
-        self.task = Task(prompt=prompt, response=response)
+        topics_json = json.dumps(self.topics.to_dict(), indent=2)
+        return prompt.substitute(topics=topics_json)
 
-    async def __call__(self, texts: AnyContext, model: str, **kwds) -> ResponseSet:
-        return await self.task(context=texts, model=model, **kwds)
+    @cached_property
+    def response_model(self) -> ResponseClass:
+        return make_label_model(self.topics.to_dict())
+
+    @cached_property
+    def context(self) -> AnyContext:
+        return [{"text": text} for text in self.texts]
 
 
-class MultiTopicAssigner:
+class MultiTopicAssigner(TopicAssigner):
     """Enforce correct multi-topic-subtopic assignment via a Pydantic model."""
 
-    def __init__(self, topics: Topics | dict[str, list[str]]):
-        if isinstance(topics, Topics):
-            topics = topics.to_dict()
+    SYSTEM_PROMPT: ClassVar[str] = MULTI_LABEL_PROMPT_SYSTEM
+    USER_PROMPT: ClassVar[str] = MULTI_LABEL_PROMPT_USER
 
-        topics_json = json.dumps(topics, indent=2)
-        prompt = Prompt(
-            messages=[
-                {
-                    "role": "system",
-                    "content": MULTI_ASSIGNMENT_PROMPT_SYSTEM % {"topics": topics_json},
-                },
-                {"role": "user", "content": MULTI_ASSIGNMENT_PROMPT_USER},
-            ],  # type: ignore
-            required=["text"],
-        )
-        response = make_multi_assignment_model(topics)  # type: ignore
-        self.task = Task(prompt=prompt, response=response)
-
-    async def __call__(self, texts: AnyContext, model: str, **kwds) -> ResponseSet:
-        return await self.task(context=texts, model=model, **kwds)
+    @cached_property
+    def response_model(self) -> ResponseClass:
+        return make_multi_label_model(self.topics.to_dict())  # type: ignore

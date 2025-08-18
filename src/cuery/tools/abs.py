@@ -10,15 +10,14 @@ Some examples of LLM-based methods:
   https://github.com/psimm/website/blob/master/blog/absa-with-dspy/configs/manual_prompt.json
 """
 
-from typing import Literal
+from collections.abc import Iterable
+from functools import cached_property
+from typing import ClassVar, Literal
 
-from ..context import AnyContext
-from ..prompt import Prompt
-from ..response import Field, Response, ResponseSet
-from ..task import Task
+from .. import AnyContext, Prompt, Response, ResponseClass, Tool
 from ..utils import dedent
 
-ASPECT_ENTITIES_PROMPT_SYSTEM = dedent("""
+ABS_PROMPT_SYSTEM = dedent("""
 You're an expert in Aspect-Based Sentiment Analysis (ABSA). Your task involves identifying specific
 entities mentioned in a text (e.g. a person, product, service, or experience) and determining the
 polarity of the sentiment expressed toward each.
@@ -43,10 +42,10 @@ a certain feature, or because something is mentioned as "modern", "efficient" et
 considered a sentiment. Look for explicit expressions of positive or negative feelings, especially
 adjectives or adverbs that indicate a sentiment.
 
-%(extra)s
+${instructions}
 """)
 
-ASPECT_ENTITIES_PROMPT_USER = dedent("""
+ABS_PROMPT_USER = dedent("""
 Return the entities and their sentiments with reasons from the following text section.
 
 # Text
@@ -56,32 +55,44 @@ Return the entities and their sentiments with reasons from the following text se
 
 
 class AspectEntity(Response):
-    entity: str = Field(..., description="The entity mentioned in the text.")
-    sentiment: Literal["positive", "negative"] = Field(
-        ..., description="The sentiment associated with the entity (positive or negative)."
-    )
-    reason: str = Field(..., description="The reason for the sentiment assignment.")
+    """Represents an entity with its sentiment and reason for assignment."""
+
+    entity: str
+    """The entity mentioned in the text."""
+    sentiment: Literal["positive", "negative"]
+    """The sentiment associated with the entity (positive or negative)."""
+    reason: str
+    """The reason for the sentiment assignment."""
 
 
 class AspectEntities(Response):
-    entities: list[AspectEntity] = Field(
-        ..., description="A list of entities with their sentiments and reasons."
-    )
+    """Represents a collection of entities with their sentiments and reasons for assignment."""
+
+    entities: list[AspectEntity]
+    """A list of entities with their sentiments and reasons."""
 
 
-class EntityExtractor:
+class AspectSentimentExtractor(Tool):
     """Extract entities with sentiments from texts."""
 
-    def __init__(self, extra: str = "") -> None:
+    texts: Iterable[str | float | None]
+    """The texts to extract entities from."""
+    instructions: str = ""
+    """Further instructions from the user for the entity extraction task."""
+
+    response_model: ClassVar[ResponseClass] = AspectEntities
+
+    @cached_property
+    def prompt(self) -> Prompt:
         prompt = Prompt(
             messages=[
-                {"role": "system", "content": ASPECT_ENTITIES_PROMPT_SYSTEM % {"extra": extra}},
-                {"role": "user", "content": ASPECT_ENTITIES_PROMPT_USER},
+                {"role": "system", "content": ABS_PROMPT_SYSTEM},
+                {"role": "user", "content": ABS_PROMPT_USER},
             ],  # type: ignore
-            required=["text"],
         )
 
-        self.task = Task(prompt=prompt, response=AspectEntities)
+        return prompt.substitute(instructions=self.instructions)
 
-    async def __call__(self, texts: AnyContext, model: str, **kwds) -> ResponseSet:
-        return await self.task(context=texts, model=model, **kwds)
+    @cached_property
+    def context(self) -> AnyContext:
+        return [{"text": text} for text in self.texts]

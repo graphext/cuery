@@ -1,0 +1,13 @@
+Each subsection below represents a single record with all its attributes.
+
+{% if records %}
+{% for record in records %}
+
+## Record {{ loop.index }}
+{% for key in record.keys() | list %}
+
+{{ key }}: {{ record[key] | tojson(indent=2) }}
+
+{% endfor -%}
+{% endfor %}
+{% endif %}

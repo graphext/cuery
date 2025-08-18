@@ -1,0 +1,17 @@
+Each subsection below represents the values of a single attribute for all records.
+
+{% if records %}
+{% for attr_name in records[0].keys() | list %}
+
+## {{ attr_name.replace('_', ' ').title() }}
+
+{% for record in records -%}
+{% if record[attr_name] is iterable and record[attr_name] is not string -%}
+{{ record[attr_name] | tojson -}}
+{% elif record[attr_name] -%}
+{{ record[attr_name] -}}
+{% endif -%}
+{%- if not loop.last -%}, {% endif -%}
+{% endfor -%}
+{% endfor %}
+{% endif %}

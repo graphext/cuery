@@ -1,0 +1,14 @@
+{% for key in record.keys() | list -%}
+
+## {{ key }}
+
+{% if record[key] is iterable and record[key] is not string -%}
+{%- for item in record[key] -%}
+- {{ item | trim }}
+
+{% endfor %}
+{% elif record[key] -%}
+{{ record[key] }}
+{% endif %}
+
+{% endfor -%}

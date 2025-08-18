@@ -4,16 +4,23 @@ Faciliates conversion of responses to simpler Python objects and DataFrames,
 as well as caching raw API responses for token usage calculation etc.
 """
 
+import contextlib
+import inspect
 import json
+import uuid
 from collections.abc import Iterable
+from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 from typing import Any, get_args, get_origin
 
 import pandas as pd
 import pydantic
+from datamodel_code_generator import DataModelType, InputFileType, PythonVersion, generate
 from instructor.cli.usage import calculate_cost
 from pandas import DataFrame, Series
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic_core import to_jsonable_python
 
 from .context import AnyContext, iter_context
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
@@ -49,6 +56,8 @@ class Response(BaseModel):
     items into DataFrame rows e.g.).
     """
 
+    model_config = ConfigDict(use_attribute_docstrings=True, extra="forbid")
+
     _raw_response: Any | None = None
 
     def token_usage(self) -> dict | None:
@@ -63,7 +72,7 @@ class Response(BaseModel):
 
     def to_dict(self) -> dict:
         """Convert the model to a dictionary."""
-        return json.loads(self.model_dump_json())
+        return self.model_dump(mode="json")
 
     @classmethod
     def fallback(cls) -> "Response":
@@ -93,7 +102,9 @@ class Response(BaseModel):
         """Create an instance of the model from a dictionary."""
         fields = fields.copy()
         for field_name, field_params in fields.items():
-            field_type = TYPES[field_params.pop("type")]
+            field_type = field_params.pop("type")
+            if field_type in TYPES:
+                field_type = TYPES[field_type]
             fields[field_name] = (field_type, Field(..., **field_params))
 
         return pydantic.create_model(name, __base__=Response, **fields)
@@ -179,6 +190,27 @@ class ResponseSet:
     def __getitem__(self, index: int) -> Response:
         return self.responses[index]
 
+    @staticmethod
+    def to_dict(item: Any, fallback_name: str | None = None) -> Any:
+        """Convert an item to a dictionary.
+
+        If the item is not a dict-like object, return a fallback dict if a fallback name is
+        provided, otherwise return the item as is.
+        """
+        if isinstance(item, BaseModel):
+            return item.model_dump(mode="json")
+
+        try:
+            item = to_jsonable_python(item)
+        except Exception:
+            with contextlib.suppress(Exception):
+                item = dict(item)
+
+        if isinstance(item, dict) or fallback_name is None:
+            return item
+
+        return {fallback_name: item}
+
     def to_records(self, explode: bool = True) -> list[dict] | DataFrame:
         """Convert to list of dicts, optionally with original context merged in."""
         context, responses = self.context, self.responses
@@ -188,27 +220,19 @@ class ResponseSet:
         else:
             contexts = ({} for _ in responses)
 
-        # ToDo: deduplicate code below
         records = []
         if explode and self.iterfield is not None:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
                 for item in getattr(response, self.iterfield):
-                    if isinstance(item, Response):
-                        records.append(ctx | dict(item))
-                    else:
-                        records.append(ctx | {self.iterfield: item})
+                    item_dict = self.to_dict(item, fallback_name=self.iterfield)
+                    records.append(ctx | item_dict)
         else:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
                 if self.iterfield is not None:
-                    items = []
-                    for item in getattr(response, self.iterfield):
-                        if isinstance(item, Response):
-                            items.append(dict(item))
-                        else:
-                            items.append(item)
+                    items = [self.to_dict(item) for item in getattr(response, self.iterfield)]
                     records.append(ctx | {self.iterfield: items})
                 else:
-                    records.append(ctx | dict(response))
+                    records.append(ctx | self.to_dict(response))
 
         return records
 
@@ -223,11 +247,15 @@ class ResponseSet:
 
         if not explode and normalize and self.iterfield is not None:
             # Convert single column with list of dicts to one list column per key
-            df[self.iterfield] = df[self.iterfield].apply(transpose)
-            response_df = pd.json_normalize(df.pop(self.iterfield))
-            prefix = prefix if prefix is not None else self.iterfield
-            response_df.columns = [f"{prefix}_{col}" for col in response_df]
-            df = pd.concat([df, response_df], axis=1)
+            try:
+                df[self.iterfield] = df[self.iterfield].apply(transpose)
+            except:  # noqa: E722, S110
+                pass
+            else:
+                response_df = pd.json_normalize(df.pop(self.iterfield))
+                prefix = prefix if prefix is not None else self.iterfield
+                response_df.columns = [f"{prefix}_{col}" for col in response_df]
+                df = pd.concat([df, response_df], axis=1)
 
         return df
 
@@ -246,3 +274,43 @@ class ResponseSet:
 
     def __repr__(self) -> str:
         return self.responses.__repr__()
+
+
+def is_response_subclass(obj):
+    return issubclass(obj, Response) and obj is not Response
+
+
+def get_module_responses(module: ModuleType):
+    members = inspect.getmembers(module, lambda obj: is_response_subclass(obj))
+    return [member[1] for member in members]
+
+
+def models_from_jsonschema(schema: str | dict, log: bool = False) -> list[ResponseClass]:
+    """Create response models dynamically from configuration files.
+
+    Also see:
+    - https://koxudaxi.github.io/datamodel-code-generator/using_as_module/
+    - https://github.com/koxudaxi/datamodel-code-generator/issues/331
+    - https://github.com/koxudaxi/datamodel-code-generator/issues/278#issuecomment-764498857
+    - https://github.com/VRSEN/agency-swarm/blob/main/agency_swarm/tools/ToolFactory.py
+    """
+    if isinstance(schema, dict):
+        schema = json.dumps(schema)
+
+    module = "_dynamic_model_" + uuid.uuid4().hex
+    output = Path(f"{module}.py")
+    generate(
+        input_=schema,
+        input_file_type=InputFileType.JsonSchema,
+        output=output,
+        output_model_type=DataModelType.PydanticV2BaseModel,
+        base_class="cuery.response.Response",
+        target_python_version=PythonVersion.PY_312,
+    )
+
+    if log:
+        LOG.info(output.read_text())
+
+    module = import_module(module)
+    output.unlink(missing_ok=True)
+    return get_module_responses(module)

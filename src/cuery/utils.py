@@ -5,17 +5,24 @@ import logging
 import os
 import re
 from collections.abc import Iterable
+from datetime import date, datetime
 from importlib.resources import as_file, files
 from importlib.resources.abc import Traversable
 from inspect import cleandoc
 from math import inf as INF
 from pathlib import Path
-from typing import get_args
+from textwrap import dedent as pydedent
+from typing import Any, get_args
 
+import numpy as np
+import pandas as pd
 import yaml
 from glom import glom
 from jinja2 import Environment, meta
+from jinja2.sandbox import SandboxedEnvironment
 from pandas import isna
+from pandas.api.types import is_scalar
+from pandas.api.typing import NAType
 from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
@@ -35,6 +42,39 @@ else:
 DEFAULT_PATH = Path().home() / "Development/config/ai-api-keys.json"
 
 BaseModelClass = type(BaseModel)
+
+NpNa = float
+Missing = None | NAType | NpNa
+"""Type hint for missing values."""
+
+
+def json_encode(obj: Any) -> Any:  # noqa: PLR0911
+    """Convert a value to a JSON string."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, np.generic):
+        return obj.item()
+    if isinstance(obj, datetime | date):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    if is_scalar(obj) and pd.isna(obj):
+        return None
+    if isinstance(obj, type):
+        if hasattr(obj, "__name__"):
+            return obj.__name__
+        return str(obj)
+
+    raise TypeError(f"Type {type(obj)} not serializable to JSON.")
+
+
+def apply_template(text: str, context: dict[str, Any]) -> str:
+    """Apply Jinja2 template to the given text."""
+    env = SandboxedEnvironment()
+    env.policies["json.dumps_kwargs"]["ensure_ascii"] = False
+    env.policies["json.dumps_kwargs"]["sort_keys"] = False
+    env.policies["json.dumps_kwargs"]["default"] = json_encode
+    return pydedent(env.from_string(text).render(**context))
 
 
 def load_api_keys(path: str | Path | None = DEFAULT_PATH) -> dict:
@@ -206,7 +246,7 @@ def model_encoding(model: str) -> Encoding:
 
 
 def concat_up_to(
-    texts: Iterable[str],
+    texts: Iterable[str | Missing],
     model: str,
     max_dollars: float | None = None,
     max_tokens: float | None = None,
@@ -293,7 +333,7 @@ def customize_fields(model: BaseModelClass, class_name: str, **fields) -> BaseMo
     return create_model(class_name, **field_args, __base__=model)
 
 
-class HashableConfig(BaseModel):
+class Configurable(BaseModel):
     """Base class for configurations. Hashable so we can cache API calls using them."""
 
     model_config = ConfigDict(use_attribute_docstrings=True, extra="forbid")

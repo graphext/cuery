@@ -28,11 +28,45 @@ from async_lru import alru_cache
 from pandas import DataFrame, NamedAgg, Series
 from pydantic import Field
 
-from ..utils import LOG, HashableConfig
-from .tools import EntityExtractor, SerpIntentAssigner, SerpTopicAssigner, SerpTopicExtractor
+from ..tools.flex.classify import Classifier
+from ..tools.flex.entities import EntityExtractor
+from ..tools.flex.topics import TopicAssigner, TopicExtractor
+from ..utils import LOG, Configurable, dedent
+
+TOPIC_INSTRUCTIONS = dedent("""
+Data records represent Google search keywords and associated SERP data.
+Make sure to create topics relevant in the context of SEO keywords research,
+focusing on the semantic meaning of keywords and SERPS, commercial intent etc.
+""")
+
+INTENT_INSTRUCTIONS = dedent("""
+Data records represent Google search keywords and associated SERP data.
+Categorize their search intent in the context of a SEO keywords analysis,
+focusing on the semantic meaning and intent.
+""")
+
+INTENTS = {
+    "informational": "The search intent is to find information or learn about a topic.",
+    "navigational": "The search intent is to navigate to a specific website or page.",
+    "transactional": "The search intent is to make a purchase or complete a transaction.",
+    "commercial": "The search intent is to compare products or services before making a decision.",
+    "local": "The search intent is to find local businesses or services in a specific area.",
+}
+
+ENTITY_INSTRUCTIONS = dedent("""
+Data records represent AI Overviews from SERP data associated with keyword searches.
+Focus on extracting entities that are relevant to SEO analysis.
+""")
+
+ENTITIES = {
+    "brand_company": "A brand or company name, typically a well-known entity in the market.",
+    "product_service": "A specific product or service offered by a brand or company.",
+    "technology": "A technology or platform related to the product or service.",
+    "other": "Any other relevant entity that does not fit into the above categories.",
+}
 
 
-class SerpConfig(HashableConfig):
+class SerpConfig(Configurable):
     """Configuration for fetching SERP data using Apify Google Search Scraper actor."""
 
     keywords: tuple[str, ...] | None = None
@@ -375,41 +409,43 @@ async def topic_and_intent(  # noqa: PLR0913
     min_ldist: int = 2,
 ) -> DataFrame | None:
     """Classify keywords and their top N organic results into topics and intent."""
-
-    if extra_columns is None:
-        extra_columns = ["titles", "domains", "breadcrumbs"]
+    columns = [text_column] + (extra_columns or ["titles", "domains", "breadcrumbs"])
+    topic_instructions = TOPIC_INSTRUCTIONS + f"\n\n{topics_instructions}".strip()
 
     try:
-        extractor = SerpTopicExtractor(
-            text_column=text_column,
-            extra_columns=extra_columns,
+        extractor = TopicExtractor(
+            model=topic_model,
+            records=df,
+            attrs=columns,
             n_topics=10,
             n_subtopics=5,
+            instructions=topic_instructions,
             min_ldist=min_ldist,
-            extra=topics_instructions,
             max_samples=max_samples,
-            model=topic_model,
         )
-        topics = await extractor(df, max_retries=max_retries)
+        topics = await extractor(max_retries=max_retries)
         LOG.info("Extracted topic hierarchy")
         LOG.info(json.dumps(topics.to_dict(), indent=2, ensure_ascii=False))
 
-        topic_assigner = SerpTopicAssigner(
-            topics=topics,
-            text_column=text_column,
-            extra_columns=extra_columns,
+        assigner = TopicAssigner(
             model=assignment_model,
+            records=df,
+            attrs=columns,
+            topics=topics,
         )
-        term_topics = await topic_assigner(df=df, n_concurrent=100)
+        term_topics = await assigner(n_concurrent=100)
         term_topics = term_topics[[text_column, "topic", "subtopic"]]
 
-        intent_assigner = SerpIntentAssigner(
-            text_column=text_column,
-            extra_columns=extra_columns,
+        classifier = Classifier(
             model=assignment_model,
+            records=df,
+            attrs=columns,
+            categories=INTENTS,
+            instructions=INTENT_INSTRUCTIONS,
         )
-        term_intents = await intent_assigner(df=df, n_concurrent=100)
-        term_intents = term_intents[[text_column, "intent"]]
+        term_intents = await classifier(n_concurrent=100)
+        term_intents = term_intents[[text_column, "label"]]
+        term_intents = term_intents.rename(columns={"label": "intent"})
 
         return term_topics.merge(term_intents, on=text_column, how="left")
     except Exception as exc:
@@ -424,48 +460,37 @@ async def extract_aio_entities(
     id_column: str = "term",
 ) -> DataFrame | None:
     """Process AI overviews in SERP data and extract entities."""
-    if "aio_content" in df.columns and df["aio_content"].notna().any():
-        aio_columns = [
-            "aio_content",
-            "aio_source_titles",
-            "aio_source_descs",
-            "aio_source_urls",
-        ]
-        aio_columns = [col for col in aio_columns if col in df.columns]
-        LOG.info(f"Extracting entities from columns: {aio_columns}")
+    if ("aio_content" not in df.columns) or df["aio_content"].isna().all():
+        LOG.warning("No AI overview content found in DataFrame, skipping entity extraction.")
+        return None
 
-        try:
-            # Todo: extract brand and competitor ranks
-            ai_df = df[df.aio_content.notna()].copy().reset_index()
-            entity_extractor = EntityExtractor(
-                model=entity_model,
-                columns=aio_columns,
-            )
-            entities = await entity_extractor(df=ai_df, n_concurrent=100)
-            ent_df = entities.to_pandas(explode=False)
+    aio_columns = [
+        "aio_content",
+        "aio_source_titles",
+        "aio_source_descs",
+        "aio_source_urls",
+    ]
+    aio_columns = [col for col in aio_columns if col in df.columns]
+    LOG.info(f"Extracting entities from columns: {aio_columns}")
 
-            for kind in ("brand_company", "product_service", "technology", "other"):
-                ent_df[f"aio_ents_{kind}"] = ent_df.entities.apply(
-                    lambda es, kind=kind: [
-                        e.name
-                        for e in es
-                        if e is not None
-                        and hasattr(e, "type")
-                        and hasattr(e, "name")
-                        and e.type == kind
-                    ]
-                    if es is not None
-                    else None
-                )
+    try:
+        # Todo: extract brand and competitor ranks
+        ai_df = df[df.aio_content.notna()].copy().reset_index()
+        extractor = EntityExtractor(
+            model=entity_model,
+            records=ai_df,
+            attrs=aio_columns,
+            entities=ENTITIES,
+        )
+        ent_df = await extractor(n_concurrent=100)
 
-            ent_df = ent_df[[col for col in ent_df.columns if col.startswith("aio_ents_")]]
-            ent_df[id_column] = ai_df[id_column]
-            return ent_df
-        except Exception as exc:
-            LOG.error(f"Error processing AI overviews: {exc}")
-            return None
-
-    return None
+        ent_df = ent_df[[col for col in ent_df.columns if col.startswith("entities_")]]
+        ent_df.columns = [f"aio_{col}" for col in ent_df.columns]
+        ent_df[id_column] = ai_df[id_column]
+        return ent_df
+    except Exception as exc:
+        LOG.error(f"Error processing AI overviews: {exc}")
+        return None
 
 
 def mentioned_in_string(

@@ -1,8 +1,10 @@
+"""FastAPI server and MCP for cuery tasks."""
+
 from fastapi import FastAPI
 from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel, Field
 
-from cuery.topics.oneshot import TopicAssigner, TopicAssignment, TopicExtractor, Topics
+from cuery.tools.topics import TopicAssigner, TopicLabel, TopicExtractor, Topics
 
 app = FastAPI(
     title="Cuery Topic Extraction API",
@@ -66,7 +68,7 @@ async def extract_topics(request: ExtractTopicsRequest) -> Topics:
 
 
 @app.post("/assign_topics", operation_id="assign_topics")
-async def assign_topics(request: AssignTopicsRequest) -> list[TopicAssignment]:
+async def assign_topics(request: AssignTopicsRequest) -> list[TopicLabel]:
     """
     Assigns topics and subtopics to a list of texts using a predefined topic hierarchy.
     """

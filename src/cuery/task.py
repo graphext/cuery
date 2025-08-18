@@ -26,34 +26,19 @@ def check_model_name(model: str) -> None:
         )
 
 
-class ErrorLogger:
+class ErrorLogger(list):
     """A simple logger to count parsing errors."""
 
-    def __init__(self) -> None:
-        self.count = 0
-        self.messages = []
-
     def log(self, error: Exception) -> None:
-        self.count += 1
-        self.messages.append(str(error))
-
-    def reset(self) -> None:
-        self.count = 0
-        self.messages = []
+        super().append(str(error))
 
 
-class QueryLogger:
+class QueryLogger(list):
     """A simple logger to store query parameters."""
-
-    def __init__(self) -> None:
-        self.queries = []
 
     def log(self, *args, **kwargs) -> None:
         """Log a query to the internal list."""
-        self.queries.append(kwargs)
-
-    def reset(self) -> None:
-        self.queries = []
+        super().append(kwargs)
 
 
 class Task:
@@ -93,8 +78,8 @@ class Task:
         if name:
             Task.registry[name] = self
 
-        self.error_log = ErrorLogger()
-        self.query_log = QueryLogger()
+        self.errors = ErrorLogger()
+        self.queries = QueryLogger()
 
     def _select_client(self, model: str | None = None) -> Instructor:
         if model is None:
@@ -105,10 +90,10 @@ class Task:
 
     def reset_loggers(self, client: Instructor) -> None:
         """Reset the error and query loggers."""
-        self.error_log.reset()
-        self.query_log.reset()
-        client.on("parse:error", self.error_log.log)
-        client.on("completion:kwargs", self.query_log.log)
+        self.errors.clear()
+        self.queries.clear()
+        client.on("parse:error", self.errors.log)
+        client.on("completion:kwargs", self.queries.log)
 
     async def call(
         self,
@@ -162,8 +147,8 @@ class Task:
             **kwds,
         )
 
-        if self.error_log.count > 0:
-            LOG.warning(f"Encountered: {self.error_log.count} response parsing errors!")
+        if err_count := len(self.errors):
+            LOG.warning(f"Encountered: {err_count} response parsing errors!")
 
         return ResponseSet(responses, context, self.prompt.required)  # type: ignore
 
@@ -193,8 +178,8 @@ class Task:
             **kwds,
         )
 
-        if self.error_log.count > 0:
-            LOG.warning(f"Encountered: {self.error_log.count} response parsing errors!")
+        if err_count := len(self.errors):
+            LOG.warning(f"Encountered: {err_count} response parsing errors!")
 
         return ResponseSet(responses, context, self.prompt.required)  # type: ignore
 

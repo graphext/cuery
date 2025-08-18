@@ -49,13 +49,13 @@ Authentication
 
 from pandas import DataFrame
 
-from ..utils import LOG, HashableConfig
+from ..utils import LOG, Configurable
 from .keywords import GoogleKwdConfig, keywords
 from .serps import SerpConfig, serps
 from .traffic import TrafficConfig, keyword_traffic
 
 
-class SeoConfig(HashableConfig):
+class SeoConfig(Configurable):
     """Configuration for complete keyword data extraction (historical metrics, SERPs, traffic)."""
 
     kwd_cfg: GoogleKwdConfig

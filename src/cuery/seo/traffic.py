@@ -25,10 +25,10 @@ from apify_client import ApifyClientAsync
 from async_lru import alru_cache
 from pandas import DataFrame, NamedAgg, Series
 
-from ..utils import LOG, HashableConfig
+from ..utils import LOG, Configurable
 
 
-class TrafficConfig(HashableConfig):
+class TrafficConfig(Configurable):
     """Configuration for fetching SERP data using Apify Google Search Scraper actor."""
 
     batch_size: int = 100

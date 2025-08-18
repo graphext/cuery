@@ -24,8 +24,13 @@ from pydantic import Field
 from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
-from ..tools.topics import TopicLabel, Topics, make_assignment_model, make_topic_model
-from ..utils import LOG, HashableConfig, dedent
+from ..tools.topics import (
+    Topics,
+    make_label_model,
+    make_multi_label_model,
+    make_topic_model,
+)
+from ..utils import LOG, Configurable, dedent
 
 TOPICS_PROMPT = dedent("""
 From the keyword SERP data below, extract a two-level nested list of topics.
@@ -86,6 +91,42 @@ the keyword.
 
 TOPIC_ASSIGNMENT_PROMPT_USER = dedent("""
 Assign the correct topic and subtopic to the following keyword based on its SERP results.
+
+# Keyword: "{{keyword["term"]}}"
+
+{% for attr_name in keyword.keys() | list -%}
+{% if attr_name != "term" -%}
+
+{{ attr_name }}:
+{% if keyword[attr_name] is iterable and keyword[attr_name] is not string -%}
+{%- for item in keyword[attr_name] -%}
+{{ item | trim }}{% if not loop.last %} | {% endif %}
+{%- endfor %}
+{% elif keyword[attr_name] -%}
+{{ keyword[attr_name] }}
+{% endif %}
+
+{% endif -%}
+{% endfor -%}
+""")
+
+MULTI_TOPIC_ASSIGNMENT_PROMPT_SYSTEM = dedent("""
+You're task is to use the following hierarchy of topics and subtopics (in json format),
+to assign one or more relevant topics and subtopics to each keyword based on its SERP results.
+A keyword can be assigned multiple topics and subtopics if its SERP results cover multiple themes.
+
+Consider the keyword term itself, as well as any other provided attribute associated with
+the keyword.
+
+# Topics
+
+%(topics)s
+""")
+
+MULTI_TOPIC_ASSIGNMENT_PROMPT_USER = dedent("""
+Assign one or more relevant topics and subtopics to the following keyword based on its
+SERP results. Consider all themes covered in the SERP data and assign appropriate
+topic-subtopic pairs.
 
 # Keyword: "{{keyword["term"]}}"
 
@@ -235,7 +276,7 @@ class Entities(Response):
     )
 
 
-class SerpTopicExtractor(HashableConfig):
+class SerpTopicExtractor(Configurable):
     """Extract topics from keyword SERP data."""
 
     text_column: str = "term"
@@ -287,7 +328,7 @@ class SerpTopicExtractor(HashableConfig):
         return responses[0]  # type: ignore
 
 
-class SerpTopicAssigner(HashableConfig):
+class SerpTopicAssigner(Configurable):
     """Assign topics for keywords based on their SERP results.
 
     Returns a DataFrame containing the configured input columns along with the
@@ -325,8 +366,8 @@ class SerpTopicAssigner(HashableConfig):
             ],  # type: ignore
             required=["keyword"],
         )
-        response = make_assignment_model(topics, TopicLabel)  # type: ignore
-        self._task = Task(prompt=prompt, response=response)  # type: ignore
+        response = make_label_model(topics)
+        self._task = Task(prompt=prompt, response=response)
 
         # Keep only configured columns
         columns = [self.text_column] + [col for col in self.extra_columns if col in df.columns]
@@ -350,7 +391,74 @@ class SerpTopicAssigner(HashableConfig):
         return result.rename(columns={"term": self.text_column})
 
 
-class SerpIntentAssigner(HashableConfig):
+class SerpMultiTopicAssigner(Configurable):
+    """Assign multiple topics for keywords based on their SERP results.
+
+    Returns a DataFrame containing the configured input columns along with the
+    assigned topics and subtopics. Unlike SerpTopicAssigner, this class can assign
+    multiple topic-subtopic pairs to each keyword when SERP data covers multiple themes.
+    """
+
+    topics: Topics | dict[str, list[str]]
+    """Topics and subtopics to use for assignment, either as a Topics object or a dict."""
+    text_column: str = "term"
+    """Column name in the DataFrame containing the main texts."""
+    extra_columns: list[str] = Field(default_factory=list)
+    """List of additional columns to include in the context for topic extraction."""
+    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    """Model to use for topic extraction."""
+    max_labels: int = Field(3, ge=1, le=10)
+    """Maximum number of topic-subtopic pairs to assign per keyword (default 3)."""
+
+    _task: Task | None = None
+    _response: ResponseSet | None = None
+
+    async def __call__(self, df: DataFrame, model: str | None = None, **kwds) -> DataFrame:
+        """Assign multiple topics for each keyword in the DataFrame."""
+        model = model or self.model
+
+        topics = self.topics
+        if isinstance(topics, Topics):
+            topics = topics.to_dict()
+
+        topics_json = json.dumps(topics, indent=2)
+
+        prompt = Prompt(
+            messages=[
+                {
+                    "role": "system",
+                    "content": MULTI_TOPIC_ASSIGNMENT_PROMPT_SYSTEM % {"topics": topics_json},
+                },
+                {"role": "user", "content": MULTI_TOPIC_ASSIGNMENT_PROMPT_USER},
+            ],  # type: ignore
+            required=["keyword"],
+        )
+        response = make_multi_label_model(topics, max_assignments=self.max_labels)  # type: ignore
+        self._task = Task(prompt=prompt, response=response)  # type: ignore
+
+        # Keep only configured columns
+        columns = [self.text_column] + [col for col in self.extra_columns if col in df.columns]
+        df = df[columns]
+        df = df.rename(columns={self.text_column: "term"})
+
+        # Convert DataFrame to context format (one dict per row)
+        context = [{"keyword": record} for record in df.to_dict(orient="records")]
+
+        LOG.info(f"Assigning multi-topics row-wise with columns: {columns}")
+        self._response = await self._task(context=context, model=model, **kwds)
+
+        result = self._response.to_pandas(explode=False, normalize=True)
+        result = pd.concat(
+            [
+                result.drop(columns="keyword"),
+                pd.json_normalize(result["keyword"]),  # type: ignore
+            ],
+            axis=1,
+        )
+        return result.rename(columns={"term": self.text_column})
+
+
+class SerpIntentAssigner(Configurable):
     """Classify intent for keywords based on their SERP results."""
 
     text_column: str = "term"
@@ -401,7 +509,7 @@ class SerpIntentAssigner(HashableConfig):
         return result.rename(columns={"term": self.text_column})
 
 
-class EntityExtractor(HashableConfig):
+class EntityExtractor(Configurable):
     """ "Extract SEO-relevant entities from Google SERP AI Overview data."""
 
     columns: list[str]
@@ -424,7 +532,7 @@ class EntityExtractor(HashableConfig):
         return await self._task(context=context, model=model, **kwds)
 
 
-class PurchaseProbAssigner(HashableConfig):
+class PurchaseProbAssigner(Configurable):
     """Classify intent for keywords based on their SERP results."""
 
     text_column: str = "term"

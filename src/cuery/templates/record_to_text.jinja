@@ -1,0 +1,4 @@
+{% for key in record.keys() | list -%}
+{{ key }}: {{ record[key] | tojson(indent=2) }}
+
+{% endfor -%}

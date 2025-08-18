@@ -55,10 +55,10 @@ from ..context import AnyContext
 from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
-from ..utils import LOG, HashableConfig, dedent
+from ..utils import LOG, Configurable, dedent
 
 
-class GoogleKwdConfig(HashableConfig):
+class GoogleKwdConfig(Configurable):
     """Configuration for Google Ads API access."""
 
     keywords: tuple[str, ...] | None = None
