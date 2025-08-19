@@ -1,0 +1,10 @@
+{
+    "dataset_id": "sGY0eqsMa0uOoZy6H",
+    "model": "openai/gpt-4.1",
+    "schema_model": "openai/gpt-4.1",
+    "instructions": "Extract domains mentioned in keyword SERP urls and AI overview references.",
+    "attrs": [
+        "urls",
+        "aio_source_urls"
+    ]
+}
