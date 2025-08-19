@@ -2,11 +2,11 @@
 FROM apify/actor-python:3.13
 
 RUN pip install uv
-RUN uv pip install --system "cuery[seo]==0.15.3"
+RUN uv pip install --system "cuery[seo]==0.15.4"
 
 COPY . ./
 
 RUN useradd --create-home apify && chown -R apify:apify .
 USER apify
 
-CMD ["python", "-m", "cuery.actors.assign_intent"]
+CMD ["python", "-m", "cuery.actors.classify"]
