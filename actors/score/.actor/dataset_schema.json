@@ -1,0 +1,20 @@
+{
+    "actorSpecification": 1,
+    "title": "Scorer",
+    "description": "Assign custom scores to data records based on arbitrary data attributes using AI.",
+    "views": {
+        "score": {
+            "title": "Assigned scores",
+            "description": "Input data with assigned scores.",
+            "transformation": {
+                "fields": [
+                    "*"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {}
+            }
+        }
+    }
+}

@@ -770,7 +770,7 @@ wheels = [
 
 [[package]]
 name = "cuery"
-version = "0.15.3"
+version = "0.15.5"
 source = { editable = "." }
 dependencies = [
     { name = "async-lru" },

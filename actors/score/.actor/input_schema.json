@@ -1,0 +1,70 @@
+{
+    "title": "Scorer",
+    "description": "Assign custom scores to data records based on arbitrary data attributes using AI.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "dataset_id": {
+            "title": "Dataset ID",
+            "type": "string",
+            "description": "The ID of the dataset containing the data records to be scored.",
+            "editor": "textfield"
+        },
+        "model": {
+            "title": "LLM Model",
+            "type": "string",
+            "description": "The LLM provider and model to be used for scoring. Format: provider/model (e.g., 'openai/gpt-4', 'anthropic/claude-3-sonnet')",
+            "editor": "textfield",
+            "default": "openai/gpt-3.5-turbo",
+            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
+        },
+        "attrs": {
+            "title": "Record Attributes",
+            "type": "array",
+            "description": "List of record attributes/columns to use for scoring. If null, all attributes are used. This allows focusing on specific fields in your data.",
+            "editor": "stringList"
+        },
+        "name": {
+            "title": "Score Name",
+            "type": "string",
+            "description": "Name of the score to assign (e.g., 'relevance', 'quality', 'purchase_probability'). This will be the column name in the output.",
+            "editor": "textfield"
+        },
+        "type": {
+            "title": "Score Type",
+            "type": "string",
+            "description": "Whether to return the score as 'integer' or 'float'.",
+            "editor": "select",
+            "enum": [
+                "integer",
+                "float"
+            ],
+            "default": "float"
+        },
+        "min": {
+            "title": "Minimum Score",
+            "type": "integer",
+            "description": "Minimum value of the score range.",
+            "editor": "number"
+        },
+        "max": {
+            "title": "Maximum Score",
+            "type": "integer",
+            "description": "Maximum value of the score range.",
+            "editor": "number"
+        },
+        "description": {
+            "title": "Score Description",
+            "type": "string",
+            "description": "Detailed description of what the score represents and how it should be assigned. This helps the AI model understand your scoring criteria.",
+            "editor": "textarea"
+        }
+    },
+    "required": [
+        "dataset_id",
+        "name",
+        "min",
+        "max",
+        "description"
+    ]
+}
