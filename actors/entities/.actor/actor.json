@@ -1,0 +1,24 @@
+{
+    "actorSpecification": 1,
+    "name": "entity-extractor",
+    "title": "Entity Extractor",
+    "description": "Extract entities from data records/rows based on predefined entity categories.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "dockerfile": "./Dockerfile",
+    "dockerContextDir": "../..",
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "main": "python -m cuery.actors.entities",
+    "readme": "./README.md",
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 4096,
+    "usesStandbyMode": false,
+    "environmentVariables": {
+        "OPENAI_API_KEY": "@OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY": "@ANTHROPIC_API_KEY",
+        "GOOGLE_API_KEY": "@GOOGLE_API_KEY"
+    }
+}

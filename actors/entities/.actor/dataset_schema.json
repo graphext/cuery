@@ -1,0 +1,24 @@
+{
+    "actorSpecification": 1,
+    "title": "Entity Extractor",
+    "description": "Extract entities from data records/rows based on predefined entity categories.",
+    "views": {
+        "entities": {
+            "title": "Extracted entities",
+            "description": "Input data with extracted entities organized by category.",
+            "transformation": {
+                "fields": [
+                    "entities_*"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "entities_*": {
+                        "format": "array"
+                    }
+                }
+            }
+        }
+    }
+}

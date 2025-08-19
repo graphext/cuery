@@ -1,0 +1,38 @@
+{
+    "title": "Entity Extractor",
+    "description": "Extract entities from data records/rows based on predefined entity categories.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "dataset_id": {
+            "title": "Dataset ID",
+            "type": "string",
+            "description": "The ID of the dataset containing the data records from which to extract entities.",
+            "editor": "textfield"
+        },
+        "model": {
+            "title": "LLM Model",
+            "type": "string",
+            "description": "The LLM provider and model to be used for entity extraction. Format: provider/model (e.g., 'openai/gpt-4', 'anthropic/claude-3-sonnet')",
+            "editor": "textfield",
+            "default": "openai/gpt-3.5-turbo",
+            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
+        },
+        "attrs": {
+            "title": "Record Attributes",
+            "type": "array",
+            "description": "List of record attributes/columns to use for entity extraction. If null, all attributes are used. This allows focusing on specific fields in your data.",
+            "editor": "stringList"
+        },
+        "entities": {
+            "title": "Entity Categories",
+            "type": "object",
+            "description": "A mapping of entity category names to their descriptions. The model will extract entities belonging to these categories from the provided record attributes.",
+            "editor": "json"
+        }
+    },
+    "required": [
+        "dataset_id",
+        "entities"
+    ]
+}
