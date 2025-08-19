@@ -1,0 +1,20 @@
+{
+    "actorSpecification": 1,
+    "title": "Automagic",
+    "description": "Automatically extract and structure information from data records using AI-generated schemas and custom instructions.",
+    "views": {
+        "extracted": {
+            "title": "Extracted information",
+            "description": "Input data with extracted and structured information.",
+            "transformation": {
+                "fields": [
+                    "*"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {}
+            }
+        }
+    }
+}
