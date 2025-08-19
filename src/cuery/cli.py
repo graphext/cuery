@@ -11,10 +11,13 @@ from rich.table import Table
 
 from .builder.ui import launch
 from .seo import SeoConfig
+from .seo.keywords import encode_json_b64
 from .task import Task
 from .utils import load_api_keys
 
 app = typer.Typer()
+
+PROJ_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 @app.command("tasks")
@@ -66,7 +69,11 @@ DEFAULT_CONFIG_DIR = "~/Development/config"
 
 
 @app.command("set-vars")
-def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR), apify_secrets: bool = True):
+def set_env_vars(
+    cfg_dir: Path = Path(DEFAULT_CONFIG_DIR),
+    apify_secrets: bool = True,
+    dotenv: bool = True,
+):
     """Set environment variables from configuration files."""
     config_dir = cfg_dir.expanduser().resolve()
     vars = {}
@@ -85,7 +92,7 @@ def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR), apify_secrets: bool =
 
     if key_path := vars.get("GOOGLE_ADS_JSON_KEY_FILE_PATH"):  # noqa: SIM102
         with open(key_path) as f:
-            vars["GOOGLE_ADS_JSON_KEY"] = json.dumps(json.load(f))
+            vars["GOOGLE_ADS_JSON_KEY"] = encode_json_b64(json.load(f))
             vars.pop("GOOGLE_ADS_JSON_KEY_FILE_PATH")
 
     vars |= load_api_keys(config_dir / "ai-api-keys.json")
@@ -99,6 +106,35 @@ def set_env_vars(cfg_dir: Path = Path(DEFAULT_CONFIG_DIR), apify_secrets: bool =
             os.system(f"apify secrets add {key} '{value}'")  # noqa: S605
 
     print(f"Environment variables set: {list(vars.keys())}")
+
+    # Update .env file with the same variables if they don't already exist in the file
+    if dotenv:
+        fp = Path(".env")
+        if not fp.exists():
+            fp.touch()
+
+        with open(fp) as f:
+            existing_vars = f.readlines()
+
+        with open(fp, "a") as f:
+            for key, value in vars.items():
+                if not any(line.startswith(f"{key}=") for line in existing_vars):
+                    f.write(f"{key}={value}\n")
+
+    return vars
+
+
+@app.command("actor")
+def actor(name: str, apify_secrets: bool = True):
+    os.chdir(PROJ_DIR)
+    vars = set_env_vars(apify_secrets=apify_secrets)
+    os.chdir(PROJ_DIR / "actors" / name)
+    os.system(f"apify login --token {vars['APIFY_TOKEN']}")  # noqa: S605
+    cmd = (
+        f"apify run --env-file {PROJ_DIR / '.env'} --purge --input-file=.actor/example_input.json"
+    )
+    print(f"Running actor {name} with command: {cmd}")
+    os.system(cmd)  # noqa: S605, S607
 
 
 if __name__ == "__main__":

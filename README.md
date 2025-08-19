@@ -440,10 +440,18 @@ To build and render locally simply use `./docs.sh` or manually:
 
 Individual functionalities are wrapped in Apify actors, inside the `cuery/actors` subdirectory.
 
-To run a specific actor locally during development (assuming `apify-cli` is already installed):
+To run a specific actor locally during development (assuming `apify-cli` is already installed), either use the built-in `actor` command:
 
 ``` bash
-(cuery set-vars && cd actors/keywords && apify run --purge --input-file=.actor/example_input.json)
+uv run cuery actor <name_of_actor>
+```
+
+This will collect the required environment variables, save them locally to a .env file, log in to apify, and run the actor with the found environment variables.
+
+Doing it manually translates to something like this:
+
+``` bash
+(uv run cuery set-vars && cd actors/classify && uv run --env-file ../../.env apify run --purge --input-file=.actor/example_input.json)
 ```
 
 `cuery set-vars` will search for files containing secrets, tokens etc. in a local `~/Development/config/` folder,
