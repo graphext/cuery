@@ -1,9 +1,9 @@
 {
     "actorSpecification": 1,
-    "name": "intent-classifier",
-    "title": "SERP Intent Classifier",
-    "description": "Classify search intent for keywords based on their SERP results using AI. Categorizes keywords into informational, navigational, transactional, or commercial intent.",
-    "version": "1.0",
+    "name": "classifier",
+    "title": "Classifier",
+    "description": "Classify data records/rows into desired categories based on arbitrary data attributes.",
+    "version": "2.0",
     "buildTag": "latest",
     "dockerfile": "./Dockerfile",
     "dockerContextDir": "../..",
@@ -11,7 +11,7 @@
     "storages": {
         "dataset": "./dataset_schema.json"
     },
-    "main": "python -m cuery.actors.assign_intent",
+    "main": "python -m cuery.actors.classify",
     "readme": "./README.md",
     "minMemoryMbytes": 256,
     "maxMemoryMbytes": 4096,

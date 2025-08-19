@@ -8,6 +8,7 @@ from ..utils import LOG
 from .utils import fetch_dataset
 
 MAX_RETRIES = 6
+N_CONCURRENT = 100
 
 
 async def main():
@@ -18,7 +19,7 @@ async def main():
         df = await fetch_dataset(Actor, id=dataset_id)
 
         assigner = TopicAssigner(records=df, **config)
-        result = await assigner(max_retries=MAX_RETRIES)
+        result = await assigner(max_retries=MAX_RETRIES, n_concurrent=N_CONCURRENT)
         LOG.info(f"Assigned topics:\n{result}")
 
         records = json.loads(result.to_json(orient="records", date_format="iso", index=False))

@@ -1,0 +1,45 @@
+{
+    "title": "Classifier",
+    "description": "Classify data records/rows into the desired categories based on arbitrary data attributes.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "dataset_id": {
+            "title": "Dataset ID",
+            "type": "string",
+            "description": "The ID of the dataset containing the data records to be classified.",
+            "editor": "textfield"
+        },
+        "model": {
+            "title": "LLM Model",
+            "type": "string",
+            "description": "The LLM provider and model to be used for classification. Format: provider/model (e.g., 'openai/gpt-4', 'anthropic/claude-3-sonnet')",
+            "editor": "textfield",
+            "default": "openai/gpt-3.5-turbo",
+            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
+        },
+        "attrs": {
+            "title": "Record Attributes",
+            "type": "array",
+            "description": "List of record attributes/columns to use for classification. If null, all attributes are used. This allows focusing on specific fields in your data.",
+            "editor": "stringList"
+        },
+        "categories": {
+            "title": "Categories/Labels",
+            "type": "object",
+            "description": "A mapping of category names to their descriptions. The model will classify records into these categories based on the provided attributes.",
+            "editor": "json"
+        },
+        "instructions": {
+            "title": "Additional Instructions",
+            "type": "string",
+            "description": "Additional use-case specific instructions or context for the classification. This helps the AI model understand your specific domain or requirements",
+            "editor": "textarea",
+            "default": ""
+        }
+    },
+    "required": [
+        "dataset_id",
+        "categories"
+    ]
+}

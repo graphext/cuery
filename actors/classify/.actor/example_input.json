@@ -1,0 +1,16 @@
+{
+    "dataset_id": "y3wzszG9DojmcAbOs",
+    "categories": {
+        "informational": "The search intent is to find information or learn about a topic.",
+        "navigational": "The search intent is to navigate to a specific website or page.",
+        "transactional": "The search intent is to make a purchase or complete a transaction.",
+        "commercial": "The search intent is to compare products or services before making a decision.",
+        "local": "The search intent is to find local businesses or services in a specific area."
+    },
+    "instructions": "Data records represent Google search keywords and associated SERP data. Categorize their search intent in the context of a SEO keywords analysis, focusing on the semantic meaning and intent.",
+    "model": "openai/gpt-4.1-mini",
+    "attrs": [
+        "term",
+        "titles"
+    ]
+}

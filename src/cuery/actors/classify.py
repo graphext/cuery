@@ -3,11 +3,12 @@ import json
 
 from apify import Actor
 
-from ..seo.tools import SerpIntentAssigner
+from ..tools.flex.classify import Classifier
 from ..utils import LOG
 from .utils import fetch_dataset
 
 MAX_RETRIES = 6
+N_CONCURRENT = 100
 
 
 async def main():
@@ -17,8 +18,8 @@ async def main():
         dataset_id = config.pop("dataset_id")
         df = await fetch_dataset(Actor, id=dataset_id)
 
-        assigner = SerpIntentAssigner(**config)
-        result = await assigner(df, max_retries=MAX_RETRIES)
+        assigner = Classifier(records=df, **config)
+        result = await assigner(max_retries=MAX_RETRIES, n_concurrent=N_CONCURRENT)
         LOG.info(f"Assigned intent:\n{result}")
 
         records = json.loads(result.to_json(orient="records", date_format="iso", index=False))

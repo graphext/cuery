@@ -1,0 +1,24 @@
+{
+    "actorSpecification": 1,
+    "title": "Classifier",
+    "description": "Classify data records/rows into desired categories based on arbitrary data attributes.",
+    "views": {
+        "label": {
+            "title": "Assigned category labels",
+            "description": "Input data with assigned category labels.",
+            "transformation": {
+                "fields": [
+                    "label"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "label": {
+                        "format": "text"
+                    }
+                }
+            }
+        }
+    }
+}

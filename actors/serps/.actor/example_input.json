@@ -8,7 +8,7 @@
     "batch_size": 25,
     "resultsPerPage": 10,
     "maxPagesPerQuery": 1,
-    "country": "us",
+    "countryCode": "us",
     "searchLanguage": "en",
     "languageCode": "en",
     "top_n": 10,

@@ -3,7 +3,7 @@
     "name": "serp-collector",
     "title": "SERP collector",
     "description": "Fetch and process Google SERPS for a given list of keywords/search terms.",
-    "version": "1.0",
+    "version": "1.1",
     "buildTag": "latest",
     "dockerfile": "./Dockerfile",
     "dockerContextDir": "../..",

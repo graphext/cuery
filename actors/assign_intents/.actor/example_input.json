@@ -1,9 +1,0 @@
-{
-    "dataset_id": "5Rrc6BnTBi7nZfpvF",
-    "text_column": "term",
-    "extra_columns": [
-        "titles",
-        "domains",
-        "breadcrumbs"
-    ]
-}
