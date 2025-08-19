@@ -9,6 +9,7 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from .actors.scaffold.flex import make_scaffold
 from .builder.ui import launch
 from .seo import SeoConfig
 from .seo.keywords import encode_json_b64
@@ -133,6 +134,34 @@ def actor(name: str, apify_secrets: bool = True):
     cmd = f"uv run --env-file {PROJ_DIR / '.env'} apify run --purge --input-file=.actor/example_input.json"
     print(f"Running actor {name} with command: {cmd}")
     os.system(cmd)  # noqa: S605, S607
+
+
+@app.command("scaffold")
+def _make_scaffold(
+    tool: str = typer.Argument(
+        ..., help="Import path to FlexTool subclass, e.g. cuery.tools.flex.classify.Classifier"
+    ),
+    actor_name: str | None = typer.Option(
+        None, help="Directory name for the new actor (default from tool class)"
+    ),
+    module_name: str | None = typer.Option(
+        None, help="Module name to create in src/cuery/actors (default from tool class)"
+    ),
+    title: str | None = typer.Option(None, help="Actor title (default from tool class name)"),
+    description: str | None = typer.Option(
+        None, help="Actor description (default from tool class docstring)"
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing files"),
+) -> None:
+    """Create a new actor directory and module for a given FlexTool subclass."""
+    make_scaffold(
+        tool=tool,
+        actor_name=actor_name,
+        module_name=module_name,
+        title=title,
+        description=description,
+        force=force,
+    )
 
 
 if __name__ == "__main__":
