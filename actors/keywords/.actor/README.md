@@ -6,14 +6,14 @@ Analyze and expand keywords using the Google Ads API to generate comprehensive k
 
 This Actor connects to the Google Ads API to provide comprehensive keyword planning data for SEO and PPC professionals:
 
-- ✅ **Expand seed keywords** into thousands of related keyword suggestions using Google's keyword planner
-- ✅ **Generate keyword ideas** from landing pages or websites with configurable limits
-- ✅ **Analyze search volumes** with up to 4 years of historical data and monthly breakdowns
-- ✅ **Calculate growth trends** including year-over-year, 3-month, and 1-month growth rates
-- ✅ **Extract competition metrics** including average CPC, competition scores, and bid estimates
-- ✅ **Perform trend analysis** using linear regression to identify keyword momentum
-- ✅ **Support multiple markets** with configurable language and country targeting
-- ✅ **Generate structured data** ready for SEO analysis, PPC planning, and content strategy
+- **Expand seed keywords** into thousands of related keyword suggestions using Google's keyword planner
+- **Generate keyword ideas** from landing pages or websites with configurable limits
+- **Analyze search volumes** with up to 4 years of historical data and monthly breakdowns
+- **Calculate growth trends** including year-over-year, 3-month, and 1-month growth rates
+- **Extract competition metrics** including average CPC, competition scores, and bid estimates
+- **Perform trend analysis** using linear regression to identify keyword momentum
+- **Support multiple markets** with configurable language and country targeting
+- **Generate structured data** ready for SEO analysis, PPC planning, and content strategy
 
 **Perfect for**: SEO professionals, PPC specialists, content marketers, digital agencies, and businesses planning their keyword strategy and content optimization.
 
@@ -212,7 +212,7 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 
 ### Real-World Examples
 
-**🎯 Content Strategy with Keyword Expansion**
+**Content Strategy with Keyword Expansion**
 *Scenario: Blog content planning for a marketing agency*
 ```json
 {
@@ -227,7 +227,7 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 ```
 *Expected output: ~300-500 related keywords with 12 months of trend data*
 
-**🏪 Local Business Keyword Research**  
+**Local Business Keyword Research**  
 *Scenario: Spanish restaurant chain expansion*
 ```json
 {
@@ -242,7 +242,7 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 ```
 *Expected output: ~200-400 location-based keywords with competition data*
 
-**🛒 E-commerce PPC Planning**
+**E-commerce PPC Planning**
 *Scenario: Online fashion store keyword research*
 ```json
 {
@@ -257,7 +257,7 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 ```
 *Expected output: ~500-800 product-related keywords with bid estimates and trend analysis*
 
-**🌐 URL-based Keyword Discovery**
+**URL-based Keyword Discovery**
 *Scenario: Analyzing competitor landing pages*
 ```json
 {
@@ -284,168 +284,68 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 - **Use URL mode**: Generate ideas from competitor pages or your own landing pages
 - **Consider whole-site analysis**: Use domain URLs with `whole_site: true` for comprehensive site analysis
 
-## Connect Google Ads Keyword Planning Actor to your workflows
 
-### 🔌 Apify API Integration
-
-```bash
-curl -X POST https://api.apify.com/v2/acts/[ACTOR_ID]/runs \
-  -H "Authorization: Bearer [YOUR_API_TOKEN]" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "keywords": ["digital marketing", "seo"],
-    "ideas": true,
-    "max_ideas": 200,
-    "language": "en",
-    "country": "us"
-  }'
-```
-
-### 🐍 Python SDK Integration
-
-```python
-from apify_client import ApifyClient
-
-# Initialize the client
-client = ApifyClient("[YOUR_API_TOKEN]")
-
-# Prepare Actor input with keyword ideas generation
-run_input = {
-    "keywords": ["digital marketing", "seo", "content strategy"],
-    "ideas": True,
-    "max_ideas": 300,
-    "language": "en", 
-    "country": "us",
-    "metrics_start": "2024-01",
-    "metrics_end": "2025-01"
-}
-
-# Run the Actor and wait for it to finish
-run = client.actor("[ACTOR_ID]").call(run_input=run_input)
-
-# Fetch results from the run's dataset
-keywords_data = client.dataset(run["defaultDatasetId"]).list_items().items
-
-# Process your keyword data
-for keyword in keywords_data:
-    print(f"{keyword['keyword']}: {keyword['avg_monthly_searches']} searches/month")
-```
-
-### 🔔 Webhook Automation
-
-Automatically process results when the Actor finishes:
-
-```json
-{
-  "eventTypes": ["ACTOR.RUN.SUCCEEDED"],
-  "requestUrl": "https://your-website.com/webhook/keywords",
-  "payloadTemplate": {
-    "actorRunId": "{{resource.id}}",
-    "datasetId": "{{resource.defaultDatasetId}}",
-    "status": "{{resource.status}}"
-  }
-}
-```
-
-### 📊 Popular Integrations
-
-- **Google Sheets**: Export to spreadsheets for team collaboration
-- **Airtable**: Organize keyword data in structured databases  
-- **Slack/Discord**: Get notifications when analysis completes
-- **Zapier**: Connect to 5,000+ apps and services
-- **Power BI/Tableau**: Create keyword performance dashboards
 
 ## Troubleshooting
 
-### ❓ Common Questions
+### Common Questions
 
 **"No results for my keywords"**
-- ✅ Verify keywords are in the target language
-- ✅ Try broader or more popular seed keywords
-- ✅ Check if the language/country combination is valid
+- Verify keywords are in the target language
+- Try broader or more popular seed keywords
+- Check if the language/country combination is valid
 
 **"Keywords format error"**  
-- ✅ Ensure keywords are provided as an array: `["keyword1", "keyword2"]`
-- ✅ Check that at least one keyword is provided
-- ✅ Remove special characters or excessive punctuation
+- Ensure keywords are provided as an array: `["keyword1", "keyword2"]`
+- Check that at least one keyword is provided
+- Remove special characters or excessive punctuation
 
 **"Language/Geographic code not recognized"**
-- ✅ Use standard ISO codes: `"en"` for English, `"us"` for United States
-- ✅ Check that language and country use consistent formatting
-- ✅ Refer to the Quick Reference section above for valid codes
-- ✅ Try common codes like `"en"` (English) or `"us"` (USA)
+- Use standard ISO codes: `"en"` for English, `"us"` for United States
+- Check that language and country use consistent formatting
+- Refer to the Quick Reference section above for valid codes
+- Try common codes like `"en"` (English) or `"us"` (USA)
 
 **"Ideas generation taking too long"**
-- ✅ Reduce `max_ideas` to 100-500 for faster processing
-- ✅ Use more specific seed keywords to narrow results
-- ✅ Consider disabling ideas generation (`ideas: false`) for quick keyword analysis only
+- Reduce `max_ideas` to 100-500 for faster processing
+- Use more specific seed keywords to narrow results
+- Consider disabling ideas generation (`ideas: false`) for quick keyword analysis only
 
 **"Ideas generation not working"**
-- ✅ Ensure you have 20 or fewer seed keywords (idea generation is limited to 20 keywords)
-- ✅ Check that `ideas` is set to `true` in your input
-- ✅ Verify `max_ideas` is set to a reasonable number (100-1000)
-- ✅ If you have more than 20 keywords, the system automatically disables idea generation
-- ✅ Try using `url` parameter instead for URL-based keyword generation
+- Ensure you have 20 or fewer seed keywords (idea generation is limited to 20 keywords)
+- Check that `ideas` is set to `true` in your input
+- Verify `max_ideas` is set to a reasonable number (100-1000)
+- If you have more than 20 keywords, the system automatically disables idea generation
+- Try using `url` parameter instead for URL-based keyword generation
 
 **"URL-based keyword generation not working"**
-- ✅ Ensure the URL is accessible and returns a valid webpage
-- ✅ Use complete URLs including https:// for landing pages
-- ✅ For whole-site analysis, use domain-only format (e.g., "example.com") and set `whole_site: true`
-- ✅ Check that the website has sufficient content for keyword extraction
+- Ensure the URL is accessible and returns a valid webpage
+- Use complete URLs including https:// for landing pages
+- For whole-site analysis, use domain-only format (e.g., "example.com") and set `whole_site: true`
+- Check that the website has sufficient content for keyword extraction
 
 **"No historical data returned"**
-- ✅ Ensure both `metrics_start` and `metrics_end` are provided
-- ✅ Use valid date range within the last 4 years
-- ✅ Check that keywords have sufficient search volume for historical data
-- ✅ Try broader or more popular keywords
+- Ensure both `metrics_start` and `metrics_end` are provided
+- Use valid date range within the last 4 years
+- Check that keywords have sufficient search volume for historical data
+- Try broader or more popular keywords
 
 **"Actor run failed or timed out"**
-- ✅ Reduce the number of seed keywords (try 10-20 keywords max for idea generation)
-- ✅ Decrease `max_ideas` to limit keyword expansion
-- ✅ Try simpler, more common keywords first
-- ✅ Wait a few minutes and try again
-
-**"Should I provide my own Customer ID?"**
-- ✅ **Leave empty** for most use cases - Graphext's internal customer provides full access
-- ✅ **Provide your own** only if you need data from your specific Google Ads account
-- ✅ **Ensure access** if using your own ID, make sure it has Google Ads API access enabled
+- Reduce the number of seed keywords (try 10-20 keywords max for idea generation)
+- Decrease `max_ideas` to limit keyword expansion
+- Try simpler, more common keywords first
+- Wait a few minutes and try again
 
 **"Invalid date range error"**
-- ✅ Use YYYY-MM format: `"2024-01"` not `"January 2024"`
-- ✅ Ensure start date is before end date
-- ✅ Keep within last 4 years (Google Ads API limitation)
-- ✅ Don't use future dates for end date
-- ✅ Maximum 2-year range between start and end dates
+- Use YYYY-MM format: `"2024-01"` not `"January 2024"`
+- Ensure start date is before end date
+- Keep within last 4 years (Google Ads API limitation)
+- Don't use future dates for end date
+- Maximum 2-year range between start and end dates
 
 **"Google Ads API date error"**
-- ✅ Try more recent dates (within last 18-24 months)
-- ✅ Use current month or previous month as end date
-- ✅ Check that date format is exactly YYYY-MM
-- ✅ Verify month is valid (01-12, not 13 or 00)
+- Try more recent dates (within last 18-24 months)
+- Use current month or previous month as end date
+- Check that date format is exactly YYYY-MM
+- Verify month is valid (01-12, not 13 or 00)
 
-### 📞 Need More Help?
-
-1. **Check your input format** using the examples above
-2. **Review the Getting Started section** for proper usage
-3. **Try the provided example inputs** to test functionality
-4. **Contact support** through Apify platform if issues persist
-
-### 🔧 Advanced Troubleshooting
-
-**For power users and developers:**
-- Monitor the Actor run logs for detailed error messages
-- Verify API quotas and rate limits haven't been exceeded
-- Test with minimal input first, then scale up
-- Check the dataset output even if the run shows warnings
-
-**Performance optimization:**
-- Use more specific seed keywords for faster processing
-- Limit historical date ranges when possible  
-- Consider running multiple smaller batches instead of one large batch
-- Use URL-based generation for very specific keyword discovery
-
----
-
-*Made with ❤️ by Graphext for the SEO and PPC community*
-
-**Ready to supercharge your keyword research?** Start analyzing keywords now and discover new opportunities with Google's authoritative keyword data!
