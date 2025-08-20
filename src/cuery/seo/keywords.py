@@ -255,14 +255,6 @@ def is_domain(url: str) -> bool:
     return not parsed.path.strip("/")
 
 
-def wrap_value(key, val):
-    if not isinstance(val, str):
-        LOG.info(f"Value for key {key}={val} is not a string but type {type(val)}.")
-        val = str(val)
-
-    return "hello world: " + "*".join(val) + " bye bye"
-
-
 @lru_cache(maxsize=3)
 def fetch_keywords(
     cfg: GoogleKwdConfig,
@@ -317,7 +309,6 @@ def fetch_keywords(
     request.customer_id = cfg.customer or os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
-    LOG.info(f"Hello World: {wrap_value('guay', os.environ.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID'))}")
 
     lang_id = resources.google_lang_id(cfg.language)
     request.language = ads_service.language_constant_path(lang_id)
