@@ -213,10 +213,15 @@ def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClie
                 json.dump(json_key, fp)
                 fp.flush()
                 config["json_key_file_path"] = fp.name
+                safe_config = {
+                    k: v for k, v in config.items() if k not in ("json_key", "developer_token")
+                }
+                LOG.info(f"Connecting to Google Ads API with credentials dict:\n{safe_config}")
                 client = GoogleAdsClient.load_from_dict(config)
 
             return client  # noqa: RET504
 
+        LOG.info(f"Connecting to Google Ads API with credentials dict:\n{config}")
         return GoogleAdsClient.load_from_dict(config)
 
     if isinstance(config, str | Path):
@@ -304,6 +309,10 @@ def fetch_keywords(
     request.customer_id = cfg.customer or os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
+    LOG.info(f"Configured customer ID: {request.customer_id}")
+    LOG.info(f"cfg.customer: {cfg.customer}")
+    LOG.info(f"env.GOOGLE_ADS_CUSTOMER_ID: {os.environ.get('GOOGLE_ADS_CUSTOMER_ID')}")
+    LOG.info(f"env.GOOGLE_ADS_LOGIN_CUSTOMER_ID: {os.environ.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID')}")
 
     lang_id = resources.google_lang_id(cfg.language)
     request.language = ads_service.language_constant_path(lang_id)
