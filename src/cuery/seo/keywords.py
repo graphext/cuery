@@ -317,10 +317,7 @@ def fetch_keywords(
     request.customer_id = cfg.customer or os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
-    LOG.info(f"Hello World 0: {wrap_value('0', request.customer_id)}")
-    LOG.info(f"Hello World 1: {wrap_value('1', cfg.customer)}")
-    LOG.info(f"Hello World 2: {wrap_value('2', os.environ.get('GOOGLE_ADS_CUSTOMER_ID'))}")
-    LOG.info(f"Hello World 3: {wrap_value('3', os.environ.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID'))}")
+    LOG.info(f"Hello World: {wrap_value('guay', os.environ.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID'))}")
 
     lang_id = resources.google_lang_id(cfg.language)
     request.language = ads_service.language_constant_path(lang_id)

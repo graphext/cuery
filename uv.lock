@@ -770,7 +770,7 @@ wheels = [
 
 [[package]]
 name = "cuery"
-version = "0.17.1"
+version = "0.17.3"
 source = { editable = "." }
 dependencies = [
     { name = "async-lru" },
@@ -824,7 +824,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "fastapi-mcp", specifier = ">=0.3.4" },
     { name = "glom", specifier = ">=24.11.0" },
-    { name = "google-ads", marker = "extra == 'seo'" },
+    { name = "google-ads", marker = "extra == 'seo'", specifier = "<28.0.0" },
     { name = "google-genai", specifier = ">=1.23.0,<1.24.0" },
     { name = "gradio", specifier = ">=5.9.1" },
     { name = "instructor", extras = ["anthropic", "google-genai"], specifier = ">=1.8.1" },
