@@ -4,8 +4,8 @@
     "collections": {
         "topics": {
             "title": "Topics",
-            "description": "Stores the extracted topic hierarchy for each dataset.",
-            "keyPrefix": "topics",
+            "description": "Stores the extracted topic hierarchy.",
+            "key": "topics",
             "contentTypes": [
                 "application/json"
             ]
