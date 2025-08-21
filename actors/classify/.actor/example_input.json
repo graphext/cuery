@@ -1,5 +1,5 @@
 {
-    "dataset_id": "y3wzszG9DojmcAbOs",
+    "dataset": "y3wzszG9DojmcAbOs",
     "categories": {
         "informational": "The search intent is to find information or learn about a topic.",
         "navigational": "The search intent is to navigate to a specific website or page.",

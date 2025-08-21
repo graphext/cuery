@@ -1,5 +1,5 @@
 {
-    "dataset_id": "y3wzszG9DojmcAbOs",
+    "dataset": "y3wzszG9DojmcAbOs",
     "model": "openai/gpt-4.1-mini",
     "entities": {
         "brand": "Company or brand names mentioned in the content",

@@ -4,10 +4,10 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "dataset_id": {
-            "title": "Dataset ID",
+        "dataset": {
+            "title": "Dataset",
             "type": "string",
-            "description": "The ID of the dataset containing the data records from which to extract entities.",
+            "description": "Dataset containing the data records to process. Either an Apify dataset ID or a URL to a parquet file.",
             "editor": "textfield"
         },
         "model": {
@@ -32,7 +32,7 @@
         }
     },
     "required": [
-        "dataset_id",
+        "dataset",
         "entities"
     ]
 }

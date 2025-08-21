@@ -4,10 +4,10 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "dataset_id": {
-            "title": "Apify Dataset ID",
+        "dataset": {
+            "title": "Dataset",
             "type": "string",
-            "description": "Dataset ID of input dataset in Apify platform",
+            "description": "Dataset containing the data records to process. Either an Apify dataset ID or a URL to a parquet file.",
             "editor": "textfield"
         },
         "model": {
@@ -78,6 +78,6 @@
         }
     },
     "required": [
-        "dataset_id"
+        "dataset"
     ]
 }

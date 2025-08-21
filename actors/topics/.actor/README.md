@@ -20,13 +20,13 @@ The actor extracts topics using generic AI instructions that don't assume any sp
 
 ## Input
 
-The actor requires an Apify dataset containing records with arbitrary attributes. You can specify which attributes to use for topic extraction, or use all available attributes.
+The actor requires an Apify dataset or a Parquet file containing records with arbitrary attributes. You can specify which attributes to use for topic extraction, or use all available attributes.
 
 ### Example Input
 
 ```json
 {
-  "dataset_id": "your-dataset-id",
+  "dataset": "your-dataset-id-or-url",
   "model": "openai/gpt-4.1",
   "attrs": ["title", "description", "category"],
   "n_topics": 8,
@@ -42,7 +42,7 @@ For SEO keyword topic extraction, you might use instructions similar to this:
 
 ```json
 {
-  "dataset_id": "your-dataset-id",
+  "dataset": "your-dataset-id-or-url",
   "instructions": "Data records represent Google search keywords and associated SERP data. Make sure to create topics relevant in the context of SEO keywords research, focusing on the semantic meaning of keywords and SERPS, commercial intent etc.",
   "attrs": ["keyword", "titles", "domains"]
 }
@@ -73,13 +73,13 @@ The actor outputs a hierarchical topic structure as a JSON object with key-value
 }
 ```
 
-The output is stored in the actor's key-value store with the key format: `topics-{dataset_id}`
+The output is stored in the actor's key-value store with the key format: `topics-{dataset_ref}`
 
 ## Configuration
 
 ### Core Parameters
 
-- **dataset_id**: Apify dataset ID containing your input data (required)
+- **dataset**: Apify dataset ID containing your input data or URL to Parquet file (required)
 - **model**: AI model for topic extraction (default: openai/gpt-3.5-turbo)
 - **attrs**: List of record attributes to use for topic extraction (optional - uses all if not specified)
 - **instructions**: Additional context and instructions for the AI model (highly recommended)

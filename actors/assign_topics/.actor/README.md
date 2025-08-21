@@ -15,13 +15,13 @@ This Apify actor assigns predefined topics and subtopics to keywords based on th
 
 The actor expects:
 
-1. **Dataset ID**: An Apify dataset containing keyword SERP data
+1. **Dataset**: ID of an Apify dataset containing keyword SERP data, or a URL of a Parquet file
 2. **Topic Hierarchy**: A JSON object defining topics and subtopics for classification
 3. **Configuration**: Options for text columns, extra context columns, and AI model selection
 
 ### Required Input Fields
 
-- `dataset_id`: The ID of the dataset containing keyword SERP data
+- `dataset`: ID of an Apify dataset containing keyword SERP data, or a URL of a Parquet file
 - `topics`: JSON object with topic hierarchy (main topics as keys, subtopics as arrays)
 
 ### Optional Input Fields

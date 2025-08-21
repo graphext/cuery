@@ -148,13 +148,16 @@ def build_input_schema(
     required: set[str] = set(schema.get("required", []))
 
     # Always require dataset_id
-    props["dataset_id"] = {
-        "title": "Dataset ID",
+    props["dataset"] = {
+        "title": "Dataset",
         "type": "string",
-        "description": "The ID of the dataset containing the data records to be processed.",
+        "description": (
+            "Dataset containing the data records to process. "
+            "Either an Apify dataset ID or the URL of a Parquet file."
+        ),
         "editor": "textfield",
     }
-    required.add("dataset_id")
+    required.add("dataset")
 
     for name, field_schema in (schema.get("properties") or {}).items():
         if name == "records":
@@ -300,7 +303,7 @@ def scaffold(spec: ScaffoldSpec) -> Path:  # noqa: PLR0912, PLR0915
     )
 
     # Example input
-    example: dict[str, Any] = {"dataset_id": "YOUR_DATASET_ID"}
+    example: dict[str, Any] = {"dataset": "YOUR_DATASET_ID"}
     try:
         schema = tool_cls.model_json_schema()
         for name, fs in (schema.get("properties") or {}).items():

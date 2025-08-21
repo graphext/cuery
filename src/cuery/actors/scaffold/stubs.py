@@ -45,7 +45,7 @@ README = """
 
 ## How it works
 
-- Fetches an Apify dataset by `dataset_id`
+- Fetches an Apify dataset by `dataset` (either an Apify ID or a Parquet file URL)
 - Runs the configured FlexTool over each record
 - Pushes the processed records to the default dataset
 """.lstrip()

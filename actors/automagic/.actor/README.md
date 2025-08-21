@@ -22,8 +22,8 @@ The Automagic Actor is a fully automated tool that can extract and structure any
 
 ### Required
 
-- **Dataset ID**: The ID of the Apify dataset containing your data records
-- **Instructions**: Detailed description of what information to extract and how to process the data
+- **dataset**: The ID of the Apify dataset containing your data records or the URL of a parquet file
+- **instructions**: Detailed description of what information to extract and how to process the data
 
 ### Optional
 

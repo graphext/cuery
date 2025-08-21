@@ -15,7 +15,7 @@ This Apify actor performs general classification of data records/rows using AI. 
 
 ### Required Input Fields
 
-- `dataset_id`: The ID of the dataset containing data records to classify
+- `dataset`: The ID of the Apify dataset containing data records to classify, or the URL of a Parquet file
 - `categories`: Dictionary of category labels and their descriptions
 
 ### Optional Input Fields

@@ -16,7 +16,7 @@ This Apify actor extracts entities from data records/rows using AI. It can ident
 
 ### Required Input Fields
 
-- `dataset_id`: The ID of the dataset containing data records from which to extract entities
+- `dataset`: The ID of the Apify dataset containing data records from which to extract entities, or the URL of a Parquet file
 - `entities`: Dictionary of entity category names and their descriptions
 
 ### Optional Input Fields
@@ -59,7 +59,7 @@ Define your own entity categories by providing a dictionary of category names an
 
 ```json
 {
-  "dataset_id": "your-dataset-id-here",
+  "dataset": "your-dataset-ref-here",
   "model": "openai/gpt-3.5-turbo",
   "entities": {
     "brand": "Company or brand names mentioned in the content",

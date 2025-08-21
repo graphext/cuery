@@ -16,7 +16,7 @@ This Apify actor performs general scoring of data records/rows using AI. It can 
 
 ### Required Input Fields
 
-- `dataset_id`: The ID of the dataset containing data records to score
+- `dataset`: The ID of the dataset containing data records to score, or the URL of a Parquet file
 - `name`: Name of the score to assign (becomes the column name in output)
 - `min`: Minimum value of the score range
 - `max`: Maximum value of the score range
