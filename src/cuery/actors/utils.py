@@ -18,6 +18,7 @@ async def fetch_apify_dataset(
     force_cloud: bool = True,
 ) -> DataFrame:
     """Fetch a dataset from Apify and return it as a DataFrame."""
+    LOG.info(f"Fetching Apify dataset with id '{id}'")
     if isinstance(source, ApifyClientAsync):
         dataset = source.dataset(dataset_id=id)
     else:
@@ -33,6 +34,7 @@ def fetch_parquet_dataset(url: str, columns: list[str] | None = None) -> DataFra
     Since we can't validate column names before fetching, we try to read the dataset
     with and without specifying them.
     """
+    LOG.info(f"Fetching Parquet dataset from '{url}' with columns {columns}")
     try:
         return pd.read_parquet(url, columns=columns)
     except Exception:
@@ -57,6 +59,9 @@ async def run_flex_tool(Actor: ActorClass, Tool: FlexToolClass, **kwargs):
         df = fetch_parquet_dataset(dataset_ref, columns=columns)
     else:
         df = await fetch_apify_dataset(source=Actor, id=dataset_ref)
+
+    LOG.info(f"Got dataset\n{df}")
+    LOG.info(f"Executing tool {Tool.__name__} with config {json.dumps(config, indent=2)}")
 
     tool = Tool(records=df, **config)
     result = await tool(**kwargs)

@@ -1,13 +1,15 @@
 {
-    "dataset": "y3wzszG9DojmcAbOs",
-    "name": "purchase_probability",
-    "type": "integer",
-    "min": 0,
-    "max": 10,
-    "description": "Estimate the probability of a purchase action based on the keyword and its associated attributes. The score should be between 0 and 10, where 0 means no purchase probability and 10 means very high purchase probability. Consider the context of the keyword, its intent, and any other relevant attributes that might indicate a user's likelihood to purchase.",
-    "model": "openai/gpt-4.1-mini",
     "attrs": [
-        "term",
-        "titles"
-    ]
+        "Pclass",
+        "Name",
+        "Sex",
+        "Age"
+    ],
+    "dataset": "https://www.timestored.com/data/sample/titanic.parquet",
+    "description": "Estimate the probability of survival of the passenger on the titanic.",
+    "max": 1,
+    "min": 0,
+    "model": "openai/gpt-4.1-mini",
+    "name": "survival_probability",
+    "type": "float"
 }
