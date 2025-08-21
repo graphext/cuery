@@ -5,7 +5,7 @@
         "topics": {
             "title": "Topics",
             "description": "Stores the extracted topic hierarchy for each dataset.",
-            "keyPrefix": "topics-",
+            "keyPrefix": "topics",
             "contentTypes": [
                 "application/json"
             ]
