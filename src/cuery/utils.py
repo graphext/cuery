@@ -48,6 +48,11 @@ Missing = None | NAType | NpNa
 """Type hint for missing values."""
 
 
+def on_apify():
+    """Check if the code is running on Apify's platform."""
+    return os.environ.get("APIFY_IS_AT_HOME") == "1"
+
+
 def json_encode(obj: Any) -> Any:  # noqa: PLR0911
     """Convert a value to a JSON string."""
     if isinstance(obj, np.ndarray):

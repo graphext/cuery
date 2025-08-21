@@ -13,7 +13,10 @@ from tqdm.auto import tqdm
 from .context import iter_context
 from .prompt import Prompt
 from .response import Response, ResponseClass
-from .utils import LOG
+from .utils import LOG, on_apify
+
+TQDM_POSITION = -1 if on_apify() else None
+"""On Apify log each tqdm update on a separate line (line breaks trigger log updates)."""
 
 
 async def call(
@@ -77,21 +80,24 @@ async def iter_calls(
     context, total = iter_context(context, prompt.required)  # type: ignore
 
     results = []
-    with tqdm(desc="Iterating context", total=total) as pbar:
-        for c in context:
-            result = await call(
-                client,
-                prompt=prompt,
-                context=c,  # type: ignore
-                response_model=response_model,
-                **kwds,
-            )
-            results.append(result)
+    for c in tqdm(
+        context,
+        desc="Iterating context",
+        total=total,
+        position=TQDM_POSITION,
+        miniters=total / 100,
+    ):
+        result = await call(
+            client,
+            prompt=prompt,
+            context=c,  # type: ignore
+            response_model=response_model,
+            **kwds,
+        )
+        results.append(result)
 
-            if callback is not None:
-                callback(result, prompt, c)  # type: ignore
-
-            pbar.update(1)
+        if callback is not None:
+            callback(result, prompt, c)  # type: ignore
 
     return results
 
@@ -111,7 +117,7 @@ async def gather_calls(
 ) -> list[Response]:
     """Async iteration of prompt over iterable contexts."""
     sem = Semaphore(max_concurrent)
-    context, _ = iter_context(context, prompt.required)  # type: ignore
+    context, total = iter_context(context, prompt.required)  # type: ignore
     func = partial(
         rate_limited,
         func=call,
@@ -122,4 +128,10 @@ async def gather_calls(
         **kwds,
     )
     tasks = [func(context=c) for c in context]
-    return await async_tqdm.gather(*tasks, desc="Gathering responses", total=len(tasks))
+    return await async_tqdm.gather(
+        *tasks,
+        desc="Gathering responses",
+        total=len(tasks),
+        position=TQDM_POSITION,
+        miniters=total / 100,
+    )
