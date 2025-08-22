@@ -29,14 +29,23 @@ from pydantic_core import PydanticUndefinedType
 from tiktoken import Encoding, encoding_for_model, get_encoding
 
 from .cost import cost_per_token
-from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, RichHandler, Text
+from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, Text
 
-if not logging.getLogger("cuery").hasHandlers():
-    LOG = logging.getLogger("cuery")
-    LOG.addHandler(RichHandler(markup=False, show_path=False, enable_link_path=False))
-    LOG.setLevel(logging.INFO)
-else:
-    LOG = logging.getLogger("cuery")
+LOG = logging.getLogger("cuery")
+
+if LOG.hasHandlers():
+    LOG.handlers.clear()
+
+LOG.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+time_format = "%Y-%m-%d %H:%M:%S"
+formatter = logging.Formatter(
+    "%(asctime)s [%(name)s|%(levelname)s] %(message)s",
+    datefmt=time_format,
+)
+ch.setFormatter(formatter)
+LOG.addHandler(ch)
 
 
 DEFAULT_PATH = Path().home() / "Development/config/ai-api-keys.json"

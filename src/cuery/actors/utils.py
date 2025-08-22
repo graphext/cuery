@@ -6,10 +6,16 @@ from apify_client import ApifyClientAsync
 from pandas import DataFrame
 
 from ..tools.flex.base import FlexTool
-from ..utils import LOG
+from ..utils import LOG, json_encode
 
 ActorClass = type(Actor)
 FlexToolClass = type(FlexTool)
+
+DEFAULT_FLEX_CONFIG = {
+    "max_retries": 6,
+    "n_concurrent": 100,
+    "timeout": 10,
+}
 
 
 async def fetch_apify_dataset(
@@ -49,8 +55,13 @@ def fetch_parquet_dataset(url: str, columns: list[str] | None = None) -> DataFra
         raise
 
 
-async def run_flex_tool(Actor: ActorClass, Tool: FlexToolClass, **kwargs):
+async def run_flex_tool(
+    Actor: ActorClass,
+    Tool: FlexToolClass,
+    **kwargs,
+):
     """Run a flex tool with the given arguments."""
+    exec_config = DEFAULT_FLEX_CONFIG.copy() | (kwargs or {})
     config = await Actor.get_input()
 
     dataset_ref = config.pop("dataset")
@@ -60,11 +71,13 @@ async def run_flex_tool(Actor: ActorClass, Tool: FlexToolClass, **kwargs):
     else:
         df = await fetch_apify_dataset(source=Actor, id=dataset_ref)
 
-    LOG.info(f"Got dataset\n{df}")
-    LOG.info(f"Executing tool {Tool.__name__} with config {json.dumps(config, indent=2)}")
+    LOG.info(f"Got dataset\n{df}\n")
+    LOG.info(f"Executing tool '{Tool.__name__}'")
+    LOG.info(f"Tool config:\n {json.dumps(config, indent=2, default=json_encode)}")
+    LOG.info(f"Execution config:\n {json.dumps(exec_config, indent=2, default=json_encode)}")
 
     tool = Tool(records=df, **config)
-    result = await tool(**kwargs)
+    result = await tool(**exec_config)
     LOG.info(f"Result:\n{result}")
 
     records = json.loads(result.to_json(orient="records", date_format="iso", index=False))

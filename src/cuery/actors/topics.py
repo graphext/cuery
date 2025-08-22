@@ -7,7 +7,7 @@ from ..tools.flex import TopicExtractor
 from ..utils import LOG
 from .utils import fetch_apify_dataset, fetch_parquet_dataset
 
-MAX_RETRIES = 6
+MAX_RETRIES = 8
 
 
 async def main():
@@ -22,7 +22,7 @@ async def main():
             df = await fetch_apify_dataset(source=Actor, id=dataset_ref)
 
         extractor = TopicExtractor(records=df, **config)
-        topics = await extractor(max_retries=8)
+        topics = await extractor(max_retries=MAX_RETRIES)
 
         LOG.info("Extracted topic hierarchy")
         LOG.info(json.dumps(topics.to_dict(), indent=2))
