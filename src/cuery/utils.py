@@ -27,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 from tiktoken import Encoding, encoding_for_model, get_encoding
+from tqdm.auto import tqdm as auto_tqdm
 
 from .cost import cost_per_token
 from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, Text
@@ -55,6 +56,20 @@ BaseModelClass = type(BaseModel)
 NpNa = float
 Missing = None | NAType | NpNa
 """Type hint for missing values."""
+
+
+class progress(auto_tqdm):
+    """A tqdm progress bar that calls an external callback on each update."""
+
+    def __init__(self, *args, **kwds):
+        self.callback = kwds.pop("callback", None)
+        super().__init__(*args, **kwds)
+
+    def update(self, n=1):
+        displayed = super().update(n)
+        if displayed and self.callback is not None:
+            self.callback(self.format_dict)
+        return displayed
 
 
 def on_apify():

@@ -122,6 +122,7 @@ class Task:
         context: AnyContext | None = None,
         model: str | None = None,
         callback: Callable[[Response, Prompt, dict], None] | None = None,
+        progress_callback: Callable | None = None,
         **kwds,
     ) -> ResponseSet:
         """Iterate the prompt over items in the context.
@@ -144,6 +145,7 @@ class Task:
             callback=callback,
             log_prompt=self.log_prompt,
             log_response=self.log_response,
+            progress_callback=progress_callback,
             **kwds,
         )
 
@@ -157,6 +159,7 @@ class Task:
         context: AnyContext | None = None,
         model: str | None = None,
         n_concurrent: int = 1,
+        progress_callback: Callable | None = None,
         **kwds,
     ) -> ResponseSet:
         """Gather multiple calls to the task in parallel.
@@ -175,6 +178,7 @@ class Task:
             max_concurrent=n_concurrent,
             log_prompt=self.log_prompt,
             log_response=self.log_response,
+            progress_callback=progress_callback,
             **kwds,
         )
 

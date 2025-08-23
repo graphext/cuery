@@ -1,4 +1,5 @@
 import json
+from time import time
 
 import pandas as pd
 from apify import Actor
@@ -61,6 +62,15 @@ async def run_flex_tool(
     **kwargs,
 ):
     """Run a flex tool with the given arguments."""
+
+    async def set_progress_status(progress: dict):
+        n = progress.get("n", 0)
+        total = progress.get("total", "?")
+        msg = f"Processed: {n}/{total} rows."
+        await Actor.set_status_message(msg)
+
+    t0 = time()
+
     exec_config = DEFAULT_FLEX_CONFIG.copy() | (kwargs or {})
     config = await Actor.get_input()
 
@@ -77,8 +87,11 @@ async def run_flex_tool(
     LOG.info(f"Execution config:\n {json.dumps(exec_config, indent=2, default=json_encode)}")
 
     tool = Tool(records=df, **config)
-    result = await tool(**exec_config)
+    result = await tool(progress_callback=set_progress_status, **exec_config)
     LOG.info(f"Result:\n{result}")
 
     records = json.loads(result.to_json(orient="records", date_format="iso", index=False))
     await Actor.push_data(records)
+
+    t1 = time()
+    LOG.info(f"Done in {t1 - t0:.1f}s")

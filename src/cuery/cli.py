@@ -106,8 +106,6 @@ def set_env_vars(
             os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
             os.system(f"apify secrets add {key} '{value}'")  # noqa: S605
 
-    print(f"Environment variables set: {list(vars.keys())}")
-
     # Update .env file with the same variables if they don't already exist in the file
     if dotenv:
         fp = Path(".env")
