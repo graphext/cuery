@@ -7,6 +7,7 @@
         "urls": {
             "title": "Company URLs",
             "type": "array",
+            "description": "List of company homepage URLs to seed brand normalization (e.g., https://example.com).",
             "editor": "stringList",
             "prefill": [
                 "https://www.mapfre.es"
@@ -15,21 +16,29 @@
         "expand_competitors": {
             "title": "Expand competitors",
             "type": "boolean",
+            "description": "If true, adds a few heuristic competitor brands for comparison.",
+            "editor": "checkbox",
             "default": true
         },
         "sector": {
             "title": "Sector",
             "type": "string",
+            "description": "Industry or sector context for prompt generation (e.g., insurance, banking).",
+            "editor": "textfield",
             "default": "insurance"
         },
         "market": {
             "title": "Market",
             "type": "string",
+            "description": "Geographic market focus for prompts (e.g., Spain, Germany).",
+            "editor": "textfield",
             "default": "Spain"
         },
         "language": {
             "title": "Language (BCP-47)",
             "type": "string",
+            "description": "Prompt language as BCP-47 tag (e.g., es-ES, en-US).",
+            "editor": "textfield",
             "default": "es-ES"
         },
         "n_prompts": {
@@ -37,6 +46,8 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 200,
+            "description": "Number of localized commercial-intent prompts to generate.",
+            "editor": "number",
             "default": 30
         },
         "llms": {
@@ -55,17 +66,21 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 10,
+            "description": "How many times to run each prompt per LLM for stability checks.",
+            "editor": "number",
             "default": 5
         },
         "brand_overrides": {
             "title": "Brand overrides",
             "type": "array",
+            "description": "Optional overrides to add brand aliases or domains.",
+            "editor": "json",
             "items": {
                 "type": "object",
                 "properties": {
-                    "brand": { "type": "string" },
-                    "aliases": { "type": "array", "items": { "type": "string" } },
-                    "domains": { "type": "array", "items": { "type": "string" } }
+                    "brand": { "title": "Brand", "type": "string", "description": "Canonical brand name to override or add.", "editor": "textfield" },
+                    "aliases": { "title": "Aliases", "type": "array", "description": "Optional brand aliases for name-based mention detection.", "editor": "stringList", "items": { "type": "string" } },
+                    "domains": { "title": "Domains", "type": "array", "description": "Domain hosts used for URL-based mention detection (e.g., example.com).", "editor": "stringList", "items": { "type": "string" } }
                 },
                 "required": ["brand"]
             }
@@ -73,20 +88,27 @@
         "max_competitors": {
             "title": "Max competitors",
             "type": "integer",
+            "description": "Maximum number of competitors to include when expansion is enabled.",
+            "editor": "number",
             "default": 12
         },
         "random_seed": {
             "title": "Random seed",
             "type": "integer",
+            "description": "Deterministic seed for prompt generation and sampling.",
+            "editor": "number",
             "default": 42
         },
         "timeouts_sec": {
             "title": "Timeouts",
             "type": "object",
+            "description": "Per-operation timeouts in seconds for LLM calls and search.",
+            "editor": "json",
             "properties": {
-                "llm_call": { "type": "integer", "default": 45 },
-                "search": { "type": "integer", "default": 30 }
-            }
+                "llm_call": { "title": "LLM call timeout (sec)", "type": "integer", "description": "Timeout for a single LLM call (seconds).", "editor": "number" },
+                "search": { "title": "Search timeout (sec)", "type": "integer", "description": "Timeout for auxiliary search operations (seconds).", "editor": "number" }
+            },
+            "default": { "llm_call": 45, "search": 30 }
         }
     },
     "required": [

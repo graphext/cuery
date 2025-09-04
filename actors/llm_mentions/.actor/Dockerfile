@@ -5,13 +5,13 @@ FROM apify/actor-python:3.13
 RUN pip install uv
 
 # First install runtime deps needed by the actor
-RUN uv pip install --system "httpx~=0.27" "remove-accents~=0.1" "rapidfuzz~=3.9"
+# Dependencies are provided by the local project install below
 
 # Copy repository source (actor.json sets dockerContextDir to repo root)
 COPY . ./
 
-# Install local package to ensure cuery.actors.llm_mentions is present
-RUN uv pip install --system .
+# Install local package with SEO extras and httpx used by this actor
+RUN uv pip install --system ".[seo]" "httpx~=0.27"
 
 RUN useradd --create-home apify && chown -R apify:apify .
 USER apify

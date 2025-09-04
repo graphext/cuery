@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import asyncio
 import re
 import random
 import unicodedata
@@ -311,5 +312,9 @@ async def main() -> None:
                 "notes": notes[:10],
             },
         )
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
