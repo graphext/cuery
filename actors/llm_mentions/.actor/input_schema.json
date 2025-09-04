@@ -1,0 +1,100 @@
+{
+    "title": "LLM Mentions Auditor",
+    "description": "Generate localized commercial prompts, run them across multiple LLMs with repetitions, detect brand mentions by name and URL, and output a coverage matrix.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "urls": {
+            "title": "Company URLs",
+            "type": "array",
+            "editor": "stringList",
+            "prefill": [
+                "https://www.mapfre.es"
+            ]
+        },
+        "expand_competitors": {
+            "title": "Expand competitors",
+            "type": "boolean",
+            "default": true
+        },
+        "sector": {
+            "title": "Sector",
+            "type": "string",
+            "default": "insurance"
+        },
+        "market": {
+            "title": "Market",
+            "type": "string",
+            "default": "Spain"
+        },
+        "language": {
+            "title": "Language (BCP-47)",
+            "type": "string",
+            "default": "es-ES"
+        },
+        "n_prompts": {
+            "title": "Commercial queries to generate",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200,
+            "default": 30
+        },
+        "llms": {
+            "title": "Target LLMs",
+            "type": "array",
+            "editor": "stringList",
+            "description": "Identifiers like openai:gpt-4o, google:gemini-1.5-pro, perplexity:sonar-large",
+            "default": [
+                "openai:gpt-4o",
+                "google:gemini-1.5-pro",
+                "perplexity:sonar-large"
+            ]
+        },
+        "repetitions": {
+            "title": "Repetitions per LLM",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5
+        },
+        "brand_overrides": {
+            "title": "Brand overrides",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "brand": { "type": "string" },
+                    "aliases": { "type": "array", "items": { "type": "string" } },
+                    "domains": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["brand"]
+            }
+        },
+        "max_competitors": {
+            "title": "Max competitors",
+            "type": "integer",
+            "default": 12
+        },
+        "random_seed": {
+            "title": "Random seed",
+            "type": "integer",
+            "default": 42
+        },
+        "timeouts_sec": {
+            "title": "Timeouts",
+            "type": "object",
+            "properties": {
+                "llm_call": { "type": "integer", "default": 45 },
+                "search": { "type": "integer", "default": 30 }
+            }
+        }
+    },
+    "required": [
+        "urls",
+        "n_prompts",
+        "llms",
+        "repetitions"
+    ]
+}
+
+

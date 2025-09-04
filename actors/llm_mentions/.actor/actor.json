@@ -1,0 +1,26 @@
+{
+    "actorSpecification": 1,
+    "name": "llm-mentions-auditor",
+    "title": "LLM Mentions Auditor",
+    "description": "Generate localized commercial prompts, run them across multiple LLMs with repetitions, detect brand mentions by name and URL, and output a coverage matrix.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "dockerfile": "./Dockerfile",
+    "dockerContextDir": "../..",
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "main": "python -m cuery.actors.llm_mentions",
+    "readme": "./README.md",
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 4096,
+    "usesStandbyMode": false,
+    "environmentVariables": {
+        "OPENAI_API_KEY": "@OPENAI_API_KEY",
+        "GOOGLE_API_KEY": "@GOOGLE_API_KEY",
+        "PERPLEXITY_API_KEY": "@PERPLEXITY_API_KEY"
+    }
+}
+
+
