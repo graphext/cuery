@@ -133,6 +133,12 @@ async def generate_commercial_prompts(*, n: int, language: str, sector: str, mar
 async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, timeouts: dict) -> list[dict]:
     out: list[dict[str, Any]] = []
     timeout_sec = int((timeouts or {}).get("llm_call", 45))
+    total = max(1, len(prompts) * max(1, len(llms)) * max(1, int(repetitions)))
+    step = max(1, total // 20)
+    Actor.log.info(
+        f"Running LLMs: prompts={len(prompts)} llms={len(llms)} repetitions={repetitions} total_calls={total}"
+    )
+    idx = 0
     for prompt in prompts:
         for llm in llms:
             for r in range(1, int(repetitions) + 1):
@@ -143,6 +149,9 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
                     "repetition": r,
                     "response_text": text or "",
                 })
+                idx += 1
+                if idx % step == 0 or idx == total:
+                    Actor.log.info(f"LLM calls progress: {idx}/{total} ({int(idx/total*100)}%)")
     return out
 
 
@@ -257,6 +266,7 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
 async def main() -> None:
     async with Actor:
         actor_input = await Actor.get_input() or {}
+        Actor.log.info("Starting LLM Mentions Auditor run")
         notes: list[str] = [SYSTEM_PROMPT]
 
         urls = actor_input.get("urls", [])
@@ -273,12 +283,15 @@ async def main() -> None:
         timeouts_sec = actor_input.get("timeouts_sec", {"llm_call": 45, "search": 30})
 
         base_brands = await normalize_brands_from_urls(urls, notes)
+        Actor.log.info(f"Normalized {len(base_brands)} brands from URLs")
         brands = await merge_brand_overrides(base_brands, brand_overrides)
+        Actor.log.info(f"After overrides: {len(brands)} brands")
 
         if expand:
             brands = await expand_competitors(
                 brands, sector=sector, market=market, max_count=max_competitors, notes=notes
             )
+            Actor.log.info(f"After competitor expansion: {len(brands)} brands")
 
         prompts = await generate_commercial_prompts(
             n=n_prompts,
@@ -288,12 +301,15 @@ async def main() -> None:
             focus_brands=[b["brand"] for b in brands],
             random_seed=random_seed,
         )
+        Actor.log.info(f"Generated {len(prompts)} prompts")
 
         runs = await run_llms(
             prompts=prompts, llms=llms, repetitions=repetitions, timeouts=timeouts_sec
         )
+        Actor.log.info(f"Collected {len(runs)} responses from LLMs")
 
         result = await _aggregate_mentions_matrix(runs=runs, brands=brands)
+        Actor.log.info(f"Aggregated matrix rows: {len(result.get('matrix', []))}")
 
         # Persist artifacts (Apify KV store + Dataset)
         await Actor.set_value("brands.json", brands)
