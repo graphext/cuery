@@ -136,21 +136,109 @@ async def merge_brand_overrides(brands: list[dict], overrides: list[dict]) -> li
     return list(by.values())
 
 
-async def expand_competitors(brands: list[dict], *, sector: str, market: str, max_count: int, notes: list[str]) -> list[dict]:
-    if not brands:
+async def expand_competitors(
+    brands: list[dict],
+    *,
+    sector: str,
+    market: str,
+    max_count: int,
+    notes: list[str],
+    language: str | None = None,
+    urls: list[str] | None = None,
+    timeouts: dict | None = None,
+) -> list[dict]:
+    """Discover competitors using GPT-5 via OpenAI Responses (no fallback).
+
+    Returns original brands plus discovered competitors (up to max_count).
+    Does not synthesize placeholders when the model fails.
+    """
+    # Build instruction for LLM
+    seed_brands = ", ".join([b.get("brand", "").strip() for b in brands if b.get("brand")])
+    url_list = ", ".join((urls or [])[:10]) if urls else ""
+    instruction = (
+        f"Identify up to {max_count} real competitor brands for: [{seed_brands}] in sector '{sector}' within market '{market}'. "
+        f"Return a strict JSON array of objects with fields: brand (string), aliases (string[]), domains (string[]). "
+        f"Use each company's primary website domains (no social/aggregators). "
+        f"Only output the JSON array, nothing else. Context URLs (optional): [{url_list}]."
+    )
+
+    timeout_sec = int((timeouts or {}).get("llm_call", 45))
+    llm_id = "openai:gpt-5"
+    text, meta = await _call_llm(llm_id, instruction, timeout_sec, language)
+
+    # Parse JSON array of objects robustly
+    import json
+    import re as _re
+
+    def _extract_json_array_objs(s: str) -> list[dict]:
+        if not s:
+            return []
+        s2 = s.strip()
+        if s2.startswith("```") and s2.endswith("```"):
+            lines = s2.splitlines()
+            s2 = "\n".join(lines[1:-1])
+        m = _re.search(r"\[.*\]", s2, flags=_re.S)
+        if m:
+            try:
+                arr = json.loads(m.group(0))
+                return arr if isinstance(arr, list) else []
+            except Exception:
+                pass
+        try:
+            arr = json.loads(s2)
+            return arr if isinstance(arr, list) else []
+        except Exception:
+            return []
+
+    raw_items = _extract_json_array_objs(text)
+    comps: list[dict] = []
+    seen_names: set[str] = set()
+    for it in raw_items:
+        try:
+            brand_name = str(it.get("brand", "")).strip()
+            if not brand_name:
+                continue
+            key = brand_name.upper()
+            if key in seen_names:
+                continue
+            seen_names.add(key)
+            aliases = [brand_name, brand_name.lower(), *[str(a).strip() for a in (it.get("aliases") or []) if a]]
+            # Normalize domains, keep host-like strings, dedupe www/root
+            doms_in = [str(d).strip().lower() for d in (it.get("domains") or []) if d]
+            doms_norm: list[str] = []
+            for d in doms_in:
+                dd = d.removeprefix("www.")
+                if dd and dd not in doms_norm:
+                    doms_norm.append(dd)
+                w = f"www.{dd}" if dd else ""
+                if dd and w not in doms_norm:
+                    # add www variant for URL regex detection later
+                    doms_norm.append(w)
+            comps.append({
+                "brand": key,
+                "aliases": sorted(set(a for a in aliases if a)),
+                "domains": [d for d in doms_norm if d],
+            })
+            if len(comps) >= max_count:
+                break
+        except Exception:
+            continue
+
+    if not comps:
+        # Do not fabricate placeholders; keep original brands
+        status = meta.get("status")
+        err = meta.get("error")
+        if err or status and status != 200:
+            notes.append(f"Competitor discovery via GPT-5 returned no results (status={status} error={err})")
+        else:
+            notes.append("Competitor discovery via GPT-5 returned no parseable results")
         return brands
-    seed = brands[0]["brand"]
-    guesses = [f"{seed} COMP{i}" for i in range(1, 6)][: max_count]
-    comps = [
-        {
-            "brand": g,
-            "aliases": [g, g.lower()],
-            "domains": [f"{g.split()[0].lower()}.com"],
-        }
-        for g in guesses
-    ]
-    merged = {b["brand"]: b for b in [*brands, *comps]}
-    notes.append(f"Competitors guessed for demo: {[c['brand'] for c in comps]}")
+
+    merged = {b["brand"]: b for b in brands}
+    for c in comps:
+        if c["brand"] not in merged:
+            merged[c["brand"]] = c
+    notes.append(f"Competitors discovered via GPT-5: {[c['brand'] for c in comps]}")
     return list(merged.values())
 
 
@@ -670,7 +758,14 @@ async def main() -> None:
 
         if expand:
             brands = await expand_competitors(
-                brands, sector=sector, market=market, max_count=max_competitors, notes=notes
+                brands,
+                sector=sector,
+                market=market,
+                max_count=max_competitors,
+                notes=notes,
+                language=language,
+                urls=urls,
+                timeouts=timeouts_sec,
             )
             Actor.log.info(f"After competitor expansion: {len(brands)} brands")
 
