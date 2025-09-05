@@ -91,24 +91,73 @@ async def expand_competitors(brands: list[dict], *, sector: str, market: str, ma
 
 # ----------------------------- Helpers: prompts -----------------------------
 
-async def generate_commercial_prompts(*, n: int, language: str, sector: str, market: str, focus_brands: list[str], random_seed: int) -> list[str]:
+async def generate_commercial_prompts(
+    *,
+    n: int,
+    language: str,
+    sector: str,
+    market: str,
+    focus_brands: list[str],
+    urls: list[str],
+    llms: list[str],
+    timeouts: dict,
+    random_seed: int,
+) -> list[str]:
+    """Generate N realistic commercial/consumer search queries using an LLM meta-instruction.
+
+    Avoids hardcoded templates. Leverages the first configured LLM (or a default) to synthesize
+    localized prompts, returning a JSON array of strings. Includes deduplication.
+    """
     random.seed(int(random_seed))
-    yrs = ["2023", "2024", "2025"]
-    brand = focus_brands[0] if focus_brands else "brand"
-    templates = [
-        f"best {sector} providers in {market} {random.choice(yrs)}",
-        f"alternatives to {brand.lower()} in {market}",
-        f"{sector} prices and coverage {market}",
-        f"reviews and complaints about {sector} companies in {market}",
-        f"how to cancel {sector} policy and switch in {market}",
-        f"top {sector} for freelancers in {market} {random.choice(yrs)}",
-        f"ranking of {sector} companies in {market}",
-        f"{sector} for families in {market}",
-        f"{sector} for students in {market}",
-        f"{sector} with international coverage {market}",
-    ]
-    # Greedy sampling with simple near-duplicate filtering (RapidFuzz if available)
+    meta_llm = llms[0] if llms else "openai:gpt-4.1-mini"
+    lang = language or "en"
+    brand_list = ", ".join(focus_brands[:10]) if focus_brands else ""
+    url_list = ", ".join(urls[:10]) if urls else ""
+    instruction = (
+        f"Generate {n} unique, concise search queries in {lang} for consumer/commercial intent in the sector '{sector}' "
+        f"in market '{market}'. Cover realistic user intents like comparisons, transactional queries, alternatives, trust/regulatory, and location nuances. "
+        f"If brand context helps, consider these brands: [{brand_list}]. If helpful, infer from URLs: [{url_list}]. "
+        f"Strictly return a JSON array of strings. No numbering, no prose, no code fences."
+    )
+
+    timeout_sec = int((timeouts or {}).get("llm_call", 45))
+    text, _ = await _call_llm(meta_llm, instruction, timeout_sec, language)
+
+    # Parse JSON array robustly
+    import json
+    import re as _re
+
+    def _extract_json_array(s: str) -> list[str]:
+        if not s:
+            return []
+        s2 = s.strip()
+        # Remove code fences if present
+        if s2.startswith("```") and s2.endswith("```"):
+            lines = s2.splitlines()
+            s2 = "\n".join(lines[1:-1])
+        # Try to find first JSON array
+        m = _re.search(r"\[.*\]", s2, flags=_re.S)
+        if m:
+            try:
+                arr = json.loads(m.group(0))
+                if isinstance(arr, list):
+                    return [str(x).strip() for x in arr if isinstance(x, (str, int, float)) or isinstance(x, str)]
+            except Exception:
+                pass
+        # Try entire string
+        try:
+            arr = json.loads(s2)
+            if isinstance(arr, list):
+                return [str(x).strip() for x in arr if isinstance(x, (str, int, float)) or isinstance(x, str)]
+        except Exception:
+            return []
+        return []
+
+    candidates = _extract_json_array(text)
+
+    # Greedy deduplication
     bag: list[str] = []
+
     def similar(a: str, b: str) -> bool:
         try:
             from rapidfuzz import fuzz  # type: ignore
@@ -122,16 +171,27 @@ async def generate_commercial_prompts(*, n: int, language: str, sector: str, mar
                 return True
         return False
 
-    while len(bag) < int(n):
-        q = random.choice(templates)
-        if not is_dupe(q, bag):
+    for q in candidates:
+        if len(bag) >= int(n):
+            break
+        q = (q or "").strip()
+        if q and not is_dupe(q, bag):
             bag.append(q)
+
+    # If LLM returned fewer than requested, clone mild variants
+    i = 0
+    while len(bag) < int(n) and candidates:
+        base = (candidates[i % len(candidates)] or "").strip()
+        variant = base
+        if variant and not is_dupe(variant, bag):
+            bag.append(variant)
+        i += 1
     return bag
 
 
 # ------------------------------ Helpers: LLMs -------------------------------
 
-async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, timeouts: dict, max_concurrent: int) -> list[dict]:
+async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, timeouts: dict, max_concurrent: int, language: str) -> list[dict]:
     out: list[dict[str, Any]] = []
     timeout_sec = int((timeouts or {}).get("llm_call", 45))
     jobs: list[tuple[str, str, int]] = []
@@ -155,8 +215,12 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
 
     async def worker(job: tuple[str, str, int]) -> dict:
         prompt, llm, rep = job
+        started_at_unix = time.time()
+        started_perf = time.perf_counter()
         async with sem:
-            text, meta = await _call_llm(llm, prompt, timeout_sec)
+            text, meta = await _call_llm(llm, prompt, timeout_sec, language)
+        finished_perf = time.perf_counter()
+        finished_at_unix = time.time()
         record = {
             "prompt": prompt,
             "llm": llm,
@@ -168,6 +232,10 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
             "model": meta.get("model"),
             "response_preview": (text or "")[:200],
             "grounding_urls": meta.get("grounding_urls", []),
+            "language": language,
+            "started_at": started_at_unix,
+            "finished_at": finished_at_unix,
+            "duration_ms": int((finished_perf - started_perf) * 1000),
         }
         try:
             await runs_ds.push_data(record)
@@ -213,7 +281,7 @@ def _supports_gemini_grounding(model: str) -> bool:
     return ("gemini-2.5" in m) or ("gemini-1.5" in m)
 
 
-async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, dict]:
+async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | None = None) -> tuple[str, dict]:
     provider, model = _parse_llm_id(llm_id)
     if provider == "openai":
         key = os.environ["OPENAI_API_KEY"]
@@ -269,7 +337,9 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, di
                     headers={"Authorization": f"Bearer {key}"},
                     json={
                         "model": chat_model,
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": (
+                            [{"role": "system", "content": f"Answer in {language or 'the user language'} and keep responses concise."}] if language else []
+                        ) + [{"role": "user", "content": prompt}],
                         "temperature": 0.2,
                         "max_tokens": 800,
                     },
@@ -293,6 +363,9 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, di
                     else:
                         payload["tools"] = [{"google_search_retrieval": {}}]
                 payload["generationConfig"] = {"temperature": 0.3}
+                if language:
+                    payload["safetySettings"] = []
+                    payload["systemInstruction"] = {"parts": [{"text": f"Responde en {language} con baja verbosidad."}]}
                 try:
                     rr = await client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
@@ -332,7 +405,21 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, di
                         if isinstance(val, str):
                             for m in re.findall(r"https?://[\w\-\./%#?=&]+", val):
                                 urls.append(m)
-                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+                # Resolve Vertex redirectors (without making network calls) by decoding 'q' param when present
+                def resolve_vertex(u: str) -> str:
+                    try:
+                        from urllib.parse import urlparse, parse_qs
+                        pu = urlparse(u)
+                        if pu.netloc.endswith("vertexsearch.cloud.google.com") and (pu.path.startswith("/grounding-api-redirect/") or pu.path.startswith("/grounding-api-redirect")):
+                            q = parse_qs(pu.query).get("q")
+                            if q and isinstance(q, list) and q[0]:
+                                return q[0]
+                        return u
+                    except Exception:
+                        return u
+
+                resolved = [resolve_vertex(u) for u in urls]
+                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(resolved))}
 
             # Try with grounding; if unsupported, retry without tools
             text, meta = await call_gemini(with_grounding=True)
@@ -429,6 +516,7 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
 
 async def main() -> None:
     async with Actor:
+        overall_started = time.perf_counter()
         actor_input = await Actor.get_input() or {}
         Actor.log.info("Starting LLM Mentions Auditor run")
         notes: list[str] = [SYSTEM_PROMPT]
@@ -463,6 +551,9 @@ async def main() -> None:
             sector=sector,
             market=market,
             focus_brands=[b["brand"] for b in brands],
+            urls=urls,
+            llms=llms,
+            timeouts=timeouts_sec,
             random_seed=random_seed,
         )
         Actor.log.info(f"Generated {len(prompts)} prompts")
@@ -473,10 +564,13 @@ async def main() -> None:
             repetitions=repetitions,
             timeouts=timeouts_sec,
             max_concurrent=int(actor_input.get("max_concurrent", 16)),
+            language=language,
         )
         Actor.log.info(f"Collected {len(runs)} responses from LLMs")
 
         result = await _aggregate_mentions_matrix(runs=runs, brands=brands)
+        overall_ms = int((time.perf_counter() - overall_started) * 1000)
+        Actor.log.info(f"Total runtime: {overall_ms} ms")
         Actor.log.info(f"Aggregated matrix rows: {len(result.get('matrix', []))}")
 
         # Persist artifacts (Apify KV store + Dataset)
@@ -485,14 +579,21 @@ async def main() -> None:
         await Actor.set_value("runs.json", runs)
         for row in result["matrix"]:
             await Actor.push_data(row)
-        await Actor.set_value("stats.json", result["stats"])
+        # Add timing stats
+        result_stats = dict(result["stats"])
+        result_stats["timing_ms"] = {
+            "total": overall_ms,
+            "per_call_p50": int(sorted(r.get("duration_ms", 0) for r in runs)[len(runs)//2]) if runs else 0,
+            "per_call_p95": int(sorted(r.get("duration_ms", 0) for r in runs)[max(0, int(len(runs)*0.95)-1)]) if runs else 0,
+        }
+        await Actor.set_value("stats.json", result_stats)
         await Actor.set_value("notes.json", notes)
         await Actor.set_value(
             "OUTPUT",
             {
                 "brands": brands,
                 "promptsCount": len(prompts),
-                "stats": result["stats"],
+                "stats": result_stats,
                 "notes": notes[:10],
             },
         )
