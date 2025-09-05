@@ -139,16 +139,29 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
         f"Running LLMs: prompts={len(prompts)} llms={len(llms)} repetitions={repetitions} total_calls={total}"
     )
     idx = 0
+    # Open a secondary dataset to stream per-call progress
+    runs_ds = await Actor.open_dataset(name="runs")
     for prompt in prompts:
         for llm in llms:
             for r in range(1, int(repetitions) + 1):
-                text = await _call_llm(llm, prompt, timeout_sec)
-                out.append({
+                text, meta = await _call_llm(llm, prompt, timeout_sec)
+                record = {
                     "prompt": prompt,
                     "llm": llm,
                     "repetition": r,
                     "response_text": text or "",
-                })
+                    "status": meta.get("status"),
+                    "error": meta.get("error"),
+                    "provider": meta.get("provider"),
+                    "model": meta.get("model"),
+                    "response_preview": (text or "")[:200],
+                }
+                out.append(record)
+                # Stream partial result for visibility in Apify
+                try:
+                    await runs_ds.push_data(record)
+                except Exception:
+                    pass
                 idx += 1
                 if idx % step == 0 or idx == total:
                     Actor.log.info(f"LLM calls progress: {idx}/{total} ({int(idx/total*100)}%)")
@@ -175,7 +188,7 @@ def _supports_gemini_grounding(model: str) -> bool:
     return ("gemini-2.5" in m) or ("gemini-1.5" in m)
 
 
-async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> str:
+async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, dict]:
     provider, model = _parse_llm_id(llm_id)
     if provider == "openai":
         key = os.environ["OPENAI_API_KEY"]
@@ -190,9 +203,11 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> str:
                         "tools": [{"type": "web_search"}],
                     },
                 )
+                if r.status_code != 200:
+                    return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
                 j = r.json()
                 if isinstance(j, dict) and j.get("output_text"):
-                    return j["output_text"]
+                    return j["output_text"], {"status": r.status_code, "provider": provider, "model": model}
                 texts: list[str] = []
                 for item in j.get("output", []) or []:
                     if item.get("type") == "message":
@@ -201,28 +216,39 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> str:
                             if t:
                                 texts.append(t)
                 if texts:
-                    return "\n".join(texts)
+                    return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model}
                 # Fallback to chat completions if Responses format is not as expected
             r = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {key}"},
                 json={"model": model, "messages": [{"role": "user", "content": prompt}]},
             )
+            if r.status_code != 200:
+                return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
             j = r.json()
-            return j.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": model}
     if provider == "google":
         key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            payload: dict[str, Any] = {"contents": [{"parts": [{"text": prompt}]}]}
+            payload: dict[str, Any] = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
             if _supports_gemini_grounding(model):
                 payload["tools"] = [{"googleSearchRetrieval": {}}]
             r = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
                 json=payload,
             )
+            if r.status_code != 200:
+                return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
             j = r.json()
-            parts = j.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-            return " ".join([p.get("text", "") for p in parts])
+            # Prefer aggregated text across candidates
+            texts: list[str] = []
+            for cand in j.get("candidates", []) or []:
+                parts = cand.get("content", {}).get("parts", [])
+                for p in parts:
+                    t = p.get("text", "")
+                    if t:
+                        texts.append(t)
+            return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model}
     if provider == "perplexity":
         key = os.environ["PERPLEXITY_API_KEY"]
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
@@ -231,9 +257,11 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> str:
                 headers={"Authorization": f"Bearer {key}"},
                 json={"model": model, "messages": [{"role": "user", "content": prompt}]},
             )
+            if r.status_code != 200:
+                return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
             j = r.json()
-            return j.get("choices", [{}])[0].get("message", {}).get("content", "")
-    raise ValueError(f"Unsupported LLM id: {llm_id}")
+            return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": model}
+    return "", {"status": None, "error": f"Unsupported LLM id: {llm_id}", "provider": provider, "model": model}
 
 
 # --------------------------- Helpers: mentions/matrix ------------------------
