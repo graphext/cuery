@@ -155,6 +155,7 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
                     "provider": meta.get("provider"),
                     "model": meta.get("model"),
                     "response_preview": (text or "")[:200],
+                    "grounding_urls": meta.get("grounding_urls", []),
                 }
                 out.append(record)
                 # Stream partial result for visibility in Apify
@@ -180,11 +181,19 @@ def _parse_llm_id(llm_id: str) -> tuple[str, str]:
 
 def _supports_openai_grounding(model: str) -> bool:
     m = model.lower()
-    return ("gpt-5" in m) or ("gpt-4.1" in m)
+    # Responses web_search is supported on 4.1/5 families, but some SKUs (e.g. gpt-5-chat) may not expose tools.
+    # We'll enable grounding only for models explicitly known to support tools.
+    return any(x in m for x in [
+        "gpt-4.1-mini",  # supports responses
+        "gpt-4.1",       # supports responses
+        "gpt-5",         # some variants; we will further gate below
+    ]) and ("-chat" not in m)  # skip chat-only SKUs
 
 
 def _supports_gemini_grounding(model: str) -> bool:
     m = model.lower()
+    # googleSearchRetrieval is supported on 1.5/2.5 families, but not all endpoints/tiers accept it.
+    # If API returns 400 INVALID_ARGUMENT, we will retry without tools.
     return ("gemini-2.5" in m) or ("gemini-1.5" in m)
 
 
@@ -203,52 +212,80 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, di
                         "tools": [{"type": "web_search"}],
                     },
                 )
-                if r.status_code != 200:
-                    return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
-                j = r.json()
-                if isinstance(j, dict) and j.get("output_text"):
-                    return j["output_text"], {"status": r.status_code, "provider": provider, "model": model}
-                texts: list[str] = []
-                for item in j.get("output", []) or []:
-                    if item.get("type") == "message":
-                        for c in item.get("content", []) or []:
-                            t = c.get("text") or c.get("content") or ""
-                            if t:
-                                texts.append(t)
-                if texts:
-                    return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model}
+                if r.status_code == 200:
+                    j = r.json()
+                    urls: list[str] = []
+                    for ref in j.get("references", []) or []:
+                        u = ref.get("url") or ref.get("uri")
+                        if u:
+                            urls.append(u)
+                    if isinstance(j, dict) and j.get("output_text"):
+                        return j["output_text"], {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+                    texts: list[str] = []
+                    for item in j.get("output", []) or []:
+                        if item.get("type") == "message":
+                            for c in item.get("content", []) or []:
+                                t = c.get("text") or c.get("content") or ""
+                                if t:
+                                    texts.append(t)
+                                for ann in c.get("annotations", []) or []:
+                                    u = ann.get("url") or ann.get("file_path")
+                                    if u:
+                                        urls.append(u)
+                    if texts:
+                        return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
                 # Fallback to chat completions if Responses format is not as expected
             r = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {key}"},
-                json={"model": model, "messages": [{"role": "user", "content": prompt}]},
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "max_tokens": 800,
+                },
             )
             if r.status_code != 200:
                 return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
             j = r.json()
-            return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": model}
+            return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": []}
     if provider == "google":
         key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
-            payload: dict[str, Any] = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
-            if _supports_gemini_grounding(model):
-                payload["tools"] = [{"googleSearchRetrieval": {}}]
-            r = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
-                json=payload,
-            )
-            if r.status_code != 200:
-                return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
-            j = r.json()
-            # Prefer aggregated text across candidates
-            texts: list[str] = []
-            for cand in j.get("candidates", []) or []:
-                parts = cand.get("content", {}).get("parts", [])
-                for p in parts:
-                    t = p.get("text", "")
-                    if t:
-                        texts.append(t)
-            return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model}
+            async def call_gemini(with_grounding: bool) -> tuple[str, dict]:
+                payload: dict[str, Any] = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
+                if with_grounding and _supports_gemini_grounding(model):
+                    payload["tools"] = [{"googleSearchRetrieval": {}}]
+                payload["generationConfig"] = {"temperature": 0.3}
+                rr = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
+                    json=payload,
+                )
+                if rr.status_code != 200:
+                    return "", {"status": rr.status_code, "error": rr.text, "provider": provider, "model": model}
+                jj = rr.json()
+                texts: list[str] = []
+                urls: list[str] = []
+                for cand in jj.get("candidates", []) or []:
+                    parts = cand.get("content", {}).get("parts", [])
+                    for p in parts:
+                        t = p.get("text", "")
+                        if t:
+                            texts.append(t)
+                    gm = cand.get("groundingMetadata", {}) or {}
+                    for ga in gm.get("groundingAttributions", []) or []:
+                        u = (((ga.get("sourceId") or {}).get("web") or {}).get("uri"))
+                        if u:
+                            urls.append(u)
+                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+
+            # Try with grounding; if unsupported, retry without tools
+            text, meta = await call_gemini(with_grounding=True)
+            if meta.get("status") == 400 and ("INVALID_ARGUMENT" in (meta.get("error") or "") or "not supported" in (meta.get("error") or "").lower()):
+                text2, meta2 = await call_gemini(with_grounding=False)
+                if text2:
+                    return text2, meta2
+            return text, meta
     if provider == "perplexity":
         key = os.environ["PERPLEXITY_API_KEY"]
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
