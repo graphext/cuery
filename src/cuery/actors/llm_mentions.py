@@ -91,6 +91,26 @@ def _collect_urls_from_json(obj: Any) -> list[str]:
         return []
     return _dedupe(urls)
 
+# Specialized extractor for OpenAI Responses URL citations
+def _collect_openai_citation_urls(obj: Any) -> list[str]:
+    urls: list[str] = []
+    try:
+        if isinstance(obj, dict):
+            t = obj.get("type")
+            if isinstance(t, str) and t.lower() == "url_citation":
+                u = obj.get("url") or obj.get("uri")
+                if isinstance(u, str) and (u.startswith("http://") or u.startswith("https://")):
+                    urls.append(u)
+            for v in obj.values():
+                if isinstance(v, (dict, list)):
+                    urls.extend(_collect_openai_citation_urls(v))
+        elif isinstance(obj, list):
+            for it in obj:
+                urls.extend(_collect_openai_citation_urls(it))
+    except Exception:
+        return []
+    return _dedupe(urls)
+
 # ----------------------------- Helpers: brands ------------------------------
 
 def _norm_str(s: str) -> str:
@@ -451,23 +471,17 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     if r.status_code == 200:
                         j = r.json()
                         sources: list[str] = []
-                        # references array
+                        # 1) Explicit URL citations per OpenAI docs
+                        sources.extend(_collect_openai_citation_urls(j))
+                        # 2) references array (older/alternative placement)
                         for ref in j.get("references", []) or []:
                             u = ref.get("url") or ref.get("uri")
                             if u:
                                 sources.append(u)
-                        # output messages annotations
-                        for item in j.get("output", []) or []:
-                            if item.get("type") == "message":
-                                for c in item.get("content", []) or []:
-                                    for ann in c.get("annotations", []) or []:
-                                        u = ann.get("url") or ann.get("file_path")
-                                        if u:
-                                            sources.append(u)
-                        # also parse inline links from text if any
+                        # 3) inline links from output_text (markdown links, bare URLs)
                         inline = _extract_http_urls_from_text(j.get("output_text", ""))
                         sources.extend(inline)
-                        # Deep-scan JSON for any url/uri keys
+                        # 4) catch-all deep scan for url/uri keys
                         sources.extend(_collect_urls_from_json(j))
                         if isinstance(j, dict) and j.get("output_text"):
                             return j["output_text"], {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": [], "sources_urls": _dedupe(sources)}
@@ -479,10 +493,7 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                                     t = c.get("text") or c.get("content") or ""
                                     if t:
                                         texts.append(t)
-                                    for ann in c.get("annotations", []) or []:
-                                        u = ann.get("url") or ann.get("file_path")
-                                        if u:
-                                            sources.append(u)
+                                    # inline URLs in the text itself
                                     sources.extend(_extract_http_urls_from_text(t))
                         if texts:
                             # Also try to collect URLs from the full JSON response, just in case
