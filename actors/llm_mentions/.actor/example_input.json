@@ -8,13 +8,14 @@
     "language": "es-ES",
     "n_prompts": 4,
     "llms": [
-        "openai:gpt-5"
+        "openai:gpt-5",
+        "google:gemini-2.5-flash"
     ],
     "repetitions": 1,
     "brand_overrides": [],
     "max_competitors": 6,
     "random_seed": 42,
-    "timeouts_sec": { "llm_call": 55, "search": 30 }
+    "timeouts_sec": { "llm_call": 300, "search": 300 }
 }
 
 

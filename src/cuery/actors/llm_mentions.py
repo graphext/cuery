@@ -391,6 +391,7 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
         started_at_unix = time.time()
         started_perf = time.perf_counter()
         async with sem:
+            call_started_perf = time.perf_counter()
             text, meta = await _call_llm(llm, prompt, timeout_sec, language)
         finished_perf = time.perf_counter()
         finished_at_unix = time.time()
@@ -410,6 +411,7 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
             "started_at": _iso(started_at_unix),
             "finished_at": _iso(finished_at_unix),
             "duration_s": round((finished_perf - started_perf), 3),
+            "call_duration_s": round((finished_perf - call_started_perf), 3),
         }
         try:
             await runs_ds.push_data(record)
@@ -499,9 +501,12 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                             # Also try to collect URLs from the full JSON response, just in case
                             sources.extend(_collect_urls_from_json(j))
                             return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": [], "sources_urls": _dedupe(sources)}
+                    else:
+                        # Non-200: bubble up error body for visibility
+                        return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
                 except Exception as e:
-                    # No fallback behavior: return error
-                    return "", {"status": None, "error": f"responses_call_failed: {e}", "provider": provider, "model": model}
+                    # No fallback behavior: return error with exception type
+                    return "", {"status": None, "error": f"responses_call_failed: {type(e).__name__}: {e}", "provider": provider, "model": model}
 
             # No fallback behavior requested: do not call Chat Completions
             return "", {"status": None, "error": "no_fallback_chat_completions", "provider": provider, "model": model}
