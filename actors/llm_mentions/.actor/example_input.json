@@ -3,7 +3,7 @@
         "https://www.mapfre.es"
     ],
     "expand_competitors": true,
-    "sector": "insurance",
+    "sector": "seguro de hogar",
     "market": "Spain",
     "language": "es-ES",
     "n_prompts": 2,
@@ -11,7 +11,7 @@
         "google:gemini-2.5-flash",
         "google:gemini-2.5-pro",
         "openai:gpt-5",
-        "openai:gpt-5-chat"
+        "openai:gpt-5-chat-latest"
     ],
     "repetitions": 1,
     "brand_overrides": [],

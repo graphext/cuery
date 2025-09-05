@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from typing import Any
 
 import httpx
+import time
 from apify import Actor
 
 
@@ -130,42 +131,57 @@ async def generate_commercial_prompts(*, n: int, language: str, sector: str, mar
 
 # ------------------------------ Helpers: LLMs -------------------------------
 
-async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, timeouts: dict) -> list[dict]:
+async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, timeouts: dict, max_concurrent: int) -> list[dict]:
     out: list[dict[str, Any]] = []
     timeout_sec = int((timeouts or {}).get("llm_call", 45))
-    total = max(1, len(prompts) * max(1, len(llms)) * max(1, int(repetitions)))
-    step = max(1, total // 20)
-    Actor.log.info(
-        f"Running LLMs: prompts={len(prompts)} llms={len(llms)} repetitions={repetitions} total_calls={total}"
-    )
-    idx = 0
-    # Open a secondary dataset to stream per-call progress
-    runs_ds = await Actor.open_dataset(name="runs")
+    jobs: list[tuple[str, str, int]] = []
     for prompt in prompts:
         for llm in llms:
             for r in range(1, int(repetitions) + 1):
-                text, meta = await _call_llm(llm, prompt, timeout_sec)
-                record = {
-                    "prompt": prompt,
-                    "llm": llm,
-                    "repetition": r,
-                    "response_text": text or "",
-                    "status": meta.get("status"),
-                    "error": meta.get("error"),
-                    "provider": meta.get("provider"),
-                    "model": meta.get("model"),
-                    "response_preview": (text or "")[:200],
-                    "grounding_urls": meta.get("grounding_urls", []),
-                }
-                out.append(record)
-                # Stream partial result for visibility in Apify
-                try:
-                    await runs_ds.push_data(record)
-                except Exception:
-                    pass
-                idx += 1
-                if idx % step == 0 or idx == total:
-                    Actor.log.info(f"LLM calls progress: {idx}/{total} ({int(idx/total*100)}%)")
+                jobs.append((prompt, llm, r))
+
+    total = len(jobs)
+    step = max(1, total // 20)
+    Actor.log.info(
+        f"Running LLMs concurrently: prompts={len(prompts)} llms={len(llms)} repetitions={repetitions} total_calls={total} max_concurrent={max_concurrent}"
+    )
+
+    # Open a secondary dataset to stream per-call progress, unique per run to avoid collisions
+    ds_name = f"runs-{int(time.time())}"
+    runs_ds = await Actor.open_dataset(name=ds_name)
+
+    sem = asyncio.Semaphore(max(1, int(max_concurrent)))
+    idx = 0
+
+    async def worker(job: tuple[str, str, int]) -> dict:
+        prompt, llm, rep = job
+        async with sem:
+            text, meta = await _call_llm(llm, prompt, timeout_sec)
+        record = {
+            "prompt": prompt,
+            "llm": llm,
+            "repetition": rep,
+            "response_text": text or "",
+            "status": meta.get("status"),
+            "error": meta.get("error"),
+            "provider": meta.get("provider"),
+            "model": meta.get("model"),
+            "response_preview": (text or "")[:200],
+            "grounding_urls": meta.get("grounding_urls", []),
+        }
+        try:
+            await runs_ds.push_data(record)
+        except Exception:
+            pass
+        return record
+
+    tasks = [asyncio.create_task(worker(j)) for j in jobs]
+    for fut in asyncio.as_completed(tasks):
+        rec = await fut
+        out.append(rec)
+        idx += 1
+        if idx % step == 0 or idx == total:
+            Actor.log.info(f"LLM calls progress: {idx}/{total} ({int(idx/total*100)}%)")
     return out
 
 
@@ -202,65 +218,88 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, di
     if provider == "openai":
         key = os.environ["OPENAI_API_KEY"]
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            # Try Responses with web_search when supported
             if _supports_openai_grounding(model):
+                try:
+                    r = await client.post(
+                        "https://api.openai.com/v1/responses",
+                        headers={"Authorization": f"Bearer {key}"},
+                        json={
+                            "model": model,
+                            "input": prompt,
+                            "tools": [{"type": "web_search"}],
+                        },
+                    )
+                    if r.status_code == 200:
+                        j = r.json()
+                        urls: list[str] = []
+                        for ref in j.get("references", []) or []:
+                            u = ref.get("url") or ref.get("uri")
+                            if u:
+                                urls.append(u)
+                        if isinstance(j, dict) and j.get("output_text"):
+                            return j["output_text"], {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+                        texts: list[str] = []
+                        for item in j.get("output", []) or []:
+                            if item.get("type") == "message":
+                                for c in item.get("content", []) or []:
+                                    t = c.get("text") or c.get("content") or ""
+                                    if t:
+                                        texts.append(t)
+                                    for ann in c.get("annotations", []) or []:
+                                        u = ann.get("url") or ann.get("file_path")
+                                        if u:
+                                            urls.append(u)
+                        if texts:
+                            return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+                except Exception as e:
+                    Actor.log.warning(f"OpenAI Responses failed ({model}): {e}; falling back to Chat Completions")
+                # otherwise fall through to Chat Completions
+
+            # Fallback / default: Chat Completions
+            chat_model = model
+            m = model.lower()
+            if "gpt-5" in m and "-chat" not in m:
+                chat_model = "gpt-5-chat"
+            elif "gpt-4.1" in m and "mini" not in m:
+                chat_model = "gpt-4.1-mini"
+            try:
                 r = await client.post(
-                    "https://api.openai.com/v1/responses",
+                    "https://api.openai.com/v1/chat/completions",
                     headers={"Authorization": f"Bearer {key}"},
                     json={
-                        "model": model,
-                        "input": prompt,
-                        "tools": [{"type": "web_search"}],
+                        "model": chat_model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.2,
+                        "max_tokens": 800,
                     },
                 )
-                if r.status_code == 200:
-                    j = r.json()
-                    urls: list[str] = []
-                    for ref in j.get("references", []) or []:
-                        u = ref.get("url") or ref.get("uri")
-                        if u:
-                            urls.append(u)
-                    if isinstance(j, dict) and j.get("output_text"):
-                        return j["output_text"], {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
-                    texts: list[str] = []
-                    for item in j.get("output", []) or []:
-                        if item.get("type") == "message":
-                            for c in item.get("content", []) or []:
-                                t = c.get("text") or c.get("content") or ""
-                                if t:
-                                    texts.append(t)
-                                for ann in c.get("annotations", []) or []:
-                                    u = ann.get("url") or ann.get("file_path")
-                                    if u:
-                                        urls.append(u)
-                    if texts:
-                        return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
-                # Fallback to chat completions if Responses format is not as expected
-            r = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {key}"},
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.2,
-                    "max_tokens": 800,
-                },
-            )
-            if r.status_code != 200:
-                return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": model}
-            j = r.json()
-            return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": []}
+                if r.status_code != 200:
+                    return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": chat_model}
+                j = r.json()
+                return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": chat_model, "grounding_urls": []}
+            except Exception as e:
+                return "", {"status": None, "error": f"chat.completions error: {e}", "provider": provider, "model": chat_model}
     if provider == "google":
         key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
             async def call_gemini(with_grounding: bool) -> tuple[str, dict]:
                 payload: dict[str, Any] = {"contents": [{"role": "user", "parts": [{"text": prompt}]}]}
                 if with_grounding and _supports_gemini_grounding(model):
-                    payload["tools"] = [{"googleSearchRetrieval": {}}]
+                    m = model.lower()
+                    # Per Google docs: gemini-2.x uses google_search; 1.5 uses google_search_retrieval
+                    if "gemini-2.5" in m or "gemini-2." in m:
+                        payload["tools"] = [{"google_search": {}}]
+                    else:
+                        payload["tools"] = [{"google_search_retrieval": {}}]
                 payload["generationConfig"] = {"temperature": 0.3}
-                rr = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
-                    json=payload,
-                )
+                try:
+                    rr = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
+                        json=payload,
+                    )
+                except Exception as e:
+                    return "", {"status": None, "error": f"gemini request error: {e}", "provider": provider, "model": model}
                 if rr.status_code != 200:
                     return "", {"status": rr.status_code, "error": rr.text, "provider": provider, "model": model}
                 jj = rr.json()
@@ -273,10 +312,26 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> tuple[str, di
                         if t:
                             texts.append(t)
                     gm = cand.get("groundingMetadata", {}) or {}
+                    # 1) Primary: groundingAttributions -> sourceId.web.uri
                     for ga in gm.get("groundingAttributions", []) or []:
-                        u = (((ga.get("sourceId") or {}).get("web") or {}).get("uri"))
+                        src = (((ga.get("sourceId") or {}).get("web") or {}).get("uri"))
+                        if src:
+                            urls.append(src)
+                        # Sometimes appears directly under .web.uri
+                        src2 = ((ga.get("web") or {}).get("uri"))
+                        if src2:
+                            urls.append(src2)
+                    # 2) Alternative: citations list
+                    for cit in cand.get("citationMetadata", {}).get("citations", []) or []:
+                        u = cit.get("uri") or cit.get("url")
                         if u:
                             urls.append(u)
+                    # 3) Fallback: parse any URL-like strings in searchEntryPoint fields
+                    sep = gm.get("searchEntryPoint") or {}
+                    for val in (sep.values() if isinstance(sep, dict) else []):
+                        if isinstance(val, str):
+                            for m in re.findall(r"https?://[\w\-\./%#?=&]+", val):
+                                urls.append(m)
                 return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
 
             # Try with grounding; if unsupported, retry without tools
@@ -413,7 +468,11 @@ async def main() -> None:
         Actor.log.info(f"Generated {len(prompts)} prompts")
 
         runs = await run_llms(
-            prompts=prompts, llms=llms, repetitions=repetitions, timeouts=timeouts_sec
+            prompts=prompts,
+            llms=llms,
+            repetitions=repetitions,
+            timeouts=timeouts_sec,
+            max_concurrent=int(actor_input.get("max_concurrent", 16)),
         )
         Actor.log.info(f"Collected {len(runs)} responses from LLMs")
 
