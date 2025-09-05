@@ -6,12 +6,9 @@
     "sector": "seguro de hogar",
     "market": "Spain",
     "language": "es-ES",
-    "n_prompts": 2,
+    "n_prompts": 4,
     "llms": [
-        "google:gemini-2.5-flash",
-        "google:gemini-2.5-pro",
-        "openai:gpt-5",
-        "openai:gpt-5-chat-latest"
+        "openai:gpt-5"
     ],
     "repetitions": 1,
     "brand_overrides": [],
@@ -19,5 +16,6 @@
     "random_seed": 42,
     "timeouts_sec": { "llm_call": 55, "search": 30 }
 }
+
 
 

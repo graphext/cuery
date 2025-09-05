@@ -42,10 +42,54 @@ def _format_ms(ms: int) -> str:
     return f"{ms} ms"
 
 def _iso(ts_unix: float) -> str:
+    """Return ISO 8601 UTC timestamp to seconds precision."""
     try:
-        return datetime.fromtimestamp(ts_unix, tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(ts_unix, tz=timezone.utc).replace(microsecond=0).isoformat()
     except Exception:
         return ""
+
+
+def _dedupe(urls: list[str]) -> list[str]:
+    seen = set()
+    out: list[str] = []
+    for u in urls:
+        if u and u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
+def _extract_http_urls_from_text(text: str) -> list[str]:
+    if not text:
+        return []
+    try:
+        matches = re.findall(r"https?://[\w\-\./%#?=&]+", text)
+        return _dedupe(matches)
+    except Exception:
+        return []
+
+
+def _collect_urls_from_json(obj: Any) -> list[str]:
+    urls: list[str] = []
+    try:
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if isinstance(v, (str, bytes)):
+                    if isinstance(v, bytes):
+                        try:
+                            v = v.decode("utf-8", errors="ignore")  # type: ignore
+                        except Exception:
+                            continue
+                    if k.lower() in {"url", "uri", "source_url"} and str(v).startswith(("http://", "https://")):
+                        urls.append(str(v))
+                else:
+                    urls.extend(_collect_urls_from_json(v))
+        elif isinstance(obj, list):
+            for it in obj:
+                urls.extend(_collect_urls_from_json(it))
+    except Exception:
+        return []
+    return _dedupe(urls)
 
 # ----------------------------- Helpers: brands ------------------------------
 
@@ -253,6 +297,7 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
             "model": meta.get("model"),
             "response_preview": (text or "")[:200],
             "grounding_urls": meta.get("grounding_urls", []),
+            "sources_urls": meta.get("sources_urls", []),
             "language": language,
             "started_at": _iso(started_at_unix),
             "finished_at": _iso(finished_at_unix),
@@ -286,13 +331,9 @@ def _parse_llm_id(llm_id: str) -> tuple[str, str]:
 
 def _supports_openai_grounding(model: str) -> bool:
     m = model.lower()
-    # Responses web_search is supported on 4.1/5 families, but some SKUs (e.g. gpt-5-chat) may not expose tools.
-    # We'll enable grounding only for models explicitly known to support tools.
-    return any(x in m for x in [
-        "gpt-4.1-mini",  # supports responses
-        "gpt-4.1",       # supports responses
-        "gpt-5",         # some variants; we will further gate below
-    ]) and ("-chat" not in m)  # skip chat-only SKUs
+    # Responses web_search generally available on 4.1/5 families, including mini.
+    # We attempt Responses even for chat-labeled variants (we'll map to a base model name).
+    return ("gpt-4.1" in m) or ("gpt-5" in m)
 
 
 def _supports_gemini_grounding(model: str) -> bool:
@@ -321,14 +362,29 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     )
                     if r.status_code == 200:
                         j = r.json()
-                        urls: list[str] = []
+                        sources: list[str] = []
+                        # references array
                         for ref in j.get("references", []) or []:
                             u = ref.get("url") or ref.get("uri")
                             if u:
-                                urls.append(u)
+                                sources.append(u)
+                        # output messages annotations
+                        for item in j.get("output", []) or []:
+                            if item.get("type") == "message":
+                                for c in item.get("content", []) or []:
+                                    for ann in c.get("annotations", []) or []:
+                                        u = ann.get("url") or ann.get("file_path")
+                                        if u:
+                                            sources.append(u)
+                        # also parse inline links from text if any
+                        inline = _extract_http_urls_from_text(j.get("output_text", ""))
+                        sources.extend(inline)
+                        # Deep-scan JSON for any url/uri keys
+                        sources.extend(_collect_urls_from_json(j))
                         if isinstance(j, dict) and j.get("output_text"):
-                            return j["output_text"], {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+                            return j["output_text"], {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": [], "sources_urls": _dedupe(sources)}
                         texts: list[str] = []
+                        # reuse sources list for any additional links parsed from text
                         for item in j.get("output", []) or []:
                             if item.get("type") == "message":
                                 for c in item.get("content", []) or []:
@@ -338,39 +394,18 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                                     for ann in c.get("annotations", []) or []:
                                         u = ann.get("url") or ann.get("file_path")
                                         if u:
-                                            urls.append(u)
+                                            sources.append(u)
+                                    sources.extend(_extract_http_urls_from_text(t))
                         if texts:
-                            return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(urls))}
+                            # Also try to collect URLs from the full JSON response, just in case
+                            sources.extend(_collect_urls_from_json(j))
+                            return "\n".join(texts), {"status": r.status_code, "provider": provider, "model": model, "grounding_urls": [], "sources_urls": _dedupe(sources)}
                 except Exception as e:
-                    Actor.log.warning(f"OpenAI Responses failed ({model}): {e}; falling back to Chat Completions")
-                # otherwise fall through to Chat Completions
+                    # No fallback behavior: return error
+                    return "", {"status": None, "error": f"responses_call_failed: {e}", "provider": provider, "model": model}
 
-            # Fallback / default: Chat Completions
-            chat_model = model
-            m = model.lower()
-            if "gpt-5" in m and "-chat" not in m:
-                chat_model = "gpt-5-chat"
-            elif "gpt-4.1" in m and "mini" not in m:
-                chat_model = "gpt-4.1-mini"
-            try:
-                r = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {key}"},
-                    json={
-                        "model": chat_model,
-                        "messages": (
-                            [{"role": "system", "content": f"Answer in {language or 'the user language'} and keep responses concise."}] if language else []
-                        ) + [{"role": "user", "content": prompt}],
-                        "temperature": 0.2,
-                        "max_tokens": 800,
-                    },
-                )
-                if r.status_code != 200:
-                    return "", {"status": r.status_code, "error": r.text, "provider": provider, "model": chat_model}
-                j = r.json()
-                return j.get("choices", [{}])[0].get("message", {}).get("content", ""), {"status": r.status_code, "provider": provider, "model": chat_model, "grounding_urls": []}
-            except Exception as e:
-                return "", {"status": None, "error": f"chat.completions error: {e}", "provider": provider, "model": chat_model}
+            # No fallback behavior requested: do not call Chat Completions
+            return "", {"status": None, "error": "no_fallback_chat_completions", "provider": provider, "model": model}
     if provider == "google":
         key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
@@ -398,51 +433,122 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     return "", {"status": rr.status_code, "error": rr.text, "provider": provider, "model": model}
                 jj = rr.json()
                 texts: list[str] = []
-                urls: list[str] = []
+                sources: list[str] = []
+                goog_urls: list[str] = []
                 for cand in jj.get("candidates", []) or []:
                     parts = cand.get("content", {}).get("parts", [])
                     for p in parts:
                         t = p.get("text", "")
                         if t:
                             texts.append(t)
+                        # inline sources if any
+                        sources.extend(_extract_http_urls_from_text(t))
                     gm = cand.get("groundingMetadata", {}) or {}
                     # 1) Primary: groundingAttributions -> sourceId.web.uri
                     for ga in gm.get("groundingAttributions", []) or []:
                         src = (((ga.get("sourceId") or {}).get("web") or {}).get("uri"))
                         if src:
-                            urls.append(src)
+                            sources.append(src)
                         # Sometimes appears directly under .web.uri
                         src2 = ((ga.get("web") or {}).get("uri"))
                         if src2:
-                            urls.append(src2)
+                            sources.append(src2)
                     # 2) Alternative: citations list
                     for cit in cand.get("citationMetadata", {}).get("citations", []) or []:
                         u = cit.get("uri") or cit.get("url")
                         if u:
-                            urls.append(u)
-                    # 3) Fallback: parse any URL-like strings in searchEntryPoint fields
+                            sources.append(u)
+                    # 3) Grounding entrypoint (Google/Vertex links)
                     sep = gm.get("searchEntryPoint") or {}
                     for val in (sep.values() if isinstance(sep, dict) else []):
                         if isinstance(val, str):
                             for m in re.findall(r"https?://[\w\-\./%#?=&]+", val):
-                                urls.append(m)
+                                if "vertexai" in m or "vertexsearch" in m or "google.com" in m:
+                                    goog_urls.append(m)
                 # Resolve Vertex redirectors (without making network calls) by decoding 'q' param when present
                 def resolve_vertex(u: str) -> str:
                     try:
                         from urllib.parse import urlparse, parse_qs
+                        import base64
+                        import re as _re2
                         pu = urlparse(u)
-                        if pu.netloc.endswith("vertexsearch.cloud.google.com") and (pu.path.startswith("/grounding-api-redirect/") or pu.path.startswith("/grounding-api-redirect")):
+                        host = pu.netloc
+                        if (host.endswith("vertexsearch.cloud.google.com") or host.endswith("vertexaisearch.cloud.google.com")) and (
+                            pu.path.startswith("/grounding-api-redirect/") or pu.path.startswith("/grounding-api-redirect")
+                        ):
                             q = parse_qs(pu.query).get("q")
                             if q and isinstance(q, list) and q[0]:
                                 return q[0]
+                            # Try to decode last path segment as base64-url and extract first URL inside
+                            seg = pu.path.split("/")[-1]
+                            if seg:
+                                pad = "=" * ((4 - len(seg) % 4) % 4)
+                                try:
+                                    decoded = base64.urlsafe_b64decode((seg + pad).encode("utf-8"))
+                                    text = decoded.decode("utf-8", errors="ignore")
+                                    m = _re2.search(r"https?://[\w\-\./%#?=&]+", text)
+                                    if m:
+                                        return m.group(0)
+                                except Exception:
+                                    pass
                         return u
                     except Exception:
                         return u
 
-                resolved = [resolve_vertex(u) for u in urls]
-                # If any fallback/placeholder like SVG sneaks in, drop non-http(s) entries
-                resolved = [u for u in resolved if u.startswith("http://") or u.startswith("https://")]
-                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(resolved))}
+                # Keep Google grounding URLs as-is (vertex/google links), do not replace with source pages
+                # Also attempt to decode vertex redirector to a canonical Google URL when possible
+                resolved = [resolve_vertex(u) for u in goog_urls]
+
+                # Attempt HTTP resolution for Vertex redirectors that could not be decoded
+                async def _resolve_http(u: str) -> str:
+                    try:
+                        if not u:
+                            return u
+                        from urllib.parse import urlparse as _up
+                        pu = _up(u)
+                        if (pu.netloc.endswith("vertexsearch.cloud.google.com") or pu.netloc.endswith("vertexaisearch.cloud.google.com")) and (
+                            pu.path.startswith("/grounding-api-redirect/") or pu.path.startswith("/grounding-api-redirect")
+                        ):
+                            r0 = await client.get(u, follow_redirects=False, timeout=timeout_sec)
+                            loc = r0.headers.get("location") or r0.headers.get("Location")
+                            if loc:
+                                return loc
+                            r1 = await client.get(u, follow_redirects=True, timeout=timeout_sec)
+                            return str(r1.url)
+                        return u
+                    except Exception:
+                        return u
+
+                # Only attempt network resolution for those still on vertex domain
+                unresolved_idxs = []
+                for i, ru in enumerate(resolved):
+                    try:
+                        from urllib.parse import urlparse as _up
+                        pu = _up(ru)
+                        if pu.netloc.endswith("vertexsearch.cloud.google.com") or pu.netloc.endswith("vertexaisearch.cloud.google.com"):
+                            unresolved_idxs.append(i)
+                    except Exception:
+                        pass
+                if unresolved_idxs:
+                    tasks = [_resolve_http(resolved[i]) for i in unresolved_idxs[:10]]  # cap to 10 to avoid long delays
+                    http_resolved = await asyncio.gather(*tasks)
+                    for j, idx_i in enumerate(unresolved_idxs[:10]):
+                        resolved[idx_i] = http_resolved[j] or resolved[idx_i]
+
+                # Filter only http(s) and drop known placeholders (e.g., SVG namespace)
+                filtered: list[str] = []
+                for ru in resolved:
+                    if not (ru.startswith("http://") or ru.startswith("https://")):
+                        continue
+                    try:
+                        from urllib.parse import urlparse as _up
+                        ph = _up(ru)
+                        if ph.netloc == "www.w3.org" and ph.path.startswith("/2000/svg"):
+                            continue
+                    except Exception:
+                        pass
+                    filtered.append(ru)
+                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": _dedupe(filtered), "sources_urls": _dedupe([u for u in sources if u.startswith("http://") or u.startswith("https://")])}
 
             # Try with grounding; if unsupported, retry without tools
             text, meta = await call_gemini(with_grounding=True)
