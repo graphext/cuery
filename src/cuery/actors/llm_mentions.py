@@ -155,11 +155,54 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
     return out
 
 
+def _parse_llm_id(llm_id: str) -> tuple[str, str]:
+    if ":" in llm_id:
+        provider, model = llm_id.split(":", 1)
+        return provider.lower(), model
+    if "/" in llm_id:
+        provider, model = llm_id.split("/", 1)
+        return provider.lower(), model
+    raise ValueError(f"Unsupported LLM id format: {llm_id}")
+
+
+def _supports_openai_grounding(model: str) -> bool:
+    m = model.lower()
+    return ("gpt-5" in m) or ("gpt-4.1" in m)
+
+
+def _supports_gemini_grounding(model: str) -> bool:
+    m = model.lower()
+    return ("gemini-2.5" in m) or ("gemini-1.5" in m)
+
+
 async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> str:
-    if llm_id.startswith("openai:"):
+    provider, model = _parse_llm_id(llm_id)
+    if provider == "openai":
         key = os.environ["OPENAI_API_KEY"]
-        model = llm_id.split(":", 1)[1]
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            if _supports_openai_grounding(model):
+                r = await client.post(
+                    "https://api.openai.com/v1/responses",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={
+                        "model": model,
+                        "input": prompt,
+                        "tools": [{"type": "web_search"}],
+                    },
+                )
+                j = r.json()
+                if isinstance(j, dict) and j.get("output_text"):
+                    return j["output_text"]
+                texts: list[str] = []
+                for item in j.get("output", []) or []:
+                    if item.get("type") == "message":
+                        for c in item.get("content", []) or []:
+                            t = c.get("text") or c.get("content") or ""
+                            if t:
+                                texts.append(t)
+                if texts:
+                    return "\n".join(texts)
+                # Fallback to chat completions if Responses format is not as expected
             r = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {key}"},
@@ -167,20 +210,21 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int) -> str:
             )
             j = r.json()
             return j.get("choices", [{}])[0].get("message", {}).get("content", "")
-    if llm_id.startswith("google:"):
+    if provider == "google":
         key = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
-        model = llm_id.split(":", 1)[1]
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
+            payload: dict[str, Any] = {"contents": [{"parts": [{"text": prompt}]}]}
+            if _supports_gemini_grounding(model):
+                payload["tools"] = [{"googleSearchRetrieval": {}}]
             r = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
-                json={"contents": [{"parts": [{"text": prompt}]}]},
+                json=payload,
             )
             j = r.json()
             parts = j.get("candidates", [{}])[0].get("content", {}).get("parts", [])
             return " ".join([p.get("text", "") for p in parts])
-    if llm_id.startswith("perplexity:"):
+    if provider == "perplexity":
         key = os.environ["PERPLEXITY_API_KEY"]
-        model = llm_id.split(":", 1)[1]
         async with httpx.AsyncClient(timeout=timeout_sec) as client:
             r = await client.post(
                 "https://api.perplexity.ai/chat/completions",

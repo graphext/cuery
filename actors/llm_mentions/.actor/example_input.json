@@ -6,16 +6,18 @@
     "sector": "insurance",
     "market": "Spain",
     "language": "es-ES",
-    "n_prompts": 10,
+    "n_prompts": 2,
     "llms": [
-        "openai:gpt-4o",
-        "google:gemini-1.5-pro"
+        "google:gemini-2.5-flash",
+        "google:gemini-2.5-pro",
+        "openai:gpt-4.1-mini",
+        "openai:gpt-5-chat"
     ],
     "repetitions": 2,
     "brand_overrides": [],
     "max_competitors": 6,
     "random_seed": 42,
-    "timeouts_sec": { "llm_call": 45, "search": 30 }
+    "timeouts_sec": { "llm_call": 55, "search": 30 }
 }
 
 

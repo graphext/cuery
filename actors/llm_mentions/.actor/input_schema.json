@@ -54,11 +54,12 @@
             "title": "Target LLMs",
             "type": "array",
             "editor": "stringList",
-            "description": "Identifiers like openai:gpt-4o, google:gemini-1.5-pro, perplexity:sonar-large",
+            "description": "Identifiers like openai:gpt-4.1-mini, openai:gpt-5-chat, google:gemini-2.5-pro",
             "default": [
-                "openai:gpt-4o",
-                "google:gemini-1.5-pro",
-                "perplexity:sonar-large"
+                "google:gemini-2.5-flash",
+                "google:gemini-2.5-pro",
+                "openai:gpt-4.1-mini",
+                "openai:gpt-5-chat"
             ]
         },
         "repetitions": {
