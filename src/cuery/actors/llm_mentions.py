@@ -548,6 +548,7 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                         # inline sources if any
                         sources.extend(_extract_http_urls_from_text(t))
                     gm = cand.get("groundingMetadata", {}) or {}
+                    chunks = gm.get("groundingChunks", []) or []
                     # 1) Primary: groundingAttributions -> sourceId.web.uri
                     for ga in gm.get("groundingAttributions", []) or []:
                         src = (((ga.get("sourceId") or {}).get("web") or {}).get("uri"))
@@ -562,6 +563,18 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                         u = cit.get("uri") or cit.get("url")
                         if u:
                             sources.append(u)
+                    # 2b) Sources from groundingSupports indices -> groundingChunks[i].web.uri
+                    for sup in gm.get("groundingSupports", []) or []:
+                        for idx in sup.get("groundingChunkIndices", []) or []:
+                            try:
+                                ci = int(idx)
+                                ch = chunks[ci] if 0 <= ci < len(chunks) else None
+                                if ch:
+                                    u3 = (((ch.get("web") or {}).get("uri")))
+                                    if u3:
+                                        sources.append(u3)
+                            except Exception:
+                                continue
                     # 3) Grounding entrypoint (Google/Vertex links)
                     sep = gm.get("searchEntryPoint") or {}
                     for val in (sep.values() if isinstance(sep, dict) else []):
@@ -602,6 +615,9 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                 # Keep Google grounding URLs as-is (vertex/google links), do not replace with source pages
                 # Also attempt to decode vertex redirector to a canonical Google URL when possible
                 resolved = [resolve_vertex(u) for u in goog_urls]
+
+                # Resolve any vertex URLs that came via groundingSupports/chunks for sources
+                sources = [resolve_vertex(u) for u in sources]
 
                 # Attempt HTTP resolution for Vertex redirectors that could not be decoded
                 async def _resolve_http(u: str) -> str:
