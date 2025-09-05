@@ -600,14 +600,16 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                             seg = pu.path.split("/")[-1]
                             if seg:
                                 pad = "=" * ((4 - len(seg) % 4) % 4)
-                                try:
-                                    decoded = base64.urlsafe_b64decode((seg + pad).encode("utf-8"))
-                                    text = decoded.decode("utf-8", errors="ignore")
-                                    m = _re2.search(r"https?://[\w\-\./%#?=&]+", text)
-                                    if m:
-                                        return m.group(0)
-                                except Exception:
-                                    pass
+                                # Try raw base64 decode; if fails, try URL-decoding then base64
+                                for candidate in (seg, __import__("urllib.parse").parse.unquote(seg)):
+                                    try:
+                                        decoded = base64.urlsafe_b64decode((candidate + pad).encode("utf-8"))
+                                        text = decoded.decode("utf-8", errors="ignore")
+                                        m = _re2.search(r"https?://[\w\-\./%#?=&]+", text)
+                                        if m:
+                                            return m.group(0)
+                                    except Exception:
+                                        continue
                         return u
                     except Exception:
                         return u
@@ -650,9 +652,9 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     except Exception:
                         pass
                 if unresolved_idxs:
-                    tasks = [_resolve_http(resolved[i]) for i in unresolved_idxs[:10]]  # cap to 10 to avoid long delays
+                    tasks = [_resolve_http(resolved[i]) for i in unresolved_idxs]
                     http_resolved = await asyncio.gather(*tasks)
-                    for j, idx_i in enumerate(unresolved_idxs[:10]):
+                    for j, idx_i in enumerate(unresolved_idxs):
                         resolved[idx_i] = http_resolved[j] or resolved[idx_i]
 
                 # Also attempt network resolution for sources that remain on vertex domain
@@ -666,9 +668,9 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     except Exception:
                         pass
                 if src_unresolved_idxs:
-                    tasks2 = [_resolve_http(sources[i]) for i in src_unresolved_idxs[:10]]
+                    tasks2 = [_resolve_http(sources[i]) for i in src_unresolved_idxs]
                     http_resolved2 = await asyncio.gather(*tasks2)
-                    for j, idx_i in enumerate(src_unresolved_idxs[:10]):
+                    for j, idx_i in enumerate(src_unresolved_idxs):
                         sources[idx_i] = http_resolved2[j] or sources[idx_i]
 
                 # Filter only http(s) and drop known placeholders (e.g., SVG namespace)
