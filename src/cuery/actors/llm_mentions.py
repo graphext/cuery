@@ -11,6 +11,7 @@ from typing import Any
 
 import httpx
 import time
+from datetime import datetime, timezone
 from apify import Actor
 
 
@@ -25,6 +26,26 @@ SYSTEM_PROMPT = (
     "and log issues in notes. Be deterministic if random_seed provided."
 )
 
+
+# ----------------------------- Helpers: timing -------------------------------
+
+def _format_ms(ms: int) -> str:
+    seconds, ms_rem = divmod(int(ms), 1000)
+    minutes, secs = divmod(seconds, 60)
+    hours, mins = divmod(minutes, 60)
+    if hours:
+        return f"{hours}h {mins}m {secs}.{ms_rem:03d}s"
+    if minutes:
+        return f"{mins}m {secs}.{ms_rem:03d}s"
+    if seconds:
+        return f"{secs}.{ms_rem:03d}s"
+    return f"{ms} ms"
+
+def _iso(ts_unix: float) -> str:
+    try:
+        return datetime.fromtimestamp(ts_unix, tz=timezone.utc).isoformat()
+    except Exception:
+        return ""
 
 # ----------------------------- Helpers: brands ------------------------------
 
@@ -233,9 +254,9 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
             "response_preview": (text or "")[:200],
             "grounding_urls": meta.get("grounding_urls", []),
             "language": language,
-            "started_at": started_at_unix,
-            "finished_at": finished_at_unix,
-            "duration_ms": int((finished_perf - started_perf) * 1000),
+            "started_at": _iso(started_at_unix),
+            "finished_at": _iso(finished_at_unix),
+            "duration_s": round((finished_perf - started_perf), 3),
         }
         try:
             await runs_ds.push_data(record)
@@ -419,6 +440,8 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                         return u
 
                 resolved = [resolve_vertex(u) for u in urls]
+                # If any fallback/placeholder like SVG sneaks in, drop non-http(s) entries
+                resolved = [u for u in resolved if u.startswith("http://") or u.startswith("https://")]
                 return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": list(dict.fromkeys(resolved))}
 
             # Try with grounding; if unsupported, retry without tools
@@ -570,7 +593,7 @@ async def main() -> None:
 
         result = await _aggregate_mentions_matrix(runs=runs, brands=brands)
         overall_ms = int((time.perf_counter() - overall_started) * 1000)
-        Actor.log.info(f"Total runtime: {overall_ms} ms")
+        Actor.log.info(f"Total runtime: {overall_ms} ms (~{_format_ms(overall_ms)})")
         Actor.log.info(f"Aggregated matrix rows: {len(result.get('matrix', []))}")
 
         # Persist artifacts (Apify KV store + Dataset)
@@ -586,6 +609,8 @@ async def main() -> None:
             "per_call_p50": int(sorted(r.get("duration_ms", 0) for r in runs)[len(runs)//2]) if runs else 0,
             "per_call_p95": int(sorted(r.get("duration_ms", 0) for r in runs)[max(0, int(len(runs)*0.95)-1)]) if runs else 0,
         }
+        result_stats.setdefault("timing_human", {})
+        result_stats["timing_human"]["total"] = _format_ms(overall_ms)
         await Actor.set_value("stats.json", result_stats)
         await Actor.set_value("notes.json", notes)
         await Actor.set_value(
