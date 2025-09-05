@@ -655,6 +655,22 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     for j, idx_i in enumerate(unresolved_idxs[:10]):
                         resolved[idx_i] = http_resolved[j] or resolved[idx_i]
 
+                # Also attempt network resolution for sources that remain on vertex domain
+                src_unresolved_idxs = []
+                for i, su in enumerate(sources):
+                    try:
+                        from urllib.parse import urlparse as _up
+                        pu = _up(su)
+                        if pu.netloc.endswith("vertexsearch.cloud.google.com") or pu.netloc.endswith("vertexaisearch.cloud.google.com"):
+                            src_unresolved_idxs.append(i)
+                    except Exception:
+                        pass
+                if src_unresolved_idxs:
+                    tasks2 = [_resolve_http(sources[i]) for i in src_unresolved_idxs[:10]]
+                    http_resolved2 = await asyncio.gather(*tasks2)
+                    for j, idx_i in enumerate(src_unresolved_idxs[:10]):
+                        sources[idx_i] = http_resolved2[j] or sources[idx_i]
+
                 # Filter only http(s) and drop known placeholders (e.g., SVG namespace)
                 filtered: list[str] = []
                 for ru in resolved:
@@ -668,7 +684,20 @@ async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | 
                     except Exception:
                         pass
                     filtered.append(ru)
-                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": _dedupe(filtered), "sources_urls": _dedupe([u for u in sources if u.startswith("http://") or u.startswith("https://")])}
+                # Filter sources similarly
+                sources_filtered: list[str] = []
+                for su in sources:
+                    if not (su.startswith("http://") or su.startswith("https://")):
+                        continue
+                    try:
+                        from urllib.parse import urlparse as _up
+                        ph2 = _up(su)
+                        if ph2.netloc == "www.w3.org" and ph2.path.startswith("/2000/svg"):
+                            continue
+                    except Exception:
+                        pass
+                    sources_filtered.append(su)
+                return "\n".join(texts), {"status": rr.status_code, "provider": provider, "model": model, "grounding_urls": _dedupe(filtered), "sources_urls": _dedupe(sources_filtered)}
 
             # Try with grounding; if unsupported, retry without tools
             text, meta = await call_gemini(with_grounding=True)
