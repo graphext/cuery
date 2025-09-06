@@ -804,6 +804,8 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
     # Track prompts where each brand is detected (by name or by url)
     brand_to_prompts_by_name: dict[str, set[str]] = {b["brand"]: set() for b in brands}
     brand_to_prompts_by_url: dict[str, set[str]] = {b["brand"]: set() for b in brands}
+    # Track concrete URLs found per brand
+    brand_to_urls: dict[str, set[str]] = {b["brand"]: set() for b in brands}
     for p in prompts:
         row: dict[str, Any] = {"prompt": p}
         llms = {r["llm"] for r in runs if r["prompt"] == p}
@@ -815,6 +817,10 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
                 for hit in _detect_mentions(txt, brands):
                     merged[hit["brand"]]["by_name"] |= hit["by_name"]
                     merged[hit["brand"]]["by_url"] |= hit["by_url"]
+                    # accumulate direct URL hits from text
+                    for u in (hit.get("hits", {}).get("urls") or []):
+                        if isinstance(u, str) and u.lower().startswith(("http://", "https://")):
+                            brand_to_urls[hit["brand"]].add(u)
                 # Also count URL mentions from sources_urls metadata
                 srcs = rrun.get("sources_urls") or []
                 if srcs:
@@ -826,9 +832,22 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
                             base = str(d).lower().removeprefix("www.")
                             if not base:
                                 continue
-                            if any(base in u for u in srcs_lower):
+                            matched_any = False
+                            for i, u in enumerate(srcs_lower):
+                                if base in u:
+                                    merged[b["brand"]]["by_url"] = True
+                                    matched_any = True
+                                    # store original URL with original casing
+                                    try:
+                                        orig = (srcs[i] if isinstance(srcs, list) and i < len(srcs) else None)
+                                        if isinstance(orig, str) and orig.lower().startswith(("http://", "https://")):
+                                            brand_to_urls[b["brand"]].add(orig)
+                                    except Exception:
+                                        pass
+                                    # do not break; collect all matching URLs for brand
+                            if matched_any:
                                 merged[b["brand"]]["by_url"] = True
-                                break
+                                # continue checking remaining domains for more URLs
             for brand, flags in merged.items():
                 row[f"{llm}.{brand}.by_name"] = flags["by_name"]
                 row[f"{llm}.{brand}.by_url"] = flags["by_url"]
@@ -853,6 +872,7 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
                 "by_url": ratio(f"{b['brand']}.by_url"),
                 "prompts_by_name": sorted(brand_to_prompts_by_name[b["brand"]]),
                 "prompts_by_url": sorted(brand_to_prompts_by_url[b["brand"]]),
+                "urls_found": sorted(brand_to_urls[b["brand"]]),
             }
             for b in brands
         }
