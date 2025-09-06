@@ -367,6 +367,16 @@ async def generate_commercial_prompts(
 async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, timeouts: dict, max_concurrent: int, language: str) -> list[dict]:
     out: list[dict[str, Any]] = []
     timeout_sec = int((timeouts or {}).get("llm_call", 45))
+    # Reuse HTTP/2 clients per-provider to maximize throughput
+    limits = httpx.Limits(
+        max_connections=max(16, min(256, int(max_concurrent) * 4)),
+        max_keepalive_connections=max(8, int(max_concurrent) * 2),
+    )
+    client_map = {
+        "openai": httpx.AsyncClient(timeout=timeout_sec, http2=True, limits=limits),
+        "google": httpx.AsyncClient(timeout=timeout_sec, http2=True, limits=limits),
+        "perplexity": httpx.AsyncClient(timeout=timeout_sec, http2=True, limits=limits),
+    }
     jobs: list[tuple[str, str, int]] = []
     for prompt in prompts:
         for llm in llms:
@@ -392,7 +402,7 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
         started_perf = time.perf_counter()
         async with sem:
             call_started_perf = time.perf_counter()
-            text, meta = await _call_llm(llm, prompt, timeout_sec, language)
+            text, meta = await _call_llm(llm, prompt, timeout_sec, language, clients=client_map)
         finished_perf = time.perf_counter()
         finished_at_unix = time.time()
         record = {
@@ -420,12 +430,19 @@ async def run_llms(*, prompts: list[str], llms: list[str], repetitions: int, tim
         return record
 
     tasks = [asyncio.create_task(worker(j)) for j in jobs]
-    for fut in asyncio.as_completed(tasks):
-        rec = await fut
-        out.append(rec)
-        idx += 1
-        if idx % step == 0 or idx == total:
-            Actor.log.info(f"LLM calls progress: {idx}/{total} ({int(idx/total*100)}%)")
+    try:
+        for fut in asyncio.as_completed(tasks):
+            rec = await fut
+            out.append(rec)
+            idx += 1
+            if idx % step == 0 or idx == total:
+                Actor.log.info(f"LLM calls progress: {idx}/{total} ({int(idx/total*100)}%)")
+    finally:
+        for c in client_map.values():
+            try:
+                await c.aclose()
+            except Exception:
+                pass
     return out
 
 
@@ -453,7 +470,13 @@ def _supports_gemini_grounding(model: str) -> bool:
     return ("gemini-2.5" in m) or ("gemini-1.5" in m)
 
 
-async def _call_llm(llm_id: str, prompt: str, timeout_sec: int, language: str | None = None) -> tuple[str, dict]:
+async def _call_llm(
+    llm_id: str,
+    prompt: str,
+    timeout_sec: int,
+    language: str | None = None,
+    clients: dict | None = None,
+) -> tuple[str, dict]:
     provider, model = _parse_llm_id(llm_id)
     if provider == "openai":
         key = os.environ["OPENAI_API_KEY"]
