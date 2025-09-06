@@ -6,7 +6,8 @@
     "sector": "seguro de hogar",
     "market": "Spain",
     "language": "es-ES",
-    "n_prompts": 4,
+    "n_prompts": 10,
+    "prompts_include_competitors": "never",
     "llms": [
         "openai:gpt-5",
         "google:gemini-2.5-flash"

@@ -50,6 +50,14 @@
             "editor": "number",
             "default": 30
         },
+        "prompts_include_competitors": {
+            "title": "Include competitors in prompts",
+            "type": "string",
+            "enum": ["always", "sometimes", "never"],
+            "description": "Whether prompts should explicitly mention competitor brands: always, sometimes (default), or never.",
+            "editor": "select",
+            "default": "sometimes"
+        },
         "llms": {
             "title": "Target LLMs",
             "type": "array",

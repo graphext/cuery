@@ -119,6 +119,17 @@ def _norm_str(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+def _capitalize_first(text: str) -> str:
+    """Return string with only the first character capitalized and the rest lowercased.
+
+    Example: "MAPFRE" -> "Mapfre", "REALE SEGUROS" -> "Reale seguros".
+    """
+    if not text:
+        return text
+    t = str(text).strip()
+    return t[:1].upper() + t[1:].lower() if t else t
+
+
 async def normalize_brands_from_urls(urls: list[str], notes: list[str]) -> list[dict]:
     out: list[dict[str, Any]] = []
     for u in urls or []:
@@ -126,7 +137,7 @@ async def normalize_brands_from_urls(urls: list[str], notes: list[str]) -> list[
             host = urlparse(u).netloc or ""
             root = host.lower().removeprefix("www.")
             name_guess = root.split(".")[0] if root else ""
-            brand = name_guess.upper() if name_guess else (host or u)
+            brand = _capitalize_first(name_guess) if name_guess else (host or u)
             domains = [d for d in {root, host} if d]
             out.append({
                 "brand": brand,
@@ -218,11 +229,11 @@ async def expand_competitors(
             brand_name = str(it.get("brand", "")).strip()
             if not brand_name:
                 continue
-            key = brand_name.upper()
+            key = _capitalize_first(brand_name)
             if key in seen_names:
                 continue
             seen_names.add(key)
-            aliases = [brand_name, brand_name.lower(), *[str(a).strip() for a in (it.get("aliases") or []) if a]]
+            aliases = [key, key.lower(), brand_name, brand_name.lower(), *[str(a).strip() for a in (it.get("aliases") or []) if a]]
             # Normalize domains, keep host-like strings, dedupe www/root
             doms_in = [str(d).strip().lower() for d in (it.get("domains") or []) if d]
             doms_norm: list[str] = []
@@ -275,6 +286,7 @@ async def generate_commercial_prompts(
     llms: list[str],
     timeouts: dict,
     random_seed: int,
+    include_competitors: str | None = None,
 ) -> list[str]:
     """Generate N realistic commercial/consumer search queries using an LLM meta-instruction.
 
@@ -286,10 +298,19 @@ async def generate_commercial_prompts(
     lang = language or "en"
     brand_list = ", ".join(focus_brands[:10]) if focus_brands else ""
     url_list = ", ".join(urls[:10]) if urls else ""
+    policy = (include_competitors or "sometimes").lower()
+    if policy not in ("always", "sometimes", "never"):
+        policy = "sometimes"
+    comp_clause = ""
+    if policy == "always" and brand_list:
+        comp_clause = f" Always include at least one of these competitor brand names explicitly in every query: [{brand_list}]."
+    elif policy == "never":
+        comp_clause = " Do not mention any brand names explicitly; keep them implicit."
+
     instruction = (
         f"Generate {n} unique, concise search queries in {lang} for consumer/commercial intent in the sector '{sector}' "
         f"in market '{market}'. Cover realistic user intents like comparisons, transactional queries, alternatives, trust/regulatory, and location nuances. "
-        f"If brand context helps, consider these brands: [{brand_list}]. If helpful, infer from URLs: [{url_list}]. "
+        f"If brand context helps, consider these brands: [{brand_list}]. If helpful, infer from URLs: [{url_list}]." + comp_clause + " "
         f"Strictly return a JSON array of strings. No numbering, no prose, no code fences."
     )
 
@@ -780,6 +801,9 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
 
     prompts = list({r["prompt"] for r in runs})
     matrix: list[dict[str, Any]] = []
+    # Track prompts where each brand is detected (by name or by url)
+    brand_to_prompts_by_name: dict[str, set[str]] = {b["brand"]: set() for b in brands}
+    brand_to_prompts_by_url: dict[str, set[str]] = {b["brand"]: set() for b in brands}
     for p in prompts:
         row: dict[str, Any] = {"prompt": p}
         llms = {r["llm"] for r in runs if r["prompt"] == p}
@@ -793,6 +817,10 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
             for brand, flags in merged.items():
                 row[f"{llm}.{brand}.by_name"] = flags["by_name"]
                 row[f"{llm}.{brand}.by_url"] = flags["by_url"]
+                if flags["by_name"]:
+                    brand_to_prompts_by_name[brand].add(p)
+                if flags["by_url"]:
+                    brand_to_prompts_by_url[brand].add(p)
         matrix.append(row)
 
     def ratio(suffix: str) -> float:
@@ -808,6 +836,8 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
             b["brand"]: {
                 "by_name": ratio(f"{b['brand']}.by_name"),
                 "by_url": ratio(f"{b['brand']}.by_url"),
+                "prompts_by_name": sorted(brand_to_prompts_by_name[b["brand"]]),
+                "prompts_by_url": sorted(brand_to_prompts_by_url[b["brand"]]),
             }
             for b in brands
         }
@@ -865,6 +895,7 @@ async def main() -> None:
             llms=llms,
             timeouts=timeouts_sec,
             random_seed=random_seed,
+            include_competitors=str(actor_input.get("prompts_include_competitors", "sometimes")),
         )
         Actor.log.info(f"Generated {len(prompts)} prompts")
 
