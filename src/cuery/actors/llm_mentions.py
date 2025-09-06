@@ -795,9 +795,9 @@ def _detect_mentions(text: str, brands: list[dict]) -> list[dict]:
 
 
 async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) -> dict:
-    groups: dict[tuple[str, str], list[str]] = defaultdict(list)
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for r in runs:
-        groups[(r["prompt"], r["llm"])].append(r.get("response_text", ""))
+        groups[(r["prompt"], r["llm"])].append(r)
 
     prompts = list({r["prompt"] for r in runs})
     matrix: list[dict[str, Any]] = []
@@ -810,10 +810,25 @@ async def _aggregate_mentions_matrix(*, runs: list[dict], brands: list[dict]) ->
         for llm in llms:
             reps = groups[(p, llm)]
             merged = {b["brand"]: {"by_name": False, "by_url": False} for b in brands}
-            for txt in reps:
+            for rrun in reps:
+                txt = rrun.get("response_text", "")
                 for hit in _detect_mentions(txt, brands):
                     merged[hit["brand"]]["by_name"] |= hit["by_name"]
                     merged[hit["brand"]]["by_url"] |= hit["by_url"]
+                # Also count URL mentions from sources_urls metadata
+                srcs = rrun.get("sources_urls") or []
+                if srcs:
+                    srcs_lower = [s.lower() for s in srcs if isinstance(s, str)]
+                    for b in brands:
+                        if merged[b["brand"]]["by_url"]:
+                            continue
+                        for d in b.get("domains", []) or []:
+                            base = str(d).lower().removeprefix("www.")
+                            if not base:
+                                continue
+                            if any(base in u for u in srcs_lower):
+                                merged[b["brand"]]["by_url"] = True
+                                break
             for brand, flags in merged.items():
                 row[f"{llm}.{brand}.by_name"] = flags["by_name"]
                 row[f"{llm}.{brand}.by_url"] = flags["by_url"]
