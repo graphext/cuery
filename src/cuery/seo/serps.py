@@ -308,6 +308,11 @@ def flatten(lists: Iterable[list | None]) -> list:
     ]
 
 
+def unique(lst: list) -> list:
+    """Return a list of unique elements, preserving order."""
+    return list(dict.fromkeys(lst))
+
+
 def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
     """Aggregate organic results by term and apply aggregation functions."""
 
@@ -337,9 +342,9 @@ def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
         "titles": NamedAgg("title", list),
         "urls": NamedAgg("url", list),
         "descriptions": NamedAgg("description", list),
-        "domains": NamedAgg("domain", lambda ser: list(set(ser))),
-        "breadcrumbs": NamedAgg("breadcrumb", lambda ser: list(set(flatten(ser)))),
-        "emphasizedKeywords": NamedAgg("emphasizedKeywords", lambda ser: list(set(flatten(ser)))),
+        "domains": NamedAgg("domain", lambda ser: list),
+        "breadcrumbs": NamedAgg("breadcrumb", lambda ser: unique(flatten(ser))),
+        "emphasizedKeywords": NamedAgg("emphasizedKeywords", lambda ser: unique(flatten(ser))),
     }
 
     agg = df.groupby("term").agg(**agg_funcs).reset_index()  # type: ignore[call-overload]
@@ -350,14 +355,23 @@ def aggregate_organic_results(df: DataFrame, top_n=10) -> DataFrame:
     return agg.merge(topagg, on="term", how="left")
 
 
-def token_rank(tokens: str | list[str], texts: list[str] | None) -> int | None:
+def token_rank(
+    tokens: str | list[str],
+    texts: list[str] | None,
+    whole_word: bool = True,
+) -> int | None:
     """Find position of first occurrence of a token in a list of texts."""
+    if whole_word:
+        has_substr = lambda text, word: re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE)  # noqa: E731
+    else:
+        has_substr = lambda text, word: word.lower() in text.lower()  # noqa: E731
+
     if isinstance(texts, list):
         if isinstance(tokens, str):
             tokens = [tokens]
 
         for i, text in enumerate(texts):
-            if any(token.lower() in text.lower() for token in tokens):
+            if any(has_substr(text, token) for token in tokens):
                 return i + 1
 
     return None
@@ -498,7 +512,7 @@ def mentioned_in_string(
     text: str | None,
     whole_word: bool = True,
 ) -> list[str] | None:
-    """Check if the brand is mentioned in the text."""
+    """Return those words (brands) that are mentioned in the text."""
     if not text:
         return None
 
