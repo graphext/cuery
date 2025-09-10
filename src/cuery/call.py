@@ -5,12 +5,7 @@ from asyncio import Semaphore
 from collections.abc import Callable
 from functools import partial
 
-try:
-    # Older versions expose the client here
-    from instructor.client import Instructor
-except Exception:  # pragma: no cover - compatibility fallback
-    # Newer versions may expose Instructor at the top level
-    from instructor import Instructor  # type: ignore
+from instructor import Instructor
 from pandas import DataFrame
 from rich import print as pprint
 from tqdm.asyncio import tqdm as async_tqdm
