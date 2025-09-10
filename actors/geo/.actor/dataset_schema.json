@@ -1,0 +1,19 @@
+{
+    "actorSpecification": 1,
+    "title": "llm-monitor",
+    "views": {
+        "extracted": {
+            "title": "Extracted information",
+            "description": "Prompts with LLM search results and brand positioning.",
+            "transformation": {
+                "fields": [
+                    "*"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {}
+            }
+        }
+    }
+}
