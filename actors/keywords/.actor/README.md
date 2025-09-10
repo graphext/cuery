@@ -73,8 +73,8 @@ Configure your keyword analysis with these simple parameters:
 | `ideas` | Boolean | Generate additional keyword ideas (limited to ≤20 seed keywords) | Optional | `false` |
 | `max_ideas` | Integer | Maximum keyword ideas to generate (when `ideas` is enabled) | Optional | - |
 | `customer` | String | Google Ads Customer ID for API access | Optional | Uses environment variable |
-| `language` | String | Language code for targeting (e.g., "en", "es", "fr") | Optional | `"en"` |
-| `country` | String | Geographic target code (e.g., "us", "es", "uk") | Optional | `"us"` |
+| `language` | String | Language code for targeting (e.g., "en", "es", "fr") | Optional | `""` (all languages/keywords) |
+| `country` | String | Geographic target code (e.g., "us", "es", "uk") | Optional | `""` (all locations) |
 | `metrics_start` | String | Start date for historical metrics (YYYY-MM format) | Optional | - |
 | `metrics_end` | String | End date for historical metrics (YYYY-MM format) | Optional | - |
 
@@ -92,6 +92,8 @@ Configure your keyword analysis with these simple parameters:
 - `"ja"` - Japanese
 - `"zh"` - Chinese
 
+Leave empty to include keywords in all languages.
+
 **Most Common Geographic Codes:**
 - `"us"` - United States
 - `"uk"` - United Kingdom
@@ -104,6 +106,8 @@ Configure your keyword analysis with these simple parameters:
 - `"br"` - Brazil
 - `"mx"` - Mexico
 - `"jp"` - Japan
+
+Leave empty to include keywords from all regions/locations.
 
 **Historical Metrics Date Range:**
 - `metrics_start` and `metrics_end` control the historical data period
@@ -294,6 +298,7 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 - Verify keywords are in the target language
 - Try broader or more popular seed keywords
 - Check if the language/country combination is valid
+- Check target language is used in selected site (url)
 
 **"Keywords format error"**  
 - Ensure keywords are provided as an array: `["keyword1", "keyword2"]`

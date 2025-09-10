@@ -47,13 +47,13 @@
         "language": {
             "title": "Language Code",
             "type": "string",
-            "description": "The language to use for keyword data (e.g., ‘en’ for English).",
+            "description": "The language to use for keyword data (e.g., ‘en’ for English). Leave empty to include all languages.",
             "editor": "textfield"
         },
         "country": {
             "title": "Target Country",
             "type": "string",
-            "description": "The geographical target for keyword data (e.g., ‘us’ for United States).",
+            "description": "The geographical target for keyword data (e.g., ‘us’ for United States). Leave empty to not filter geographically.",
             "editor": "textfield"
         },
         "metrics_start": {

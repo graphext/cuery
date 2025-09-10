@@ -1,0 +1,25 @@
+{
+    "actorSpecification": 1,
+    "name": "llm-monitor",
+    "title": "LLM Monitor",
+    "description": "Generate localized commercial prompts, run them across multiple LLMs and detect brand mentions/ranks.",
+    "version": "0.1",
+    "buildTag": "latest",
+    "dockerfile": "./Dockerfile",
+    "dockerContextDir": "../..",
+    "input": "./input_schema.json",
+    "storages": {
+        "dataset": "./dataset_schema.json"
+    },
+    "main": "python -m cuery.actors.geo",
+    "readme": "./README.md",
+    "minMemoryMbytes": 256,
+    "maxMemoryMbytes": 4096,
+    "usesStandbyMode": false,
+    "environmentVariables": {
+        "OPENAI_API_KEY": "@OPENAI_API_KEY",
+        "GOOGLE_API_KEY": "@GOOGLE_API_KEY",
+        "XAI_API_KEY": "@XAI_API_KEY",
+        "DEEPSEEK_API_KEY": "@DEEPSEEK_API_KEY"
+    }
+}

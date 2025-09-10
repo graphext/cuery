@@ -78,13 +78,14 @@ class GoogleKwdConfig(Configurable):
     """
     max_ideas: int = Field(100, le=10_000)
     """Maximum number of additional keyword ideas to fetch (if `ideas` is True)."""
-    language: str = "en"
+    language: str = ""
     """The resource name of the language to target. Each keyword belongs to some set of languages;
     a keyword is included if language is one of its languages. If not set, all keywords will be
     included. (e.g., 'en' for English).
     """
-    country: str = "us"
-    """The geographical target for keyword data (e.g., 'us' for United States)."""
+    country: str = ""
+    """The geographical target for keyword data (e.g., 'us' for United States). If not set,
+    keywords from all locations will be included."""
     metrics_start: str | None = None
     """Start date (year and month) for metrics in YYYY-MM format (e.g., '2023-01').
     Either provide both `metrics_start` and `metrics_end` or neither.
@@ -118,18 +119,20 @@ class GoogleKwdConfig(Configurable):
     @field_validator("language")
     @classmethod
     def validate_language(cls, v):
-        try:
-            resources.google_lang_id(v)
+        if not v:
             return v
+        try:
+            return resources.google_lang_id(v)
         except ValueError as e:
             raise ValueError(f"Invalid language code: {v}") from e
 
     @field_validator("country")
     @classmethod
     def validate_country(cls, v):
-        try:
-            resources.google_country_id(v)
+        if not v:
             return v
+        try:
+            return resources.google_country_id(v)
         except ValueError as e:
             raise ValueError(f"Invalid country code: {v}") from e
 
@@ -310,11 +313,11 @@ def fetch_keywords(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
 
-    lang_id = resources.google_lang_id(cfg.language)
-    request.language = ads_service.language_constant_path(lang_id)
+    if cfg.language:
+        request.language = ads_service.language_constant_path(cfg.language)
 
-    geo_target = resources.google_country_id(cfg.country)
-    request.geo_target_constants.append(ads_service.geo_target_constant_path(geo_target))
+    if cfg.country:
+        request.geo_target_constants.append(ads_service.geo_target_constant_path(cfg.country))
 
     request.historical_metrics_options.include_average_cpc = True
 

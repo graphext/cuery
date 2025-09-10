@@ -5,7 +5,7 @@ from asyncio import Semaphore
 from collections.abc import Callable
 from functools import partial
 
-from instructor.client import Instructor
+from instructor import Instructor
 from pandas import DataFrame
 from rich import print as pprint
 from tqdm.asyncio import tqdm as async_tqdm

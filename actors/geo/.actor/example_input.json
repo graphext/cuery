@@ -1,0 +1,10 @@
+{
+    "sector": "insurance",
+    "market": "Spain",
+    "prompts_max": 25,
+    "brands_seed": [
+        "https://www.mapfre.es"
+    ],
+    "brands_in_prompt": "sometimes",
+    "use_search": true
+}

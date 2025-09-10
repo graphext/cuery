@@ -1,0 +1,105 @@
+{
+    "title": "LLM Monitor (Search & Brand Analysis)",
+    "description": "Generate or use seed commercial prompts, optionally expand competitor brands, and run them across multiple LLM models (with optional live search) to analyse brand presence and rankings.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "models": {
+            "title": "LLM Models",
+            "type": "array",
+            "description": "List of LLM provider/model identifiers to evaluate. If empty, sensible defaults are used (openai/gpt-4.1, google/gemini-2.5-flash). Format: provider/model (e.g., openai/gpt-4.1, google/gemini-2.5-flash).",
+            "editor": "stringList",
+            "prefill": [
+                "openai/gpt-4.1",
+                "google/gemini-2.5-flash"
+            ]
+        },
+        "prompts_seed": {
+            "title": "Seed Prompts",
+            "type": "array",
+            "description": "Optional list of seed prompts/questions to analyse directly. At least one of: seed prompts, sector, or seed brands must be provided so that the system can build a prompt list.",
+            "editor": "stringList",
+            "prefill": [
+                "best insurance for freelancers in spain",
+                "compare small business liability coverage options"
+            ]
+        },
+        "prompts_max": {
+            "title": "Max Prompts",
+            "type": "integer",
+            "description": "Maximum total number of prompts after generation + seeds. Additional prompts are LLM-generated if seeds < this limit and sector or brands context is available.",
+            "editor": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 500
+        },
+        "prompts_language": {
+            "title": "Prompt Language",
+            "type": "string",
+            "description": "Language to use when generating additional prompts (e.g., English, Spanish).",
+            "editor": "textfield",
+            "default": "English"
+        },
+        "brands_seed": {
+            "title": "Seed Brands / URLs",
+            "type": "array",
+            "description": "List of known brand names or homepage URLs to seed competitor expansion and brand rank analysis. Either brand names (e.g., 'mapfre') or URLs (https://www.mapfre.es).",
+            "editor": "stringList",
+            "prefill": [
+                "https://www.mapfre.es"
+            ]
+        },
+        "brands_max": {
+            "title": "Max Competitor Brands",
+            "type": "integer",
+            "description": "Maximum number of competitor brands to identify via LLM + live search (in addition to any seed brands).",
+            "editor": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50
+        },
+        "brands_model": {
+            "title": "Competitor Discovery Model",
+            "type": "string",
+            "description": "LLM model used specifically for discovering competitor brands using search.",
+            "editor": "textfield",
+            "default": "openai/gpt-4.1",
+            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
+        },
+        "brands_in_prompt": {
+            "title": "Include Brands In Generated Prompts",
+            "type": "string",
+            "description": "Whether generated prompts explicitly mention brand names: never (default), sometimes, or always.",
+            "editor": "select",
+            "enum": [
+                "never",
+                "sometimes",
+                "always"
+            ],
+            "default": "never"
+        },
+        "sector": {
+            "title": "Sector",
+            "type": "string",
+            "description": "Industry / sector context (e.g., insurance, banking, ecommerce). Helps prompt generation and competitor discovery.",
+            "editor": "textfield",
+            "default": "insurance"
+        },
+        "market": {
+            "title": "Market",
+            "type": "string",
+            "description": "Geographic market focus (e.g., Spain, Germany, US). Used for competitor search and localized prompt generation.",
+            "editor": "textfield",
+            "default": "Spain"
+        },
+        "use_search": {
+            "title": "Enable Live Search",
+            "type": "boolean",
+            "description": "If true, uses live search augmentation when querying models and for competitor discovery, enabling brand mention ranking.",
+            "editor": "checkbox",
+            "default": true
+        }
+    },
+    "required": [],
+    "additionalProperties": false
+}
