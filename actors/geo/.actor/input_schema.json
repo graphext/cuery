@@ -82,15 +82,13 @@
             "title": "Sector",
             "type": "string",
             "description": "Industry / sector context (e.g., insurance, banking, ecommerce). Helps prompt generation and competitor discovery.",
-            "editor": "textfield",
-            "default": "insurance"
+            "editor": "textfield"
         },
         "market": {
             "title": "Market",
             "type": "string",
             "description": "Geographic market focus (e.g., Spain, Germany, US). Used for competitor search and localized prompt generation.",
-            "editor": "textfield",
-            "default": "Spain"
+            "editor": "textfield"
         },
         "use_search": {
             "title": "Enable Live Search",

@@ -1,7 +1,9 @@
 """Tools to apply SEO to LLM responses."""
 
+import asyncio
 import json
 import re
+from collections.abc import Callable
 from functools import partial
 from typing import Any, Literal
 
@@ -9,7 +11,7 @@ import instructor
 import tldextract
 from pandas import DataFrame
 from pydantic import model_validator
-from tqdm.asyncio import tqdm as async_tqdm
+from tqdm.auto import tqdm
 
 from .. import Prompt, Response, ResponseSet, ask
 from ..call import TQDM_POSITION, call
@@ -164,6 +166,7 @@ async def query_with_models(
     prompts: list[str],
     models: list[str],
     use_search: bool = True,
+    progress_callback: Callable | None = None,
 ) -> DataFrame | Any:
     """Run a list of prompts through a list of models and return a combined DataFrame.
 
@@ -181,12 +184,27 @@ async def query_with_models(
             )
         )
 
-    responses = await async_tqdm.gather(
-        *tasks,
+    n_tasks = len(tasks)
+
+    min_iters = max(1, int(n_tasks / 20))
+    pbar = tqdm(
         desc="Gathering searches",
-        total=len(tasks),
+        total=n_tasks,
         position=TQDM_POSITION,
+        miniters=min_iters,
     )
+
+    async def with_progress(task):
+        result = await task
+        pbar.update()
+        if progress_callback is not None:  # noqa: SIM102
+            if (pbar.n % min_iters == 0) or (pbar.n == n_tasks):
+                await progress_callback(pbar.format_dict)  # type: ignore
+        return result
+
+    tasks = [with_progress(t) for t in tasks]
+    responses = await asyncio.gather(*tasks)
+
     df = ResponseSet(responses=responses, context=None, required=None).to_pandas()
     df["prompt"] = prompts * len(models)
     df["model"] = [model for model in models for _ in range(len(prompts))]
@@ -293,7 +311,7 @@ class GeoConfig(Configurable):
         return self
 
 
-async def analyse(cfg: GeoConfig) -> DataFrame | Any:
+async def analyse(cfg: GeoConfig, progress_callback: Callable | None = None) -> DataFrame | Any:
     """Run a list of prompts through a list of models and return a combined DataFrame."""
     LOG.info(f"Querying LLMs with\n\n{cfg}")
 
@@ -334,6 +352,7 @@ async def analyse(cfg: GeoConfig) -> DataFrame | Any:
         prompts=prompts,
         models=cfg.models,  # type: ignore
         use_search=cfg.use_search,
+        progress_callback=progress_callback,
     )
 
     # Analyse results

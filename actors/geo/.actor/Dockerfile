@@ -2,7 +2,7 @@
 FROM apify/actor-python:3.13
 
 RUN pip install uv
-RUN uv pip install --system "cuery[seo]==0.20.1"
+RUN uv pip install --system "cuery[seo]==0.20.2"
 
 COPY . ./
 
