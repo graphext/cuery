@@ -8,12 +8,13 @@ from typing import Any, Literal
 import instructor
 import tldextract
 from pandas import DataFrame
+from pydantic import model_validator
 from tqdm.asyncio import tqdm as async_tqdm
 
 from .. import Prompt, Response, ResponseSet, ask
 from ..call import TQDM_POSITION, call
 from ..search import query
-from ..utils import LOG, dedent
+from ..utils import LOG, Configurable, dedent
 
 DEFAULT_MODELS = ["openai/gpt-4.1", "google/gemini-2.5-flash"]
 
@@ -259,48 +260,68 @@ def add_brand_ranks(search_result: DataFrame, brands: list[str]) -> DataFrame:
     return search_result
 
 
-async def analyse_prompts(  # noqa: PLR0913
-    models: list[str] | None = None,
-    prompts_seed: list[str] | None = None,
-    prompts_max: int = 100,
-    prompts_language: str = "English",
-    brands_seed: list[str] | None = None,
-    brands_max: int = 10,
-    brands_model: str = "openai/gpt-4.1",
-    brands_in_prompt: Literal["never", "sometimes", "always"] = "never",
-    sector: str | None = None,
-    market: str | None = None,
-    use_search: bool = True,
-) -> DataFrame | Any:
+class GeoConfig(Configurable):
+    """Configuration for GEO analysis (LLM brand mentions and ranks)."""
+
+    models: list[str] | None = None
+    """List of LLM models to evaluate."""
+    prompts_seed: list[str] | None = None
+    """List of seed prompts."""
+    prompts_max: int = 100
+    """Maximum number of prompts to generate using LLM."""
+    prompts_language: str = "English"
+    """Language for generated prompts."""
+    brands_seed: list[str] | None = None
+    """List of seed brand names or URLs."""
+    brands_max: int = 10
+    """Maximum number of competitor brands to identify using LLM."""
+    brands_model: str = "openai/gpt-4.1"
+    """LLM model to use for competitor brand identification."""
+    brands_in_prompt: Literal["never", "sometimes", "always"] = "never"
+    """Whether to include brand names in generated prompts."""
+    sector: str | None = None
+    """Sector to focus on."""
+    market: str | None = None
+    """Market to focus on."""
+    use_search: bool = True
+    """Whether to enable web/live search when evaluating LLMs."""
+
+    @model_validator(mode="after")
+    def check_models(self):
+        if self.models is None or not self.models:
+            self.models = DEFAULT_MODELS
+        return self
+
+
+async def analyse(cfg: GeoConfig) -> DataFrame | Any:
     """Run a list of prompts through a list of models and return a combined DataFrame."""
-    if models is None:
-        models = DEFAULT_MODELS
+    LOG.info(f"Querying LLMs with\n\n{cfg}")
 
     # Generate brands
-    brands = brands_seed or []
+    brands = cfg.brands_seed or []
 
-    if brands_seed or sector:
+    if cfg.brands_seed or cfg.sector:
         competitors = await find_competitors(
-            brands=brands_seed,
-            sector=sector,
-            market=market,
-            max_count=brands_max,
-            model=brands_model,
+            brands=cfg.brands_seed,
+            sector=cfg.sector,
+            market=cfg.market,
+            max_count=cfg.brands_max,
+            model=cfg.brands_model,
         )
         brands += competitors
 
     # Generate prompts
-    prompts = prompts_seed or []
+    prompts = cfg.prompts_seed or []
 
-    n_gen_prompts = max(0, prompts_max - len(prompts))
-    if n_gen_prompts > 0 and (brands or sector):
+    n_gen_prompts = max(0, cfg.prompts_max - len(prompts))
+    if n_gen_prompts > 0 and (brands or cfg.sector):
         gen_prompts = await commercial_prompts(
             n=n_gen_prompts,
-            language=prompts_language,
-            sector=sector,
-            market=market,
+            language=cfg.prompts_language,
+            sector=cfg.sector,
+            market=cfg.market,
             brands=brands,
-            include_brands=brands_in_prompt,
+            include_brands=cfg.brands_in_prompt,
         )
         prompts += gen_prompts
 
@@ -308,18 +329,19 @@ async def analyse_prompts(  # noqa: PLR0913
         raise ValueError("No prompts to analyse")
 
     # Execute searches
-    LOG.info(f"Running {len(prompts)} prompts through {len(models)} models")
+    LOG.info(f"Running {len(prompts)} prompts through {len(cfg.models)} models")  # type: ignore
     df = await query_with_models(
         prompts=prompts,
-        models=models,
-        use_search=use_search,
+        models=cfg.models,  # type: ignore
+        use_search=cfg.use_search,
     )
 
     # Analyse results
-    if use_search and brands:
+    if cfg.use_search and brands:
         LOG.info("Analysing brand ranks in search results")
         df = add_brand_ranks(df, brands=brands)
-    elif not use_search:
+    elif not cfg.use_search:
         df = df.drop(columns=[col for col in df.columns if col.startswith("references_")])
 
+    LOG.info(f"Got results dataframe:\n{df}")
     return df
