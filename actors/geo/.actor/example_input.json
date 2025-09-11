@@ -5,6 +5,9 @@
     "brands_seed": [
         "https://www.mapfre.es"
     ],
+    "own_brands": [
+        "mapfre"
+    ],
     "brands_in_prompt": "sometimes",
     "use_search": true
 }

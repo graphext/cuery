@@ -37,6 +37,7 @@ Taken from `./.actor/input_schema.json` (see there for full metadata):
 | brands_max | integer | 10 | Max competitor brands to discover. |
 | brands_model | string | openai/gpt-4.1 | Model for competitor discovery. |
 | brands_in_prompt | enum | never | Whether generated prompts include brands (never / sometimes / always). |
+| own_brands | array[string] | - | List of your own brand names or homepage URLs (treated as owned; excluded from competitor list but still ranked). |
 | sector | string | insurance | Sector context for generation & discovery. |
 | market | string | Spain | Geographic market context. |
 | use_search | boolean | true | Enable live search augmentation + ranking. |

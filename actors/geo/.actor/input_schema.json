@@ -99,6 +99,15 @@
             ],
             "default": "never"
         },
+        "own_brands": {
+            "title": "Own Brands / URLs",
+            "type": "array",
+            "description": "List of own brand names or homepage URLs to highlight in results. Either brand names (e.g., 'mapfre') or URLs (https://www.mapfre.es).",
+            "editor": "stringList",
+            "prefill": [
+                "mapfre"
+            ]
+        },
         "sector": {
             "title": "Sector",
             "type": "string",
