@@ -46,8 +46,6 @@ async def find_competitors(
         raise ValueError("At least one of 'brands' or 'sector' must be provided.")
 
     prompt = f"Identify up to {max_count} real competing brands"
-
-    brands = [brand_from_url(brand) for brand in brands]
     prompt += f" for {brands}" if brands else ""
     prompt += f" in the '{sector}' sector" if sector else ""
     prompt += f" in the '{market}' market" if market else ""
@@ -226,7 +224,7 @@ def token_pos_in_list(
     key: str = "url",
     whole_word: bool = True,
     include_none: bool = False,
-) -> list[tuple[str, int | None]] | None:
+) -> list[dict] | None:
     """Find mention of first token in list of strings, returning list of (token, position) tuples."""
     flags = re.IGNORECASE
     pattern = r"\b{token}\b" if whole_word else "({token})"
@@ -243,7 +241,7 @@ def token_pos_in_list(
     if include_none:
         return matches or None
 
-    return [(token, pos) for token, pos in matches if pos is not None] or None
+    return [{"brand": token, "position": pos} for token, pos in matches if pos is not None] or None
 
 
 def add_brand_ranks(search_result: DataFrame, brands: list[str]) -> DataFrame:
@@ -259,6 +257,108 @@ def add_brand_ranks(search_result: DataFrame, brands: list[str]) -> DataFrame:
             )
 
     return search_result
+
+
+def in_strings(values: list[str], lst: list[str] | None) -> bool:
+    """Check if any of values is among list items."""
+    if lst is None:
+        return False
+
+    return any(val.lower() in [item.lower() for item in lst] for val in values)
+
+
+def pos_in_strings(values: list[str], lst: list[str] | None) -> int | None:
+    """Find first position of any of values among list items. To Do: optimize."""
+    if lst is None:
+        return None
+
+    values = [v.lower() for v in values]
+    lst = [item.lower() for item in lst]
+    positions = [lst.index(val) for val in values if val in lst]
+    return min(positions) + 1 if positions else None
+
+
+def in_dicts(values: list, lst: list[dict] | None, key: str) -> bool:
+    """Check if any of values is in any dict under the specified key."""
+    if lst is None:
+        return False
+
+    return any(d.get(key, "").lower() in [v.lower() for v in values] for d in lst)
+
+
+def pos_in_dicts(values: list, lst: list[dict] | None, key: str) -> int | None:
+    """Find first position of any of values in any dict under the specified key"""
+    if lst is None:
+        return None
+
+    values = [v.lower() for v in values]
+    positions = [idx for idx, d in enumerate(lst) if d.get(key, "").lower() in values]
+    return min(positions) + 1 if positions else None
+
+
+def summarize_ranks(
+    df: DataFrame,
+    own: list[str],
+    competitors: list[str],
+    models: list[str],
+    emoji_flags: bool = False,
+) -> DataFrame:
+    """Summarize brand ranks in a results DataFrame."""
+    own = [b.lower() for b in own]
+    competitors = [b.lower() for b in competitors]
+    for model in models:
+        if f"text_{model}_ranks" in df.columns:
+            # Text mentions and rank for own brand and competitors
+            df[f"own_in_txt_{model}"] = df[f"text_{model}_ranks"].apply(
+                lambda x: in_strings(own, x)
+            )
+            df[f"own_in_txt_pos_{model}"] = df[f"text_{model}_ranks"].apply(
+                lambda x: pos_in_strings(own, x)
+            )
+            df[f"cmp_in_txt_{model}"] = df[f"text_{model}_ranks"].apply(
+                lambda x: in_strings(competitors, x)
+            )
+            df[f"cmp_in_txt_pos_{model}"] = df[f"text_{model}_ranks"].apply(
+                lambda x: pos_in_strings(competitors, x)
+            )
+
+        if f"references_{model}_url_pos" in df.columns:
+            # URL mentions and rank for own brand and competitors
+            df[f"own_in_refs_{model}"] = df[f"references_{model}_url_pos"].apply(
+                lambda x: in_dicts(own, x, "brand")
+            )
+            df[f"own_in_refs_pos_{model}"] = df[f"references_{model}_url_pos"].apply(
+                lambda x: pos_in_dicts(own, x, "brand")
+            )
+            df[f"cmp_in_refs_{model}"] = df[f"references_{model}_url_pos"].apply(
+                lambda x: in_dicts(competitors, x, "brand")
+            )
+            df[f"cmp_in_refs_pos_{model}"] = df[f"references_{model}_url_pos"].apply(
+                lambda x: pos_in_dicts(competitors, x, "brand")
+            )
+
+    # Sum of own/competitor mentions across models per row/prompt
+    own_in_txt_cols = [f"own_in_txt_{model}" for model in models]
+    df["own_in_txt_count"] = df[own_in_txt_cols].sum(axis=1)
+
+    own_in_refs_cols = [f"own_in_refs_{model}" for model in models]
+    df["own_in_refs_count"] = df[own_in_refs_cols].sum(axis=1)
+
+    cmp_in_txt_cols = [f"cmp_in_txt_{model}" for model in models]
+    df["cmp_in_txt_count"] = df[cmp_in_txt_cols].sum(axis=1)
+
+    cmp_in_refs_cols = [f"cmp_in_refs_{model}" for model in models]
+    df["cmp_in_refs_count"] = df[cmp_in_refs_cols].sum(axis=1)
+
+    if emoji_flags:
+        for col in df.columns:
+            if (
+                (col.startswith(("own_in_", "cmp_in_")))
+                and ("_pos" not in col)
+                and ("_count" not in col)
+            ):
+                df[col] = df[col].replace({True: "✅", False: "❌"})
+    return df
 
 
 class GeoConfig(Configurable):
@@ -280,6 +380,8 @@ class GeoConfig(Configurable):
     """LLM model to use for competitor brand identification."""
     brands_in_prompt: Literal["never", "sometimes", "always"] = "never"
     """Whether to include brand names in generated prompts."""
+    own_brands: list[str] | None = None
+    """List of own brand names or URLs."""
     sector: str | None = None
     """Sector to focus on."""
     market: str | None = None
@@ -299,11 +401,16 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
     LOG.info(f"Querying LLMs with\n\n{cfg}")
 
     # Generate brands
-    brands = cfg.brands_seed or []
+    brands = cfg.brands_seed.copy() if cfg.brands_seed else []
+    if cfg.own_brands:
+        brands += cfg.own_brands
 
-    if cfg.brands_seed or cfg.sector:
+    brands = list({brand_from_url(brand) for brand in brands})
+    LOG.info(f"Using these seed brands: {brands}")
+
+    if brands or cfg.sector:
         competitors = await find_competitors(
-            brands=cfg.brands_seed,
+            brands=brands,
             sector=cfg.sector,
             market=cfg.market,
             max_count=cfg.brands_max,
@@ -312,7 +419,7 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
         brands += competitors
 
     # Generate prompts
-    prompts = cfg.prompts_seed or []
+    prompts = cfg.prompts_seed.copy() if cfg.prompts_seed else []
 
     n_gen_prompts = max(0, cfg.prompts_max - len(prompts))
     if n_gen_prompts > 0 and (brands or cfg.sector):
@@ -340,8 +447,24 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
 
     # Analyse results
     if cfg.use_search and brands:
-        LOG.info("Analysing brand ranks in search results")
-        df = add_brand_ranks(df, brands=brands)
+        LOG.info("Analysing brand ranks")
+        try:
+            df = add_brand_ranks(df, brands=brands)
+        except Exception as e:
+            LOG.error(f"Error analysing brand ranks: {e}")
+        else:
+            if cfg.own_brands:
+                LOG.info("Summarising own brand and competitor ranks")
+                try:
+                    df = summarize_ranks(
+                        df,
+                        own=cfg.own_brands,
+                        competitors=[b for b in brands if b not in (cfg.own_brands or [])],
+                        models=cfg.models,  # type: ignore
+                        emoji_flags=True,
+                    )
+                except Exception as e:
+                    LOG.error(f"Error summarizing brand ranks: {e}")
     elif not cfg.use_search:
         df = df.drop(columns=[col for col in df.columns if col.startswith("references_")])
 

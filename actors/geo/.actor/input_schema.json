@@ -9,6 +9,27 @@
             "type": "array",
             "description": "List of LLM provider/model identifiers to evaluate. If empty, sensible defaults are used (openai/gpt-4.1, google/gemini-2.5-flash). Format: provider/model (e.g., openai/gpt-4.1, google/gemini-2.5-flash).",
             "editor": "stringList",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "openai/gpt-4o-mini",
+                    "openai/gpt-4o",
+                    "openai/gpt-4.1-mini",
+                    "openai/gpt-4.1",
+                    "openai/o4-mini",
+                    "openai/o3",
+                    "openai/gpt-5",
+                    "google/gemini-2.5-pro",
+                    "google/gemini-2.5-flash",
+                    "google/gemini-2.5-flash-lite",
+                    "google/gemini-2.0-flash",
+                    "xai/grok-4",
+                    "xai/grok-3",
+                    "xai/grok-3-mini",
+                    "deepseek/deepseek-chat",
+                    "deepseek/deepseek-reasoner"
+                ]
+            },
             "prefill": [
                 "openai/gpt-4.1",
                 "google/gemini-2.5-flash"

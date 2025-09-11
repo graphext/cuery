@@ -50,7 +50,7 @@ VALID_MODELS = {
         "gpt-4.1",
         "o4-mini",
         "o3",
-        "gpt-5 with reasoning levels low, medium and high",
+        "gpt-5",
     ],
     "google": [
         "gemini-2.5-pro",
