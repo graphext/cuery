@@ -24,7 +24,6 @@ Useful documentation:
 
 """
 
-import base64
 import json
 import os
 import tempfile
@@ -55,7 +54,7 @@ from ..context import AnyContext
 from ..prompt import Prompt
 from ..response import Response, ResponseSet
 from ..task import Task
-from ..utils import LOG, Configurable, dedent
+from ..utils import LOG, Configurable, decode_json_b64, dedent
 
 
 class GoogleKwdConfig(Configurable):
@@ -167,21 +166,6 @@ class GoogleKwdConfig(Configurable):
             )
 
         return self
-
-
-def encode_json_b64(value):
-    """Encode a JSON key as a base64 string.
-
-    Can be used e.g. to store complex objects in environment variables.
-    """
-    b64 = base64.b64encode(json.dumps(value).encode("utf-8"))
-    return b64.decode("ascii")
-
-
-def decode_json_b64(value):
-    """Decode a base64-encoded JSON key string."""
-    str_val = value.encode("ascii")
-    return json.loads(base64.b64decode(str_val).decode("utf-8"))
 
 
 def config_from_env() -> dict:

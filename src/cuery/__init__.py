@@ -8,7 +8,7 @@ from .prompt import Message, Prompt
 from .response import Field, Response, ResponseClass, ResponseSet
 from .task import Chain, Task
 from .tool import Tool
-from .utils import apply_template, set_api_keys
+from .utils import apply_template, load_env, set_env
 
 # Patch the instructor templating to use our custom apply_template
 instructor.templating.apply_template = apply_template
@@ -29,8 +29,9 @@ async def ask(prompt: str, model: str | None = None, response_model: Any = str, 
 
 __all__ = [
     "AnyContext",
+    "load_env",
     "pprint",
-    "set_api_keys",
+    "set_env",
     "Chain",
     "Field",
     "Message",

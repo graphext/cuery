@@ -1,9 +1,8 @@
 """Tools to apply SEO to LLM responses."""
 
-import asyncio
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Coroutine
 from functools import partial
 from typing import Any, Literal
 
@@ -11,12 +10,11 @@ import instructor
 import tldextract
 from pandas import DataFrame
 from pydantic import model_validator
-from tqdm.auto import tqdm
 
 from .. import Prompt, Response, ResponseSet, ask
-from ..call import TQDM_POSITION, call
+from ..call import call
 from ..search import query
-from ..utils import LOG, Configurable, dedent
+from ..utils import LOG, Configurable, dedent, gather_with_progress
 
 DEFAULT_MODELS = ["openai/gpt-4.1", "google/gemini-2.5-flash"]
 
@@ -166,44 +164,29 @@ async def query_with_models(
     prompts: list[str],
     models: list[str],
     use_search: bool = True,
-    progress_callback: Callable | None = None,
+    progress_callback: Coroutine | None = None,
 ) -> DataFrame | Any:
     """Run a list of prompts through a list of models and return a combined DataFrame.
 
     Gathers all model and prompt comnbinations concurrently.
     """
-    tasks = []
+    coros = []
     for model in models:
-        tasks.extend(
+        coros.extend(
             await query(
                 prompts=prompts,
                 model=model,
                 use_search=use_search,
                 max_concurrent=10,
-                return_tasks=True,
+                return_coros=True,
             )
         )
 
-    n_tasks = len(tasks)
-
-    min_iters = max(1, int(n_tasks / 20))
-    pbar = tqdm(
-        desc="Gathering searches",
-        total=n_tasks,
-        position=TQDM_POSITION,
-        miniters=min_iters,
+    responses = await gather_with_progress(
+        coros,  # type: ignore
+        min_iters=max(1, int(len(coros) / 20)),
+        progress_callback=progress_callback,
     )
-
-    async def with_progress(task):
-        result = await task
-        pbar.update()
-        if progress_callback is not None:  # noqa: SIM102
-            if (pbar.n % min_iters == 0) or (pbar.n == n_tasks):
-                await progress_callback(pbar.format_dict)  # type: ignore
-        return result
-
-    tasks = [with_progress(t) for t in tasks]
-    responses = await asyncio.gather(*tasks)
 
     df = ResponseSet(responses=responses, context=None, required=None).to_pandas()
     df["prompt"] = prompts * len(models)
@@ -311,7 +294,7 @@ class GeoConfig(Configurable):
         return self
 
 
-async def analyse(cfg: GeoConfig, progress_callback: Callable | None = None) -> DataFrame | Any:
+async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) -> DataFrame | Any:
     """Run a list of prompts through a list of models and return a combined DataFrame."""
     LOG.info(f"Querying LLMs with\n\n{cfg}")
 

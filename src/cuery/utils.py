@@ -1,10 +1,12 @@
 """Utility functions."""
 
+import asyncio
+import base64
 import json
 import logging
 import os
 import re
-from collections.abc import Iterable
+from collections.abc import Coroutine, Iterable
 from datetime import date, datetime
 from importlib.resources import as_file, files
 from importlib.resources.abc import Traversable
@@ -14,6 +16,7 @@ from pathlib import Path
 from textwrap import dedent as pydedent
 from typing import Any, get_args
 
+import dotenv
 import numpy as np
 import pandas as pd
 import yaml
@@ -48,8 +51,8 @@ formatter = logging.Formatter(
 ch.setFormatter(formatter)
 LOG.addHandler(ch)
 
-
-DEFAULT_PATH = Path().home() / "Development/config/ai-api-keys.json"
+THIS_DIR = Path(__file__).parent
+PKG_DIR = THIS_DIR.parent.parent
 
 BaseModelClass = type(BaseModel)
 
@@ -106,31 +109,54 @@ def apply_template(text: str, context: dict[str, Any]) -> str:
     return pydedent(env.from_string(text).render(**context))
 
 
-def load_api_keys(path: str | Path | None = DEFAULT_PATH) -> dict:
-    """Load API keys from a JSON configuration file."""
-    if path is None:
-        path = DEFAULT_PATH
-
-    with open(path) as file:
-        api_keys = json.load(file)
-
-    env = {}
-    for k, v in api_keys.items():
-        if "_api_key" not in k.lower():
-            k = k + "_api_key"  # noqa: PLW2901
-
-        env[k.upper()] = v
-
-    return env
+def encode_json_b64(value):
+    """Encode value in base64 JSON string."""
+    b64 = base64.b64encode(json.dumps(value).encode("utf-8"))
+    return b64.decode("ascii")
 
 
-def set_api_keys(keys: dict | str | Path | None = None):
-    """Set API keys as environment variables from a dictionary or file."""
-    if not isinstance(keys, dict):
-        keys = load_api_keys(keys)
+def decode_json_b64(value):
+    """Decode a base64-encoded JSON string."""
+    str_val = value.encode("ascii")
+    return json.loads(base64.b64decode(str_val).decode("utf-8"))
 
-    for key, value in keys.items():
-        os.environ[key.upper()] = value
+
+class safestr(str):
+    """A string that hides its content when printed."""
+
+    def __repr__(self) -> str:
+        return "****"
+
+    def __str__(self) -> str:
+        return "****"
+
+    def raw(self) -> str:
+        """Get the actual string value."""
+        return super().__str__()
+
+
+def load_env(path: str | Path = PKG_DIR / ".env") -> dict[str, safestr]:
+    """Load environment variables from a .env file into a dict masking their values."""
+    secrets = dotenv.dotenv_values(dotenv_path=path, verbose=True)
+    return {k: safestr(v) for k, v in secrets.items() if v}
+
+
+def set_env(
+    path: str | Path = PKG_DIR / ".env",
+    apify_secrets: bool = False,
+    return_vars=False,
+) -> dict[str, safestr] | None:
+    """Set environment variables from a .env file and optionally set local Apify environment."""
+    dotenv.load_dotenv(dotenv_path=path, override=True, verbose=True)
+    if apify_secrets:
+        secrets = load_env(path)
+        for key, value in secrets.items():
+            os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
+            os.system(f"apify secrets add {key} '{value.raw()}'")  # noqa: S605
+
+    if return_vars:
+        return load_env(path)
+    return None
 
 
 def resource_path(relpath: str | Path) -> Traversable:
@@ -377,3 +403,31 @@ class Configurable(BaseModel):
 
     def __str__(self) -> str:
         return self.__repr__()
+
+
+async def gather_with_progress(
+    coros: list[Coroutine],
+    min_iters: int | None = None,
+    progress_callback: Coroutine | None = None,
+) -> list:
+    """Gather a list of awaitables with a progress bar and optioncal callback."""
+    tqdm_position = -1 if on_apify() else None
+    total = len(coros)
+
+    pbar = auto_tqdm(
+        desc="Gathering searches",
+        total=total,
+        position=tqdm_position,
+        miniters=min_iters,
+    )
+
+    async def with_progress(coro: Coroutine):
+        result = await coro
+        pbar.update()
+        if progress_callback is not None:  # noqa: SIM102
+            if (pbar.n % min_iters == 0) or (pbar.n == total):
+                await progress_callback(pbar.format_dict)  # type: ignore
+        return result
+
+    coros = [with_progress(c) for c in coros]
+    return await asyncio.gather(*coros)

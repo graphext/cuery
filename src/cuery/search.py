@@ -17,9 +17,8 @@ is raised (no silent fallbacks here – upstream caller can decide how to handle
 
 from __future__ import annotations
 
-import asyncio
 from asyncio import Semaphore
-from collections.abc import Callable
+from collections.abc import Coroutine
 from io import StringIO
 from typing import Any, Literal
 
@@ -32,16 +31,14 @@ from markdown import Markdown
 from openai import AsyncOpenAI
 from openai import types as oaitypes
 from pydantic import BaseModel
-from tqdm.asyncio import tqdm as async_tqdm
-from tqdm.auto import tqdm
 from xai_sdk import AsyncClient as XaiAsyncClient
 from xai_sdk.chat import Response as XAIResponse
 from xai_sdk.chat import user as xai_user
 from xai_sdk.proto import chat_pb2
 from xai_sdk.search import SearchParameters, news_source, web_source, x_source
 
-from .call import TQDM_POSITION
 from .response import Response, ResponseSet
+from .utils import gather_with_progress
 
 OAIResponse = oaitypes.responses.response.Response
 
@@ -368,8 +365,8 @@ async def query(
     model: str = "openai/gpt-5",
     use_search: bool = True,
     max_concurrent: int = 2,
-    progress_callback: Callable | None = None,
-    return_tasks: bool = False,
+    progress_callback: Coroutine | None = None,
+    return_coros: bool = False,
     plain: bool = False,
     **kwds,
 ) -> ResponseSet | Any:
@@ -389,8 +386,6 @@ async def query(
 
     query = LLMS[client]
     sem = Semaphore(max_concurrent)
-    total = len(prompts)
-    min_iters = max(1, int(total / 20))
 
     async def rate_limited_search(prompt: str):
         async with sem:
@@ -401,35 +396,15 @@ async def query(
                 **kwds,
             )
 
-    if return_tasks:
-        return [rate_limited_search(p) for p in prompts]
+    coros = [rate_limited_search(p) for p in prompts]
+    if return_coros:
+        return coros
 
-    if progress_callback is None:
-        tasks = [rate_limited_search(p) for p in prompts]
-        results = await async_tqdm.gather(
-            *tasks,
-            desc="Gathering searches",
-            total=len(tasks),
-            position=TQDM_POSITION,
-            miniters=min_iters,
-        )
-    else:
-        pbar = tqdm(
-            desc="Gathering searches",
-            total=total,
-            position=TQDM_POSITION,
-            miniters=min_iters,
-        )
-
-        async def with_progress(prompt: str):
-            result = await rate_limited_search(prompt)
-            pbar.update()
-            if (pbar.n % min_iters == 0) or (pbar.n == total):
-                await progress_callback(pbar.format_dict)  # type: ignore
-            return result
-
-        tasks = [with_progress(p) for p in prompts]
-        results = await asyncio.gather(*tasks)
+    responses = await gather_with_progress(
+        coros,  # type: ignore
+        min_iters=max(1, int(len(prompts) / 20)),
+        progress_callback=progress_callback,
+    )
 
     context = [{"prompt": p} for p in prompts]
-    return ResponseSet(responses=results, context=context, required=["prompt"])  # type: ignore
+    return ResponseSet(responses=responses, context=context, required=["prompt"])  # type: ignore

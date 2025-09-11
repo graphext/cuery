@@ -1,20 +1,17 @@
 """Wrappers to call instructor with a cuery.Prompt, cuery.Response and context."""
 
-import asyncio
 from asyncio import Semaphore
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from functools import partial
 
 from instructor import Instructor
 from pandas import DataFrame
 from rich import print as pprint
-from tqdm.asyncio import tqdm as async_tqdm
-from tqdm.auto import tqdm
 
 from .context import iter_context
 from .prompt import Prompt
 from .response import Response, ResponseClass
-from .utils import LOG, on_apify, progress
+from .utils import LOG, gather_with_progress, on_apify, progress
 
 TQDM_POSITION = -1 if on_apify() else None
 """On Apify log each tqdm update on a separate line (line breaks trigger log updates)."""
@@ -116,14 +113,13 @@ async def gather_calls(
     context: dict | list[dict] | DataFrame,
     response_model: ResponseClass,
     max_concurrent: int = 2,
-    progress_callback: Callable | None = None,
+    progress_callback: Coroutine | None = None,
     **kwds,
 ) -> list[Response]:
     """Async iteration of prompt over iterable contexts."""
     sem = Semaphore(max_concurrent)
-    context, total = iter_context(context, prompt.required)  # type: ignore
+    context, _ = iter_context(context, prompt.required)  # type: ignore
 
-    min_iters = int(total / 20)
     rate_limited_call = partial(
         rate_limited,
         func=call,
@@ -134,44 +130,10 @@ async def gather_calls(
         **kwds,
     )
 
-    if progress_callback is None:
-        tasks = [rate_limited_call(context=c) for c in context]
-        return await async_tqdm.gather(
-            *tasks,
-            desc="Gathering responses",
-            total=len(tasks),
-            position=TQDM_POSITION,
-            miniters=min_iters,
-        )
+    coros = [rate_limited_call(context=c) for c in context]
 
-    async_method = "gather"  # "gather or "as_completed"
-
-    pbar = tqdm(
-        desc="Iterating context",
-        total=total,
-        position=TQDM_POSITION,
-        miniters=min_iters,
+    return await gather_with_progress(
+        coros,  # type: ignore
+        min_iters=max(1, int(len(coros) / 20)),
+        progress_callback=progress_callback,
     )
-
-    if async_method == "gather":
-
-        async def with_callback(**kwds):
-            result = await rate_limited_call(**kwds)
-            pbar.update()
-            if (pbar.n % min_iters == 0) or (pbar.n == total):
-                await progress_callback(pbar.format_dict)
-            return result
-
-        tasks = [with_callback(context=c) for c in context]
-        return await asyncio.gather(*tasks)
-
-    # As completed: usually slower, and dpesn't preserve order
-    results = []
-    tasks = [rate_limited_call(context=c) for c in context]
-    for f in asyncio.as_completed(tasks):
-        results.append(await f)
-        pbar.update()
-        if (pbar.n % min_iters == 0) or (pbar.n == total):
-            await progress_callback(pbar.format_dict)
-
-    return results
