@@ -8,7 +8,7 @@
             "title": "LLM Models",
             "type": "array",
             "description": "List of LLM provider/model identifiers to evaluate. If empty, sensible defaults are used (openai/gpt-4.1, google/gemini-2.5-flash). Format: provider/model (e.g., openai/gpt-4.1, google/gemini-2.5-flash).",
-            "editor": "stringList",
+            "editor": "select",
             "items": {
                 "type": "string",
                 "enum": [
