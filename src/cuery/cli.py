@@ -75,7 +75,7 @@ def actor(name: str, apify_secrets: bool = True):
     os.chdir(PROJ_DIR)
     vars = set_env(apify_secrets=apify_secrets, return_vars=True)
     os.chdir(PROJ_DIR / "actors" / name)
-    os.system(f"apify login --token {vars['APIFY_TOKEN'].raw()}")  # noqa: S605
+    os.system(f"apify login --token {vars['APIFY_TOKEN'].reveal()}")  # noqa: S605
     cmd = f"uv run --env-file {PROJ_DIR / '.env'} apify run --purge --input-file=.actor/example_input.json"
     print(f"Running actor {name} with command: {cmd}")
     os.system(cmd)  # noqa: S605, S607

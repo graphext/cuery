@@ -121,7 +121,7 @@ def decode_json_b64(value):
     return json.loads(base64.b64decode(str_val).decode("utf-8"))
 
 
-class safestr(str):
+class Secret(str):
     """A string that hides its content when printed."""
 
     def __repr__(self) -> str:
@@ -130,32 +130,33 @@ class safestr(str):
     def __str__(self) -> str:
         return "****"
 
-    def raw(self) -> str:
+    def reveal(self) -> str:
         """Get the actual string value."""
         return super().__str__()
 
 
-def load_env(path: str | Path = PKG_DIR / ".env") -> dict[str, safestr]:
+def load_env(path: str | Path = PKG_DIR / ".env") -> dict[str, Secret]:
     """Load environment variables from a .env file into a dict masking their values."""
     secrets = dotenv.dotenv_values(dotenv_path=path, verbose=True)
-    return {k: safestr(v) for k, v in secrets.items() if v}
+    return {k: Secret(v) for k, v in secrets.items() if v}
 
 
 def set_env(
     path: str | Path = PKG_DIR / ".env",
     apify_secrets: bool = False,
     return_vars=False,
-) -> dict[str, safestr] | None:
+) -> dict[str, Secret] | None:
     """Set environment variables from a .env file and optionally set local Apify environment."""
     dotenv.load_dotenv(dotenv_path=path, override=True, verbose=True)
     if apify_secrets:
         secrets = load_env(path)
-        for key, value in secrets.items():
+        for key, secret in secrets.items():
             os.system(f"apify secrets rm {key} >/dev/null 2>&1")  # noqa: S605
-            os.system(f"apify secrets add {key} '{value.raw()}'")  # noqa: S605
+            os.system(f"apify secrets add {key} '{secret.reveal()}'")  # noqa: S605
 
     if return_vars:
         return load_env(path)
+
     return None
 
 
