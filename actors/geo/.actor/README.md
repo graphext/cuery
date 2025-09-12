@@ -25,24 +25,26 @@ Not a good fit when you only need: simple single-model prompting, non-commercial
 
 ## Input schema (summary)
 
-Taken from `./.actor/input_schema.json` (see there for full metadata):
-
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| models | array[string] | (internal defaults) | LLM models to evaluate. If empty: `openai/gpt-4.1`, `google/gemini-2.5-flash`. |
-| prompts_seed | array[string] | - | Seed prompts to include directly. |
-| prompts_max | integer | 10 | Max total prompts after generation. |
-| prompts_language | string | English | Language for generated prompts. |
-| brands_seed | array[string] | - | Seed brand names or homepage URLs. |
-| brands_max | integer | 10 | Max competitor brands to discover. |
-| brands_model | string | openai/gpt-4.1 | Model for competitor discovery. |
-| brands_in_prompt | enum | never | Whether generated prompts include brands (never / sometimes / always). |
-| own_brands | array[string] | - | List of your own brand names or homepage URLs (treated as owned; excluded from competitor list but still ranked). |
-| sector | string | insurance | Sector context for generation & discovery. |
-| market | string | Spain | Geographic market context. |
-| use_search | boolean | true | Enable live search augmentation + ranking. |
+| brands (required) | array[string] | (none) | Your own brand names or homepage URLs (canonicalized & lower‑cased). Must provide at least one. |
+| competitors | array[string] | - | Optional seed competitor brand names or URLs. Automatically expanded (search + LLM) up to `competitors_max`. |
+| competitors_max | integer | 10 | Maximum total competitors (including any seeds) to keep after discovery. |
+| competitors_model | string | openai/gpt-4.1 | LLM model used for competitor discovery. |
+| models | array[string] | openai/gpt-5, google/gemini-2.5-flash | LLM provider/model identifiers to evaluate (provider/model). If empty defaults are injected. |
+| prompts | array[string] | - | Optional seed prompts to include directly. |
+| prompts_max | integer | 10 (UI) / 20 (code default) | Target total prompt count (seed + generated). Additional prompts are LLM-generated if context available. |
+| prompt_intents | array[string] | [commercial, transactional] | Intent categories to bias generation (broad topical diversity). |
+| prompt_language | string | English | Language for generated prompts. |
+| brands_in_prompt | enum | never | Whether generated prompts explicitly mention brand names (`never`, `sometimes`, `always`). |
+| sector | string | - | Sector / industry context (improves prompt + competitor generation). |
+| market | string | - | Geographic market (localises generation & competitor discovery). |
+| use_search | boolean | true | Enable live web/search augmentation when querying models (recommended). |
 
-Important: You must provide at least one of `prompts_seed`, `sector`, or `brands_seed`, otherwise no prompts can be generated and the run fails.
+Notes:
+1. `brands` is now required by the schema; generation & competitor discovery work best when at least `brands` or (`sector` + optionally `market`) are provided. 
+2. If you omit `models`, internal defaults are inserted. 
+4. All brand/competitor entries are normalised (lower‑cased; URLs reduced to host).
 
 ---
 
@@ -75,37 +77,56 @@ This provides a lightweight relative prominence signal across models.
 
 ```json
 {
+  "brands": ["https://www.mapfre.es"],
+  "sector": "insurance",
+  "market": "Spain"
+}
+```
+
+This will: (1) normalise your own brand list, (2) attempt competitor discovery (up to default `competitors_max=10`), (3) generate additional prompts (up to default `prompts_max`) using sector + market context, and (4) run evaluation with default models.
+
+## Example with explicit prompts, intents, and custom models
+
+```json
+{
+  "brands": ["mapfre"],
+  "competitors": ["allianz", "generali"],
+  "competitors_max": 12,
+  "prompts": [
+    "best small business liability insurance spain",
+    "compare freelancer health policies"
+  ],
+  "prompt_intents": ["commercial", "informational", "navigational"],
+  "prompts_max": 40,
+  "prompt_language": "English",
+  "brands_in_prompt": "sometimes",
+  "models": ["openai/gpt-5", "google/gemini-2.5-flash"],
   "sector": "insurance",
   "market": "Spain",
-  "prompts_max": 25,
-  "brands_seed": ["https://www.mapfre.es"],
-  "brands_in_prompt": "sometimes",
   "use_search": true
 }
 ```
 
-## Example with explicit prompts and multiple models
+## Example focusing on a local market with automatic competitor discovery only
 
 ```json
 {
-  "prompts_seed": [
-    "best small business liability insurance spain",
-    "compare freelancer health policies"
-  ],
-  "models": ["openai/gpt-4.1", "google/gemini-2.5-flash"],
-  "brands_seed": ["https://www.mapfre.es", "allianz"],
-  "brands_max": 8,
-  "prompts_max": 40,
+  "brands": ["mybrand"],
+  "sector": "pet insurance",
+  "market": "Germany",
+  "prompts_max": 25,
   "brands_in_prompt": "never",
   "use_search": true
 }
 ```
 
+In this case competitors are not seeded; the system discovers them (search + LLM) until `competitors_max` is reached.
+
 ---
 
 ## Failure modes & tips
 
-- No prompts generated: ensure at least one of `prompts_seed`, `sector`, or `brands_seed` is supplied.
-- Empty competitor list: provide either `brands_seed` or `sector`; otherwise competitor discovery is skipped.
-- Large prompt counts: generation requires brand or sector context; if missing, only seeds are used.
-- Search disabled: brand ranking columns are skipped; enable `use_search` for richer analysis.
+- Missing required brands: `brands` must contain at least one entry (name or URL).
+- Limited prompt generation: if neither `sector` nor any (own + competitor) brands give context, only provided `prompts` are used.
+- Few or no competitors discovered: improve context with both `sector` and `market`, or seed some `competitors`.
+- Search disabled: reference / ranking columns (`references_*`, *_in_txt_*, *_in_refs_* etc.) are omitted; enable `use_search` for richer comparative analysis.
