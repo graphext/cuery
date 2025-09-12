@@ -1,13 +1,14 @@
 {
-    "sector": "insurance",
-    "market": "Spain",
-    "prompts_max": 25,
-    "brands_seed": [
-        "https://www.mapfre.es"
-    ],
-    "own_brands": [
+    "brands": [
         "mapfre"
     ],
+    "models": [
+        "openai/gpt-4.1",
+        "google/gemini-2.5-flash"
+    ],
+    "sector": "insurance",
+    "market": "Spain",
+    "competitors_max": 5,
     "brands_in_prompt": "sometimes",
     "use_search": true
 }

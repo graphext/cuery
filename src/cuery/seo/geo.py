@@ -13,10 +13,10 @@ from pydantic import model_validator
 
 from .. import Prompt, Response, ResponseSet, ask
 from ..call import call
-from ..search import query
+from ..search import VALID_MODELS, query
 from ..utils import LOG, Configurable, dedent, gather_with_progress
 
-DEFAULT_MODELS = ["openai/gpt-4.1", "google/gemini-2.5-flash"]
+DEFAULT_MODELS = ["openai/gpt-5", "google/gemini-2.5-flash"]
 
 
 class Brands(Response):
@@ -58,9 +58,9 @@ async def find_competitors(
     )
 
     extraction_prompt = dedent(f"""
-    Extract a list of competitor brand names from the search result below, which contains a
-    text summary of a search for competitors as well as a list of references used in the
-    search.
+    Extract a list of up to {max_count} competitor brand names from the search result below,
+    which contains a text summary of a search for competitors as well as a list of references used
+    in the search.
 
     # Search Result
 
@@ -77,26 +77,32 @@ async def find_competitors(
     )
 
     competitors = list({name.lower() for name in competitors.names})  # type: ignore
+    competitors = [c for c in competitors if c not in brands][:max_count]
     LOG.info(f"Found these competitors brands: {competitors}")
     return competitors
 
 
-async def commercial_prompts(
+async def generate_prompts(
     n: int,
+    intents: list[str] | None = None,
     language: str = "English",
     sector: str | None = None,
     market: str | None = None,
     brands: list[str] | None = None,
     include_brands: Literal["never", "sometimes", "always"] = "sometimes",
+    seed_prompts: list[str] | None = None,
 ) -> list[str]:
     """Generate N realistic commercial/consumer search queries using an LLM meta-instruction."""
     if not brands and not sector:
         raise ValueError("At least one of 'brands' or 'sector' must be provided.")
 
+    intents = intents or ["commercial", "transactional"]
+
     prompt = dedent(f"""
-    Generate {n} unique, concise search queries for consumer/commercial intent. Cover realistic
-    user intents like comparisons, transactional queries, alternatives, trust/regulatory, and
-    location nuances.
+    Generate {n} unique, concise LLM prompts with one or more of the following intents:
+    {intents}. Cover realistic user intentions like comparisons, alternatives, trust/regulatory,
+    location specific queries etc. The prompts should be similar to Google search queries
+    but adapted to how users would ask an LLM.
     """)
 
     prompt += f" Generate prompts in the '{language}' language."
@@ -109,13 +115,19 @@ async def commercial_prompts(
         prompt += f" If brand context helps, consider these brands: {brands}."
 
         if include_brands == "always":
-            prompt += " Always include at least one of the competitor brand names explicitly in every query."
+            prompt += " Always include at least one of the brand names explicitly in every query."
         elif include_brands == "never":
             prompt += " Do not mention any brand names explicitly in the queries though."
 
     prompt += " Strictly return a JSON array of strings. No numbering, no prose, no code fences."
 
-    LOG.info(f"Generating commercial search queries with prompt:\n{prompt}")
+    if seed_prompts:
+        prompt += (
+            "Do NOT generate prompts that are semantically equivalent to these initial "
+            f"seed prompts:\n\n{json.dumps(seed_prompts, indent=2)}"
+        )
+
+    LOG.info(f"Generating search queries with prompt:\n{json.dumps(prompt, indent=2)}")
     queries = await ask(prompt, model="openai/gpt-4.1", response_model=list[str])
     LOG.info(
         f"Generated {len(queries)} commercial search queries: {json.dumps(queries, indent=2)}"
@@ -175,7 +187,7 @@ async def query_with_models(
                 prompts=prompts,
                 model=model,
                 use_search=use_search,
-                max_concurrent=10,
+                max_concurrent=30,
                 return_coros=True,
             )
         )
@@ -364,24 +376,26 @@ def summarize_ranks(
 class GeoConfig(Configurable):
     """Configuration for GEO analysis (LLM brand mentions and ranks)."""
 
+    brands: list[str] | None = None
+    """List of own(!) brand names or URLs."""
     models: list[str] | None = None
     """List of LLM models to evaluate."""
-    prompts_seed: list[str] | None = None
+    prompts: list[str] | None = None
     """List of seed prompts."""
-    prompts_max: int = 100
+    prompts_max: int = 20
     """Maximum number of prompts to generate using LLM."""
-    prompts_language: str = "English"
+    prompt_intents: list[str] | None = None
+    """List of user intents to focus on in generated prompts."""
+    prompt_language: str = "English"
     """Language for generated prompts."""
-    brands_seed: list[str] | None = None
-    """List of seed brand names or URLs."""
-    brands_max: int = 10
-    """Maximum number of competitor brands to identify using LLM."""
-    brands_model: str = "openai/gpt-4.1"
-    """LLM model to use for competitor brand identification."""
     brands_in_prompt: Literal["never", "sometimes", "always"] = "never"
     """Whether to include brand names in generated prompts."""
-    own_brands: list[str] | None = None
-    """List of own brand names or URLs."""
+    competitors: list[str] | None = None
+    """List of seed brand names or URLs."""
+    competitors_max: int = 10
+    """Maximum number of competitor brands to identify using LLM."""
+    competitors_model: str = "openai/gpt-4.1"
+    """LLM model to use for competitor brand identification."""
     sector: str | None = None
     """Sector to focus on."""
     market: str | None = None
@@ -391,6 +405,11 @@ class GeoConfig(Configurable):
 
     @model_validator(mode="after")
     def check_models(self):
+        if self.brands is None:
+            self.brands = []
+        else:
+            self.brands = [brand.lower() for brand in self.brands]
+
         if self.models is None or not self.models:
             self.models = DEFAULT_MODELS
         return self
@@ -400,12 +419,8 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
     """Run a list of prompts through a list of models and return a combined DataFrame."""
     LOG.info(f"Querying LLMs with\n\n{cfg}")
 
-    # Generate brands
-    brands = cfg.brands_seed.copy() if cfg.brands_seed else []
-    if cfg.own_brands:
-        brands += cfg.own_brands
-
-    brands = list({brand_from_url(brand) for brand in brands})
+    # Prepare brands
+    brands = list({brand_from_url(brand) for brand in cfg.brands})
     LOG.info(f"Using these seed brands: {brands}")
 
     if brands or cfg.sector:
@@ -413,23 +428,28 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
             brands=brands,
             sector=cfg.sector,
             market=cfg.market,
-            max_count=cfg.brands_max,
-            model=cfg.brands_model,
+            max_count=cfg.competitors_max,
+            model=cfg.competitors_model,
         )
-        brands += competitors
+    else:
+        competitors = []
+
+    all_brands = brands + competitors
 
     # Generate prompts
-    prompts = cfg.prompts_seed.copy() if cfg.prompts_seed else []
+    prompts = cfg.prompts.copy() if cfg.prompts else []
 
     n_gen_prompts = max(0, cfg.prompts_max - len(prompts))
-    if n_gen_prompts > 0 and (brands or cfg.sector):
-        gen_prompts = await commercial_prompts(
+    if n_gen_prompts > 0 and (all_brands or cfg.sector):
+        gen_prompts = await generate_prompts(
             n=n_gen_prompts,
-            language=cfg.prompts_language,
+            intents=cfg.prompt_intents,
+            language=cfg.prompt_language,
             sector=cfg.sector,
             market=cfg.market,
-            brands=brands,
+            brands=all_brands,
             include_brands=cfg.brands_in_prompt,
+            seed_prompts=cfg.prompts,
         )
         prompts += gen_prompts
 
@@ -449,17 +469,17 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
     if cfg.use_search and brands:
         LOG.info("Analysing brand ranks")
         try:
-            df = add_brand_ranks(df, brands=brands)
+            df = add_brand_ranks(df, brands=all_brands)
         except Exception as e:
             LOG.error(f"Error analysing brand ranks: {e}")
         else:
-            if cfg.own_brands:
+            if cfg.brands:
                 LOG.info("Summarising own brand and competitor ranks")
                 try:
                     df = summarize_ranks(
                         df,
-                        own=cfg.own_brands,
-                        competitors=[b for b in brands if b not in (cfg.own_brands or [])],
+                        own=cfg.brands,
+                        competitors=competitors,
                         models=cfg.models,  # type: ignore
                         emoji_flags=True,
                     )
@@ -467,6 +487,29 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
                     LOG.error(f"Error summarizing brand ranks: {e}")
     elif not cfg.use_search:
         df = df.drop(columns=[col for col in df.columns if col.startswith("references_")])
+
+    # Clean up dataframe
+    def remove_provider(name):
+        providers = VALID_MODELS.keys()
+        for provider in providers:
+            name = name.replace(f"{provider}/", "")
+
+        return name
+
+    df.columns = [remove_provider(col) for col in df.columns]
+    df.columns = [re.sub(r"[^a-zA-Z0-9]", "_", col) for col in df.columns]
+
+    # Column order: prompt, summary columns, text/references columns
+    count_cols = [col for col in df.columns if re.search(r"(own|cmp)_.*_count", col)]
+    own_in_cols = [
+        col for col in df.columns if re.search(r"own_in_", col) and col not in count_cols
+    ]
+    cmp_in_cols = [
+        col for col in df.columns if re.search(r"cmp_in_", col) and col not in count_cols
+    ]
+    summary_cols = count_cols + own_in_cols + cmp_in_cols
+    other_cols = [col for col in df.columns if col not in (["prompt"] + summary_cols)]
+    df = df[["prompt"] + summary_cols + other_cols]
 
     LOG.info(f"Got results dataframe:\n{df}")
     return df

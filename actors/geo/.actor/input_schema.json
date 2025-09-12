@@ -4,8 +4,17 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
+        "brands": {
+            "title": "Brands to analyze",
+            "type": "array",
+            "description": "List of brand names or homepage URLs to analyze. Either brand names (e.g., 'mapfre') or URLs (https://www.mapfre.es). These are usually the clients's own brands. Competitors can be specified separately.",
+            "editor": "stringList",
+            "prefill": [
+                "mapfre"
+            ]
+        },
         "models": {
-            "title": "LLM Models",
+            "title": "LLMs to Evaluate",
             "type": "array",
             "description": "List of LLM provider/model identifiers to evaluate. If empty, sensible defaults are used (openai/gpt-4.1, google/gemini-2.5-flash). Format: provider/model (e.g., openai/gpt-4.1, google/gemini-2.5-flash).",
             "editor": "select",
@@ -30,15 +39,19 @@
                     "deepseek/deepseek-reasoner"
                 ]
             },
+            "default": [
+                "openai/gpt-5",
+                "google/gemini-2.5-flash"
+            ],
             "prefill": [
-                "openai/gpt-4.1",
+                "openai/gpt-5",
                 "google/gemini-2.5-flash"
             ]
         },
-        "prompts_seed": {
+        "prompts": {
             "title": "Seed Prompts",
             "type": "array",
-            "description": "Optional list of seed prompts/questions to analyse directly. At least one of: seed prompts, sector, or seed brands must be provided so that the system can build a prompt list.",
+            "description": "Optional list of initial prompts/questions to include in the analysis. At least one of prompts, sector, or brands must be provided so that the system can generate a more complete prompt list.",
             "editor": "stringList",
             "prefill": [
                 "best insurance for freelancers in spain",
@@ -46,46 +59,34 @@
             ]
         },
         "prompts_max": {
-            "title": "Max Prompts",
+            "title": "Maximum number of prompts to generate",
             "type": "integer",
-            "description": "Maximum total number of prompts after generation + seeds. Additional prompts are LLM-generated if seeds < this limit and sector or brands context is available.",
+            "description": "Maximum total number of prompts after generation + seeds prompts. Additional prompts are LLM-generated if seeds < this limit and sector or brands context is available.",
             "editor": "number",
             "default": 10,
             "minimum": 1,
             "maximum": 500
         },
-        "prompts_language": {
+        "prompt_intents": {
+            "title": "Intent catgories for generated prompts",
+            "type": "array",
+            "description": "Optional list of user intents to focus on when generating additional prompts (e.g., 'commercial', 'navigational', ...). Helps diversify the generated prompts.",
+            "editor": "stringList",
+            "default": [
+                "commercial",
+                "transactional"
+            ],
+            "prefill": [
+                "commercial",
+                "transactional"
+            ]
+        },
+        "prompt_language": {
             "title": "Prompt Language",
             "type": "string",
             "description": "Language to use when generating additional prompts (e.g., English, Spanish).",
             "editor": "textfield",
             "default": "English"
-        },
-        "brands_seed": {
-            "title": "Seed Brands / URLs",
-            "type": "array",
-            "description": "List of known brand names or homepage URLs to seed competitor expansion and brand rank analysis. Either brand names (e.g., 'mapfre') or URLs (https://www.mapfre.es).",
-            "editor": "stringList",
-            "prefill": [
-                "https://www.mapfre.es"
-            ]
-        },
-        "brands_max": {
-            "title": "Max Competitor Brands",
-            "type": "integer",
-            "description": "Maximum number of competitor brands to identify via LLM + live search (in addition to any seed brands).",
-            "editor": "number",
-            "default": 10,
-            "minimum": 1,
-            "maximum": 50
-        },
-        "brands_model": {
-            "title": "Competitor Discovery Model",
-            "type": "string",
-            "description": "LLM model used specifically for discovering competitor brands using search.",
-            "editor": "textfield",
-            "default": "openai/gpt-4.1",
-            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
         },
         "brands_in_prompt": {
             "title": "Include Brands In Generated Prompts",
@@ -99,23 +100,40 @@
             ],
             "default": "never"
         },
-        "own_brands": {
-            "title": "Own Brands / URLs",
+        "competitors": {
+            "title": "Competitor brands to include in analysis",
             "type": "array",
-            "description": "List of own brand names or homepage URLs to highlight in results. Either brand names (e.g., 'mapfre') or URLs (https://www.mapfre.es).",
+            "description": "List of competitor brand names or homepage URLs to analyze. These can be automatically expanded up to competitors_max. Results will show own vs competitor brand presence and rankings.",
             "editor": "stringList",
             "prefill": [
                 "mapfre"
             ]
         },
+        "competitors_max": {
+            "title": "Maximum number of competitor brands",
+            "type": "integer",
+            "description": "Maximum number of competitor brands to include in analysis. If competitors are provided, they are used first, then additional competitors are discovered using search if needed up to this limit.",
+            "editor": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50
+        },
+        "competitors_model": {
+            "title": "Competitor Discovery Model",
+            "type": "string",
+            "description": "LLM model used specifically for discovering competitor brands using search.",
+            "editor": "textfield",
+            "default": "openai/gpt-4.1",
+            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
+        },
         "sector": {
-            "title": "Sector",
+            "title": "Sector to focus on in prompt generation and competitor discovery",
             "type": "string",
             "description": "Industry / sector context (e.g., insurance, banking, ecommerce). Helps prompt generation and competitor discovery.",
             "editor": "textfield"
         },
         "market": {
-            "title": "Market",
+            "title": "Market/Region to focus on in prompt generation and competitor discovery",
             "type": "string",
             "description": "Geographic market focus (e.g., Spain, Germany, US). Used for competitor search and localized prompt generation.",
             "editor": "textfield"
@@ -123,11 +141,13 @@
         "use_search": {
             "title": "Enable Live Search",
             "type": "boolean",
-            "description": "If true, uses live search augmentation when querying models and for competitor discovery, enabling brand mention ranking.",
+            "description": "If true, uses live search augmentation when querying models. Should be enabled for almost all use cases to improve relevance and factuality. Only disable specifically for testing LLM internal knowledge.",
             "editor": "checkbox",
             "default": true
         }
     },
-    "required": [],
+    "required": [
+        "brands"
+    ],
     "additionalProperties": false
 }
