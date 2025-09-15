@@ -50,15 +50,46 @@ Notes:
 
 ## Output
 
-Dataset items (one per prompt) in a wide, merged structure. Core columns:
+Dataset items (one row per prompt) with columns grouped into:
 
-- `prompt` – The original prompt text.
-- `text_<model>` – Raw answer text from each model.
-- `references_<model>` – List (array) of cited references (URL + metadata) if search enabled.
-- `text_<model>_ranks` – Ordered list of brand tokens by first occurrence rank in answer text (only if search enabled AND brands known).
-- `references_<model>_url_pos` – List of tuples `(brand, position)` representing first URL mention position among references (only if search enabled AND brands known).
+1. Core prompt/context
+2. Per‑model raw outputs
+3. Per‑model brand ranking details (when brands + search enabled)
+4. Cross‑model summary indicators & counts
 
-If `use_search` is false, all `references_...` columns are removed before output.
+### 1. Core
+* `prompt` – Original prompt text.
+
+### 2. Per‑model raw outputs (model id appears literally, provider prefix removed)
+* `answer_<model>` – Plain answer text returned by the model.
+* `sources_<model>` – List of cited source objects (`{"title": ..., "url": ...}`) when live search enabled; absent / empty list otherwise.
+
+### 3. Per‑model brand ranking detail columns (added only if `use_search` is true AND seed brands supplied)
+Generated for each model:
+* `answer_<model>_brand_ranking` – Ordered list of brand tokens by first text occurrence (earliest index first).
+* `sources_<model>_brand_positions` – List of `{"name": <brand>, "position": <zero_based_pos>}` objects for first URL match per brand (sorted by position). Brands not found are omitted.
+* `brand_mentioned_in_answer_<model>` – Boolean: at least one of own brands appears in answer text.
+* `brand_position_in_answer_<model>` – 1-based position (rank order) of first own brand in `answer_<model>_brand_ranking` (None if not present).
+* `competitor_mentioned_in_answer_<model>` – Boolean: any competitor brand mentioned in answer text.
+* `competitor_position_in_answer_<model>` – 1-based position of first competitor brand in answer ranking.
+* `brand_mentioned_in_sources_<model>` – Boolean: any own brand appears in cited sources URLs.
+* `brand_position_in_sources_<model>` – 1-based first occurrence position for own brand in sources list.
+* `competitor_mentioned_in_sources_<model>` – Boolean: any competitor brand in sources.
+* `competitor_position_in_sources_<model>` – 1-based first occurrence position for competitor brand in sources list.
+
+### 4. Cross‑model aggregated summary columns
+* `brand_mentioned_in_answer_count` – Number of models where own brand appeared in answer text.
+* `brand_mentioned_in_sources_count` – Number of models where own brand appeared in sources.
+* `competitor_mentioned_in_answer_count` – Number of models mentioning any competitor in answer text.
+* `competitor_mentioned_in_sources_count` – Number of models citing a competitor in sources.
+
+All boolean mention columns may be rendered as ✅ / ❌ if emoji flagging was enabled during summarisation.
+
+### Notes
+* Provider prefixes (`openai/`, `google/`, etc.) are stripped from column names.
+* Non‑alphanumeric characters in model identifiers are normalised to underscores.
+* If `use_search` is false, all `sources_*` and derived source‑based columns are omitted.
+* If no brands were provided, brand ranking & summary columns (sections 3–4) are omitted.
 
 ---
 

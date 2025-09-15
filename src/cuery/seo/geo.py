@@ -13,7 +13,7 @@ from pydantic import model_validator
 
 from .. import Prompt, Response, ResponseSet, ask
 from ..call import call
-from ..search import VALID_MODELS, query
+from ..search import VALID_MODELS, SearchResult, query
 from ..utils import LOG, Configurable, dedent, gather_with_progress
 
 DEFAULT_MODELS = ["openai/gpt-4.1-mini", "google/gemini-2.5-flash"]
@@ -51,10 +51,10 @@ async def find_competitors(
     prompt += f" in the '{market}' market" if market else ""
 
     LOG.info(f"Searching for competitor brands with prompt:\n{prompt}")
-    search_result = await query(prompts=[prompt], model=model)
-    search_result = search_result[0]
+    search_results: ResponseSet = await query(prompts=[prompt], model=model)
+    search_result: SearchResult = search_results[0]  # type: ignore
     search_str = (
-        search_result.text + "\n\n" + "\n".join(c.url for c in search_result.references or [])
+        search_result.answer + "\n\n" + "\n".join(c.url for c in search_result.sources or [])
     )
 
     extraction_prompt = dedent(f"""
@@ -135,41 +135,6 @@ async def generate_prompts(
     return queries
 
 
-async def query_with_models_iter(
-    prompts: list[str],
-    models: list[str],
-    use_search: bool = True,
-) -> DataFrame | Any:
-    """Run a list of prompts through a list of models and return a combined DataFrame.
-
-    Iterates over models one by one.
-    """
-    dfs = []
-    for i, model in enumerate(models):
-        LOG.info(f"[{i + 1}/{len(models)}] Running queries through {model}")
-        model_results = await query(
-            prompts=prompts,
-            model=model,
-            use_search=use_search,
-            max_concurrent=10,
-        )
-        model_df = model_results.to_pandas()
-        model_df = model_df.rename(
-            columns={
-                "text": f"text_{model}",
-                "references": f"references_{model}",
-            }
-        )
-        LOG.info(f"Model search results:\n{model_df}")
-        dfs.append(model_df)
-
-    df = dfs[0]
-    for other_df in dfs[1:]:
-        df = df.merge(other_df, on="prompt", how="outer")
-
-    return df
-
-
 async def query_with_models(
     prompts: list[str],
     models: list[str],
@@ -189,6 +154,7 @@ async def query_with_models(
                 use_search=use_search,
                 max_concurrent=100,
                 return_coros=True,
+                log=True,
             )
         )
 
@@ -204,7 +170,7 @@ async def query_with_models(
 
     # Pivot the dataframe so that unique values in "prompt" become rows, and "text" and "reference"
     # columns are prefixed with the model name
-    df_pivot = df.pivot(index="prompt", columns="model", values=["text", "references"])  # noqa: PD010
+    df_pivot = df.pivot(index="prompt", columns="model", values=["answer", "sources"])  # noqa: PD010
     df_pivot.columns = [f"{col[0]}_{col[1]}" for col in df_pivot.columns]
     return df_pivot.reset_index()
 
@@ -253,18 +219,18 @@ def token_pos_in_list(
     if include_none:
         return matches or None
 
-    return [{"brand": token, "position": pos} for token, pos in matches if pos is not None] or None
+    return [{"name": token, "position": pos} for token, pos in matches if pos is not None] or None
 
 
 def add_brand_ranks(search_result: DataFrame, brands: list[str]) -> DataFrame:
     """Add brand rank columns to a search result DataFrame."""
     for col in search_result.columns:
-        if col.startswith("text_"):
-            search_result[f"{col}_ranks"] = search_result[col].apply(
+        if col.startswith("answer_"):
+            search_result[f"{col}_brand_ranking"] = search_result[col].apply(
                 partial(token_rank_in_text, tokens=brands)
             )
-        elif col.startswith("references_"):
-            search_result[f"{col}_url_pos"] = search_result[col].apply(
+        elif col.startswith("sources_"):
+            search_result[f"{col}_brand_positions"] = search_result[col].apply(
                 partial(token_pos_in_list, tokens=brands, key="url")
             )
 
@@ -319,55 +285,55 @@ def summarize_ranks(
     own = [b.lower() for b in own]
     competitors = [b.lower() for b in competitors]
     for model in models:
-        if f"text_{model}_ranks" in df.columns:
+        source_col = f"answer_{model}_brand_ranking"
+        if source_col in df.columns:
             # Text mentions and rank for own brand and competitors
-            df[f"own_in_txt_{model}"] = df[f"text_{model}_ranks"].apply(
+            df[f"brand_mentioned_in_answer_{model}"] = df[source_col].apply(
                 lambda x: in_strings(own, x)
             )
-            df[f"own_in_txt_pos_{model}"] = df[f"text_{model}_ranks"].apply(
+            df[f"brand_position_in_answer_{model}"] = df[source_col].apply(
                 lambda x: pos_in_strings(own, x)
             )
-            df[f"cmp_in_txt_{model}"] = df[f"text_{model}_ranks"].apply(
+            df[f"competitor_mentioned_in_answer_{model}"] = df[source_col].apply(
                 lambda x: in_strings(competitors, x)
             )
-            df[f"cmp_in_txt_pos_{model}"] = df[f"text_{model}_ranks"].apply(
+            df[f"competitor_position_in_answer_{model}"] = df[source_col].apply(
                 lambda x: pos_in_strings(competitors, x)
             )
 
-        if f"references_{model}_url_pos" in df.columns:
+        source_col = f"sources_{model}_brand_positions"
+        if source_col in df.columns:
             # URL mentions and rank for own brand and competitors
-            df[f"own_in_refs_{model}"] = df[f"references_{model}_url_pos"].apply(
-                lambda x: in_dicts(own, x, "brand")
+            df[f"brand_mentioned_in_sources_{model}"] = df[source_col].apply(
+                lambda x: in_dicts(own, x, "name")
             )
-            df[f"own_in_refs_pos_{model}"] = df[f"references_{model}_url_pos"].apply(
-                lambda x: pos_in_dicts(own, x, "brand")
+            df[f"brand_position_in_sources_{model}"] = df[source_col].apply(
+                lambda x: pos_in_dicts(own, x, "name")
             )
-            df[f"cmp_in_refs_{model}"] = df[f"references_{model}_url_pos"].apply(
-                lambda x: in_dicts(competitors, x, "brand")
+            df[f"competitor_mentioned_in_sources_{model}"] = df[source_col].apply(
+                lambda x: in_dicts(competitors, x, "name")
             )
-            df[f"cmp_in_refs_pos_{model}"] = df[f"references_{model}_url_pos"].apply(
-                lambda x: pos_in_dicts(competitors, x, "brand")
+            df[f"competitor_position_in_sources_{model}"] = df[source_col].apply(
+                lambda x: pos_in_dicts(competitors, x, "name")
             )
 
     # Sum of own/competitor mentions across models per row/prompt
-    own_in_txt_cols = [f"own_in_txt_{model}" for model in models]
-    df["own_in_txt_count"] = df[own_in_txt_cols].sum(axis=1)
+    own_in_ans_cols = [f"brand_mentioned_in_answer_{model}" for model in models]
+    df["brand_mentioned_in_answer_count"] = df[own_in_ans_cols].sum(axis=1)
 
-    own_in_refs_cols = [f"own_in_refs_{model}" for model in models]
-    df["own_in_refs_count"] = df[own_in_refs_cols].sum(axis=1)
+    own_in_src_cols = [f"brand_mentioned_in_sources_{model}" for model in models]
+    df["brand_mentioned_in_sources_count"] = df[own_in_src_cols].sum(axis=1)
 
-    cmp_in_txt_cols = [f"cmp_in_txt_{model}" for model in models]
-    df["cmp_in_txt_count"] = df[cmp_in_txt_cols].sum(axis=1)
+    cmp_in_ans_cols = [f"competitor_mentioned_in_answer_{model}" for model in models]
+    df["competitor_mentioned_in_answer_count"] = df[cmp_in_ans_cols].sum(axis=1)
 
-    cmp_in_refs_cols = [f"cmp_in_refs_{model}" for model in models]
-    df["cmp_in_refs_count"] = df[cmp_in_refs_cols].sum(axis=1)
+    cmp_in_refs_cols = [f"competitor_mentioned_in_sources_{model}" for model in models]
+    df["competitor_mentioned_in_sources_count"] = df[cmp_in_refs_cols].sum(axis=1)
 
     if emoji_flags:
         for col in df.columns:
-            if (
-                (col.startswith(("own_in_", "cmp_in_")))
-                and ("_pos" not in col)
-                and ("_count" not in col)
+            if (col.startswith(("brand_mentioned_in", "competitor_mentioned_in_"))) and (
+                "_count" not in col
             ):
                 df[col] = df[col].replace({True: "✅", False: "❌"})
     return df
@@ -500,12 +466,17 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
     df.columns = [re.sub(r"[^a-zA-Z0-9]", "_", col) for col in df.columns]
 
     # Column order: prompt, summary columns, text/references columns
-    count_cols = [col for col in df.columns if re.search(r"(own|cmp)_.*_count", col)]
+    count_cols = [col for col in df.columns if re.search(r"(brand|competitor)_.*_count", col)]
     own_in_cols = [
-        col for col in df.columns if re.search(r"own_in_", col) and col not in count_cols
+        col
+        for col in df.columns
+        if re.search(r"brand_mentioned_in_|brand_position_in_", col) and col not in count_cols
     ]
     cmp_in_cols = [
-        col for col in df.columns if re.search(r"cmp_in_", col) and col not in count_cols
+        col
+        for col in df.columns
+        if re.search(r"competitor_mentioned_in_|competitor_position_in_", col)
+        and col not in count_cols
     ]
     summary_cols = count_cols + own_in_cols + cmp_in_cols
     other_cols = [col for col in df.columns if col not in (["prompt"] + summary_cols)]

@@ -17,6 +17,8 @@ is raised (no silent fallbacks here – upstream caller can decide how to handle
 
 from __future__ import annotations
 
+import asyncio
+import time
 from asyncio import Semaphore
 from collections.abc import Coroutine
 from io import StringIO
@@ -31,6 +33,7 @@ from markdown import Markdown
 from openai import AsyncOpenAI
 from openai import types as oaitypes
 from pydantic import BaseModel
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 from xai_sdk import AsyncClient as XaiAsyncClient
 from xai_sdk.chat import Response as XAIResponse
 from xai_sdk.chat import user as xai_user
@@ -38,9 +41,9 @@ from xai_sdk.proto import chat_pb2
 from xai_sdk.search import SearchParameters, news_source, web_source, x_source
 
 from .response import Response, ResponseSet
-from .utils import gather_with_progress
+from .utils import LOG, gather_with_progress
 
-OAIResponse = oaitypes.responses.response.Response
+OAIResponse = oaitypes.responses.response.Response  # type: ignore[attr-defined]
 
 VALID_MODELS = {
     "openai": [
@@ -95,7 +98,7 @@ def unmark(text):
     return __md.convert(text)
 
 
-class Reference(Response):
+class Source(Response):
     """Single search reference with title and URL."""
 
     title: str
@@ -105,8 +108,8 @@ class Reference(Response):
 class SearchResult(Response):
     """Search result with extracted text and references."""
 
-    text: str
-    references: list[Reference]
+    answer: str
+    sources: list[Source]
 
 
 def resolve_redirect(redirect_url: str, timeout: int = 2) -> str:
@@ -124,25 +127,26 @@ def resolve_redirect(redirect_url: str, timeout: int = 2) -> str:
 def validate_openai(response, plain: bool = False) -> SearchResult:
     """Convert a raw web search response into a ``SearchResult`` instance."""
     output = response.output
-    text = ""
-    refs = []
+    answer: str = ""
+    sources: list[Source] = []
 
-    if len(output) < 2:  # noqa: PLR2004, without search
-        text = output[0].content[0].text
+    if len(output) < 2:  # noqa: PLR2004, without search tool output
+        # Only model response
+        answer = output[0].content[0].text
     else:
         if output[0].type != "web_search_call":
             raise ValueError("First output must be of type 'web_search_call'.")
 
         content = output[1].content[0]
         if content.type == "output_text":
-            text = content.text
+            answer = content.text
             if hasattr(content, "annotations"):
-                refs = [Reference(title=ann.title, url=ann.url) for ann in content.annotations]
+                sources = [Source(title=ann.title, url=ann.url) for ann in content.annotations]
 
     if plain:
-        text = unmark(text)
+        answer = unmark(answer)
 
-    result = SearchResult(text=text, references=refs)
+    result = SearchResult(answer=answer, sources=sources)
     result._raw_response = response  # type: ignore
     return result
 
@@ -157,18 +161,18 @@ def validate_gemini(response: BaseModel, plain: bool = False) -> SearchResult:
     # Text content
     content = candidate.content
     texts = [getattr(p, "text", None) for p in content.parts]
-    text = "\n".join([t for t in texts if t])
+    answer = "\n".join([t for t in texts if t])
     if plain:
-        text = unmark(text)
+        answer = unmark(answer)
 
     # References
     try:
         chunks = candidate.grounding_metadata.grounding_chunks or []
-        refs = [Reference(title=c.web.title, url=resolve_redirect(c.web.uri)) for c in chunks]
+        sources = [Source(title=c.web.title, url=resolve_redirect(c.web.uri)) for c in chunks]
     except Exception:
-        refs = []
+        sources = []
 
-    result = SearchResult(text=text, references=refs)
+    result = SearchResult(answer=answer, sources=sources)
     result._raw_response = response
     return result
 
@@ -180,14 +184,14 @@ def validate_xai(response, plain: bool = False) -> SearchResult:
     list of URL strings on ``response.citations``. We map each into a ``Reference``
     using the URL as both title and URL (title data not currently provided).
     """
-    text = getattr(response, "content", "") or ""
+    answer = getattr(response, "content", "") or ""
     if plain:
-        text = unmark(text)
+        answer = unmark(answer)
 
     citations = getattr(response, "citations", None) or []
-    refs = [Reference(title="", url=url) for url in citations]
+    sources = [Source(title="", url=url) for url in citations]
 
-    result = SearchResult(text=text, references=refs)
+    result = SearchResult(answer=answer, sources=sources)
     result._raw_response = response  # type: ignore[attr-defined]
     return result
 
@@ -348,7 +352,7 @@ async def query_deepseek(
         **kwds,
     )
     if validate:
-        return SearchResult(text=answer, references=[])
+        return SearchResult(answer=answer, sources=[])
 
     return answer
 
@@ -361,14 +365,17 @@ LLMS = {
 }
 
 
-async def query(
+async def query(  # noqa: PLR0913
     prompts: list[str],
     model: str = "openai/gpt-5",
     use_search: bool = True,
     max_concurrent: int = 100,
+    timeout: float | None = 90,
+    attempts: int = 3,
     progress_callback: Coroutine | None = None,
     return_coros: bool = False,
     plain: bool = False,
+    log: bool = False,
     **kwds,
 ) -> ResponseSet | Any:
     """Execute multiple web searches concurrently for a given provider."""
@@ -388,16 +395,36 @@ async def query(
     query = LLMS[client]
     sem = Semaphore(max_concurrent)
 
-    async def rate_limited_search(prompt: str):
+    @retry(stop=stop_after_attempt(attempts), wait=wait_random_exponential(multiplier=1, max=60))
+    async def with_rate_limit(prompt: str):
         async with sem:
-            return await query(
+            start = time.perf_counter()
+            coro = query(
                 prompt=prompt,
                 model=model,
                 use_search=use_search,
                 **kwds,
             )
+            try:
+                if (timeout is None) or timeout <= 0:
+                    return await coro
 
-    coros = [rate_limited_search(p) for p in prompts]
+                return await asyncio.wait_for(coro, timeout=timeout)
+            finally:
+                elapsed = time.perf_counter() - start
+                if log:
+                    LOG.info(f"{model} completed in {elapsed:.2f}s (prompt: {prompt[:60]})")
+
+    async def with_fallback(prompt: str):
+        try:
+            return await with_rate_limit(prompt)
+        except Exception as e:
+            LOG.error(
+                f"Search query failed after {attempts} attempts: {e} (prompt: {prompt[:80]})"
+            )
+            return SearchResult.fallback()
+
+    coros = [with_fallback(p) for p in prompts]
     if return_coros:
         return coros
 
