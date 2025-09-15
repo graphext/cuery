@@ -365,7 +365,7 @@ async def query(
     prompts: list[str],
     model: str = "openai/gpt-5",
     use_search: bool = True,
-    max_concurrent: int = 2,
+    max_concurrent: int = 100,
     progress_callback: Coroutine | None = None,
     return_coros: bool = False,
     plain: bool = False,

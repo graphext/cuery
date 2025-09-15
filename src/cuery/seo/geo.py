@@ -187,7 +187,7 @@ async def query_with_models(
                 prompts=prompts,
                 model=model,
                 use_search=use_search,
-                max_concurrent=30,
+                max_concurrent=100,
                 return_coros=True,
             )
         )
