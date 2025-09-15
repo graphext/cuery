@@ -22,7 +22,6 @@ This Apify actor performs general classification of data records/rows using AI. 
 
 - `attrs`: List of record attribute names to use for classification (if None, all attributes are used)
 - `instructions`: Additional instructions/context for the classification task
-- `record_format`: Format of the record in the prompt ("text", "json", or "md", default: "text")
 - `model`: AI model for classification (default: "openai/gpt-4.1-mini")
 
 ### Input Data Format

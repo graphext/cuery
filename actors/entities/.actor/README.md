@@ -22,7 +22,6 @@ This Apify actor extracts entities from data records/rows using AI. It can ident
 ### Optional Input Fields
 
 - `attrs`: List of record attribute names to use for entity extraction (if None, all attributes are used)
-- `record_format`: Format of the record in the prompt ("text", "json", or "md", default: "text")
 - `model`: AI model for entity extraction (default: "openai/gpt-4.1-mini")
 
 ### Input Data Format
@@ -66,8 +65,7 @@ Define your own entity categories by providing a dictionary of category names an
     "product": "Specific products or services mentioned",
     "location": "Geographic locations, cities, countries, or regions"
   },
-  "attrs": ["title", "description"],
-  "instructions": "Focus on extracting entities relevant for SEO analysis."
+  "attrs": ["title", "description"]
 }
 ```
 

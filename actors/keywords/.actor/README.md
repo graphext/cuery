@@ -72,7 +72,6 @@ Configure your keyword analysis with these simple parameters:
 | `whole_site` | Boolean | Generate ideas for entire website (requires `url` to be domain only) | Optional | `false` |
 | `ideas` | Boolean | Generate additional keyword ideas (limited to ≤20 seed keywords) | Optional | `false` |
 | `max_ideas` | Integer | Maximum keyword ideas to generate (when `ideas` is enabled) | Optional | - |
-| `customer` | String | Google Ads Customer ID for API access | Optional | Uses environment variable |
 | `language` | String | Language code for targeting (e.g., "en", "es", "fr") | Optional | `""` (all languages/keywords) |
 | `country` | String | Geographic target code (e.g., "us", "es", "uk") | Optional | `""` (all locations) |
 | `metrics_start` | String | Start date for historical metrics (YYYY-MM format) | Optional | - |
@@ -208,7 +207,6 @@ The Actor generates a comprehensive dataset with detailed keyword metrics for SE
 
 1. **📝 Enter your keywords or URL**: Add your seed keywords or provide a landing page URL
 2. **🔧 Configure settings** (optional): 
-   - **Customer ID**: Leave empty to use Graphext's internal customer, or provide your own Google Ads Customer ID
    - **Language & Country**: Set your target language and country
    - **Historical Range**: Configure date range for trend analysis
 3. **▶️ Start the Actor**: Click "Start" and let it analyze your keywords

@@ -30,7 +30,7 @@ By default, automatically includes AI-powered, topic and intent detection as wel
 {
   "keywords": ["digital marketing", "seo tools", "content marketing"],
   "resultsPerPage": 100,
-  "country": "us",
+  "countryCode": "us",
   "searchLanguage": "en",
   "top_n": 10,
   "brands": ["Ahrefs", "SEMrush", "Moz"],
@@ -44,13 +44,11 @@ By default, automatically includes AI-powered, topic and intent detection as wel
 {
   "keywords": ["e-commerce platform", "online store builder", "shopify alternatives"],
   "resultsPerPage": 50,
-  "country": "us",
+  "countryCode": "us",
   "searchLanguage": "en",
   "top_n": 15,
   "brands": ["Shopify", "WooCommerce"],
   "competitors": ["BigCommerce", "Squarespace", "Wix"],
-  "topic_model": null,
-  "entity_model": null,
 }
 ```
 
@@ -62,7 +60,6 @@ By default, automatically includes AI-powered, topic and intent detection as wel
 | `keywords` | Array | Keywords to fetch SERP data for | Optional* | - |
 | `batch_size` | Integer | Number of keywords to process in a single batch | Optional | `100` |
 | `resultsPerPage` | Integer | Number of search results to fetch per page | Optional | `100` |
-| `maxPagesPerQuery` | Integer | Maximum number of pages to fetch per query | Optional | `1` |
 | `countryCode` | String | Country code for SERP targeting (e.g., "us", "uk", "de") | Optional | - |
 | `searchLanguage` | String | Search language (e.g., "en", "es", "fr") | Optional | - |
 | `languageCode` | String | Language code for results (e.g., "en", "es") | Optional | - |
@@ -218,13 +215,11 @@ The Actor generates comprehensive SERP analysis data with detailed metrics for e
 {
   "keywords": ["project management software", "team collaboration tools", "task management app"],
   "resultsPerPage": 50,
-  "country": "us",
+  "countryCode": "us",
   "searchLanguage": "en",
   "top_n": 15,
   "brands": ["Asana", "Monday.com"],
   "competitors": ["Trello", "Notion", "ClickUp", "Jira"],
-  "topic_model": "google/gemini-2.5-flash-preview-05-20",
-  "assignment_model": "openai/gpt-4.1-mini"
 }
 ```
 *Expected output: Brand rankings, competitor positions, and topic classification for strategic positioning*
@@ -235,7 +230,7 @@ The Actor generates comprehensive SERP analysis data with detailed metrics for e
 {
   "keywords": ["ecommerce platform", "online shop builder", "create online store"],
   "resultsPerPage": 100,
-  "country": "de",
+  "countryCode": "de",
   "searchLanguage": "de",
   "languageCode": "de",
   "top_n": 10,
@@ -251,12 +246,11 @@ The Actor generates comprehensive SERP analysis data with detailed metrics for e
 {
   "keywords": ["best crm software", "customer relationship management", "sales automation tools"],
   "resultsPerPage": 50,
-  "country": "us",
+  "countryCode": "us",
   "searchLanguage": "en",
   "top_n": 10,
   "brands": ["Salesforce", "HubSpot"],
   "competitors": ["Pipedrive", "Zoho", "Freshsales"],
-  "entity_model": "openai/gpt-4.1-mini",
   "topic_max_samples": 200
 }
 ```
@@ -268,11 +262,9 @@ The Actor generates comprehensive SERP analysis data with detailed metrics for e
 {
   "keywords": ["dentist near me", "best restaurant downtown", "plumber emergency service"],
   "resultsPerPage": 30,
-  "country": "us",
+  "countryCode": "us",
   "searchLanguage": "en",
   "top_n": 10,
-  "topic_model": "google/gemini-2.5-flash-preview-05-20",
-  "assignment_model": "openai/gpt-4.1-mini"
 }
 ```
 *Expected output: Local SERP features analysis with intent classification for local SEO optimization*
@@ -281,7 +273,7 @@ The Actor generates comprehensive SERP analysis data with detailed metrics for e
 
 - **Use targeted keywords**: Focus on keywords relevant to your industry and business goals
 - **Enable brand tracking**: Add your brands and main competitors for comprehensive competitive analysis
-- **Configure geographic targeting**: Set appropriate country and language for your target market
+- **Configure geographic targeting**: Set appropriate countryCode and language for your target market
 - **Optimize batch size**: Use 50-100 keywords per batch for efficient processing
 - **Enable AI analysis**: Use topic and intent extraction for deeper SERP insights
 - **Monitor AI overviews**: Track entity mentions in Google's AI-powered results

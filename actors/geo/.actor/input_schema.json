@@ -63,7 +63,7 @@
             "type": "integer",
             "description": "Maximum total number of prompts after generation + seeds prompts. Additional prompts are LLM-generated if seeds < this limit and sector or brands context is available.",
             "editor": "number",
-            "default": 10,
+            "default": 20,
             "minimum": 1,
             "maximum": 500
         },

@@ -20,18 +20,40 @@ The Automagic Actor is a fully automated tool that can extract and structure any
 
 ## Input Parameters
 
-### Required
+Use the following JSON keys when providing `input` to the actor (e.g. via API or local run).
 
-- **dataset**: The ID of the Apify dataset containing your data records or the URL of a parquet file
-- **instructions**: Detailed description of what information to extract and how to process the data
+| Key | Title (UI) | Required | Type | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `dataset` | Dataset | Yes | string | – | Apify dataset ID or URL to a parquet file containing records to process. |
+| `instructions` | Processing Instructions | Yes | string | – | What to extract and how to process each record. Drives both schema generation and extraction. |
+| `model` | LLM Model | No | string | `openai/gpt-3.5-turbo` | LLM provider/model for data processing (format `provider/model`). |
+| `schema_model` | Schema Generation Model | No | string | `openai/gpt-4.1` | LLM provider/model used specifically to generate the JSON schema. |
+| `response_schema` | Response Schema Instructions | No | string | – | Extra instructions constraining/overriding automatic schema generation. |
+| `attrs` | Record Attributes | No | array[string] | – | Subset of record attribute names to include in prompts. All are used if omitted. |
+| `record_format` | Record Format | No | enum(`text`,`json`,`md`) | `text` | Formatting of record data in the LLM prompt. |
 
-### Optional
+### Minimal Required Example
 
-- **Model**: LLM model for data processing (default: `openai/gpt-3.5-turbo`)
-- **Schema Model**: LLM model for schema generation (default: `openai/gpt-4.1`)
-- **Response Schema Instructions**: Specific instructions for schema generation
-- **Record Attributes**: Specific columns to focus on (if not provided, all columns are used)
-- **Record Format**: How records are formatted in prompts (`text`, `json`, or `md`)
+```json
+{
+	"dataset": "apifyDatasetIdOrParquetUrl",
+	"instructions": "Extract company name, founded year, and HQ location from each profile."
+}
+```
+
+### Full Example
+
+```json
+{
+	"dataset": "apifyDatasetIdOrParquetUrl",
+	"instructions": "Extract company name, founded year, HQ location and classify the industry. Output industry as one of: SaaS, FinTech, Health, Other.",
+	"model": "openai/gpt-4o-mini",
+	"schema_model": "openai/gpt-4.1",
+	"response_schema": "Ensure founded_year is an integer and industry is one of the allowed enum values.",
+	"attrs": ["company_profile", "about", "summary"],
+	"record_format": "json"
+}
+```
 
 ## Example Use Cases
 

@@ -26,7 +26,6 @@ This Apify actor performs general scoring of data records/rows using AI. It can 
 
 - `attrs`: List of record attribute names to use for scoring (if None, all attributes are used)
 - `type`: Score type - "integer" or "float" (default: "float")
-- `record_format`: Format of the record in the prompt ("text", "json", or "md", default: "text")
 - `model`: AI model for scoring (default: "openai/gpt-3.5-turbo")
 
 ### Input Data Format
