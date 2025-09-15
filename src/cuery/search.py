@@ -209,7 +209,9 @@ async def query_openai(
     """
     client = AsyncOpenAI()
 
-    params: dict = {"model": model, "input": prompt, "reasoning": {"effort": reaonsing_effort}}
+    params: dict = {"model": model, "input": prompt}
+    if "-5" in model:
+        params["reasoning"] = {"effort": reaonsing_effort}
 
     if use_search:
         tool: dict = {
