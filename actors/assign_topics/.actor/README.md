@@ -26,9 +26,8 @@ The actor expects:
 
 ### Optional Input Fields
 
-- `text_column`: Column name containing the keywords (default: "term")
-- `extra_columns`: Additional SERP data columns for context (default: ["titles", "domains", "breadcrumbs"])
-- `model`: AI model for classification (default: "openai/gpt-4.1-mini")
+- `attrs`: List of record attribute (column) names from the dataset to use for classification. If omitted, all columns are considered. Use this to focus the model on only the most relevant SERP context (e.g. `["term", "titles", "domains", "breadcrumbs"]`).
+- `model`: AI model for classification (default: `openai/gpt-3.5-turbo` unless overridden in input)
 
 ### Input Data Format
 
@@ -37,6 +36,20 @@ The input dataset should contain keyword SERP data with columns like:
 - `titles`: Array of SERP result titles
 - `domains`: Array of SERP result domains
 - `breadcrumbs`: Array of SERP result breadcrumbs
+
+Example actor input JSON:
+
+```json
+{
+  "dataset": "abc123def456",
+  "topics": {
+    "Technology": ["AI/ML", "Web Development", "Cloud"],
+    "Marketing": ["SEO", "Content", "Social Media"]
+  },
+  "attrs": ["term", "titles", "domains", "breadcrumbs"],
+  "model": "openai/gpt-3.5-turbo"
+}
+```
 
 ## Output
 

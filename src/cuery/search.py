@@ -51,6 +51,7 @@ VALID_MODELS = {
         "o4-mini",
         "o3",
         "gpt-5",
+        "gpt-5-mini",
     ],
     "google": [
         "gemini-2.5-pro",
@@ -195,7 +196,8 @@ async def query_openai(
     prompt: str,
     country: str | None = None,  # e.g. "US"
     city: str | None = None,  # e.g. "Madrid"
-    context_size: Literal["low", "medium", "high"] | str = "high",
+    context_size: Literal["low", "medium", "high"] | str = "medium",
+    reaonsing_effort: Literal["low", "medium", "high"] | str = "low",
     model: str = "gpt-5",
     use_search: bool = True,
     validate: bool = True,
@@ -207,10 +209,7 @@ async def query_openai(
     """
     client = AsyncOpenAI()
 
-    params: dict = {
-        "model": model,
-        "input": prompt,
-    }
+    params: dict = {"model": model, "input": prompt, "reasoning": {"effort": reaonsing_effort}}
 
     if use_search:
         tool: dict = {
