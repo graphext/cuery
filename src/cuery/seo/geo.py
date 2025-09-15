@@ -16,7 +16,7 @@ from ..call import call
 from ..search import VALID_MODELS, query
 from ..utils import LOG, Configurable, dedent, gather_with_progress
 
-DEFAULT_MODELS = ["openai/gpt-5", "google/gemini-2.5-flash"]
+DEFAULT_MODELS = ["openai/gpt-4.1-mini", "google/gemini-2.5-flash"]
 
 
 class Brands(Response):

@@ -40,11 +40,11 @@
                 ]
             },
             "default": [
-                "openai/gpt-5",
+                "openai/gpt-4.1-mini",
                 "google/gemini-2.5-flash"
             ],
             "prefill": [
-                "openai/gpt-5",
+                "openai/gpt-4.1-mini",
                 "google/gemini-2.5-flash"
             ]
         },
