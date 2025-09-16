@@ -118,14 +118,6 @@
             "minimum": 1,
             "maximum": 50
         },
-        "competitors_model": {
-            "title": "Competitor Discovery Model",
-            "type": "string",
-            "description": "LLM model used specifically for discovering competitor brands using search.",
-            "editor": "textfield",
-            "default": "openai/gpt-4.1",
-            "pattern": "^[\\w\\.-]+/[\\w\\.-]+$"
-        },
         "sector": {
             "title": "Sector to focus on in prompt generation and competitor discovery",
             "type": "string",

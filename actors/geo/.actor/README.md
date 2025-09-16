@@ -30,7 +30,6 @@ Not a good fit when you only need: simple single-model prompting, non-commercial
 | brands (required) | array[string] | (none) | Your own brand names or homepage URLs (canonicalized & lower‑cased). Must provide at least one. |
 | competitors | array[string] | - | Optional seed competitor brand names or URLs. Automatically expanded (search + LLM) up to `competitors_max`. |
 | competitors_max | integer | 10 | Maximum total competitors (including any seeds) to keep after discovery. |
-| competitors_model | string | openai/gpt-4.1 | LLM model used for competitor discovery. |
 | models | array[string] | openai/gpt-5, google/gemini-2.5-flash | LLM provider/model identifiers to evaluate (provider/model). If empty defaults are injected. |
 | prompts | array[string] | - | Optional seed prompts to include directly. |
 | prompts_max | integer | 10 (UI) / 20 (code default) | Target total prompt count (seed + generated). Additional prompts are LLM-generated if context available. |

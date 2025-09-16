@@ -3,6 +3,7 @@
 import json
 import re
 from collections.abc import Coroutine
+from contextlib import suppress
 from functools import partial
 from typing import Any, Literal
 
@@ -24,12 +25,12 @@ class Brands(Response):
     """List of brand names."""
 
 
-def brand_from_url(url: str) -> str:
+def normalize_brand(url: str) -> str:
     """Extract the brand name (domain) from a URL."""
-    try:
-        return tldextract.extract(url).domain or url
-    except Exception:
-        return url
+    with suppress(Exception):
+        url = tldextract.extract(url).domain or url
+
+    return url.lower().strip()
 
 
 async def find_competitors(
@@ -38,17 +39,21 @@ async def find_competitors(
     market: str | None = None,
     max_count: int = 5,
     model: str = "openai/gpt-4.1",
+    known: list[str] | None = None,
 ) -> list[str]:
     """Find a list of competitor brands using LLM with live search."""
     brands = brands or []
+    known = known or []
 
     if not brands and not sector:
         raise ValueError("At least one of 'brands' or 'sector' must be provided.")
 
-    prompt = f"Identify up to {max_count} real competing brands"
+    prompt = f"Which are the {max_count} most important competing brands"
     prompt += f" for {brands}" if brands else ""
     prompt += f" in the '{sector}' sector" if sector else ""
     prompt += f" in the '{market}' market" if market else ""
+    if known:
+        prompt += f". Do NOT include these known competitors: {known}."
 
     LOG.info(f"Searching for competitor brands with prompt:\n{prompt}")
     search_results: ResponseSet = await query(prompts=[prompt], model=model)
@@ -58,9 +63,14 @@ async def find_competitors(
     )
 
     extraction_prompt = dedent(f"""
-    Extract a list of up to {max_count} competitor brand names from the search result below,
-    which contains a text summary of a search for competitors as well as a list of references used
-    in the search.
+    Extract a list of up to {max_count} competitor brand names from the Search Result section
+    below, which contains a text summary of a search for competitors of original brands {brands}
+    as well as a list of references used in the search.
+
+    Do NOT include any of these already known competitors: {known}, nor any of the original brands.
+
+    Return the new competitors in the order of importance (e.g. by approx. market share or company
+    size).
 
     # Search Result
 
@@ -77,8 +87,8 @@ async def find_competitors(
     )
 
     competitors = list({name.lower() for name in competitors.names})  # type: ignore
-    competitors = [c for c in competitors if c not in brands][:max_count]
-    LOG.info(f"Found these competitors brands: {competitors}")
+    competitors = [c for c in competitors if c not in brands and c not in known][:max_count]
+    LOG.info(f"Found these new competitors brands: {competitors}")
     return competitors
 
 
@@ -370,12 +380,7 @@ class GeoConfig(Configurable):
     """Whether to enable web/live search when evaluating LLMs."""
 
     @model_validator(mode="after")
-    def check_models(self):
-        if self.brands is None:
-            self.brands = []
-        else:
-            self.brands = [brand.lower() for brand in self.brands]
-
+    def check_params(self):
         if self.models is None or not self.models:
             self.models = DEFAULT_MODELS
         return self
@@ -386,19 +391,20 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
     LOG.info(f"Querying LLMs with\n\n{cfg}")
 
     # Prepare brands
-    brands = list({brand_from_url(brand) for brand in cfg.brands})
-    LOG.info(f"Using these seed brands: {brands}")
+    brands = list({normalize_brand(brand) for brand in cfg.brands or []})
+    competitors = list({normalize_brand(comp) for comp in cfg.competitors or []})
+    LOG.info(f"Using these seed brands: {brands}, and these competitors: {competitors}")
 
-    if brands or cfg.sector:
-        competitors = await find_competitors(
+    n_gen_comps = max(0, cfg.competitors_max - len(competitors))
+    if (brands or cfg.sector) and (n_gen_comps > 0):
+        competitors += await find_competitors(
             brands=brands,
             sector=cfg.sector,
             market=cfg.market,
-            max_count=cfg.competitors_max,
+            max_count=n_gen_comps,
             model=cfg.competitors_model,
+            known=competitors,
         )
-    else:
-        competitors = []
 
     all_brands = brands + competitors
 
