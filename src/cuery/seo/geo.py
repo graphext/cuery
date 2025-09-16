@@ -453,7 +453,7 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
                         own=cfg.brands,
                         competitors=competitors,
                         models=cfg.models,  # type: ignore
-                        emoji_flags=True,
+                        emoji_flags=False,
                     )
                 except Exception as e:
                     LOG.error(f"Error summarizing brand ranks: {e}")

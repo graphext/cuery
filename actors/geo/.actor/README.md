@@ -82,8 +82,6 @@ Generated for each model:
 * `competitor_mentioned_in_answer_count` – Number of models mentioning any competitor in answer text.
 * `competitor_mentioned_in_sources_count` – Number of models citing a competitor in sources.
 
-All boolean mention columns may be rendered as ✅ / ❌ if emoji flagging was enabled during summarisation.
-
 ### Notes
 * Provider prefixes (`openai/`, `google/`, etc.) are stripped from column names.
 * Non‑alphanumeric characters in model identifiers are normalised to underscores.
