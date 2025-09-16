@@ -289,7 +289,6 @@ def summarize_ranks(
     own: list[str],
     competitors: list[str],
     models: list[str],
-    emoji_flags: bool = False,
 ) -> DataFrame:
     """Summarize brand ranks in a results DataFrame."""
     own = [b.lower() for b in own]
@@ -340,12 +339,6 @@ def summarize_ranks(
     cmp_in_refs_cols = [f"competitor_mentioned_in_sources_{model}" for model in models]
     df["competitor_mentioned_in_sources_count"] = df[cmp_in_refs_cols].sum(axis=1)
 
-    if emoji_flags:
-        for col in df.columns:
-            if (col.startswith(("brand_mentioned_in", "competitor_mentioned_in_"))) and (
-                "_count" not in col
-            ):
-                df[col] = df[col].replace({True: "✅", False: "❌"})
     return df
 
 
@@ -453,7 +446,6 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
                         own=cfg.brands,
                         competitors=competitors,
                         models=cfg.models,  # type: ignore
-                        emoji_flags=False,
                     )
                 except Exception as e:
                     LOG.error(f"Error summarizing brand ranks: {e}")

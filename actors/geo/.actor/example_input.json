@@ -3,9 +3,9 @@
         "mapfre"
     ],
     "models": [
-        "openai/gpt-4.1",
-        "google/gemini-2.5-flash"
+        "openai/gpt-4.1-mini"
     ],
+    "prompts_max": 10,
     "sector": "insurance",
     "market": "Spain",
     "competitors_max": 5,
