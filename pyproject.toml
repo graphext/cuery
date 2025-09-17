@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.24.4"
+version = "0.25.0"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -30,6 +30,7 @@ urls = { Homepage = "https://github.com/graphext/cuery", Documentation = "https:
 requires-python = ">=3.11"
 dependencies = [
     "async-lru>=2.0.5",
+    "aiohttp>=3.9.0",
     "datamodel-code-generator>=0.32.0",
     "fastapi>=0.115.12",
     "fastapi-mcp>=0.3.4",
