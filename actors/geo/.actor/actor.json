@@ -1,7 +1,7 @@
 {
     "actorSpecification": 1,
-    "name": "llm-auditor",
-    "title": "LLM Auditor",
+    "name": "llm-monitor",
+    "title": "LLM Monitor",
     "description": "Generate customisable prompts, run them across multiple LLMs and detect brand mentions/ranks.",
     "version": "0.1",
     "buildTag": "latest",

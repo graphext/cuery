@@ -1,6 +1,6 @@
 {
     "actorSpecification": 1,
-    "title": "llm-auditor",
+    "title": "llm-monitor",
     "views": {
         "extracted": {
             "title": "Extracted information",
