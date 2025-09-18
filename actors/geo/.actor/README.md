@@ -39,12 +39,13 @@ Not a good fit when you only need: simple single-model prompting, non-commercial
 | sector | string | - | Sector / industry context (improves prompt + competitor generation). |
 | market | string | - | Geographic market (localises generation & competitor discovery). |
 | use_search | boolean | true | Enable live web/search augmentation when querying models (recommended). |
+| search_country | string | - | Optional country code for search localisation (e.g., 'us', 'uk', 'de') |
 
 Notes:
 1. `brands` is now required by the schema; generation & competitor discovery work best when at least `brands` or (`sector` + optionally `market`) are provided. 
 2. If you omit `models`, internal defaults are inserted. 
-4. All brand/competitor entries are normalised (lower‑cased; URLs reduced to host).
-
+3. All brand/competitor entries are normalised (lower‑cased; URLs reduced to host).
+4. `search_country` localisation is currently supported only by OpenAI (GPT models), XAI (Grok), and Google's AI Overview (via hasdata API).
 ---
 
 ## Output
@@ -144,7 +145,8 @@ This will: (1) normalise your own brand list, (2) attempt competitor discovery (
   "market": "Germany",
   "prompts_max": 25,
   "brands_in_prompt": "never",
-  "use_search": true
+  "use_search": true,
+  "search_country": de
 }
 ```
 
