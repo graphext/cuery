@@ -247,7 +247,7 @@ async def gather(  # noqa: PLR0913
     )
 
     kwds = [{"prompt": p} for p in prompts]
-    coros = all_with_policies(func, kwds=kwds, policies=policies)
+    coros = all_with_policies(func, kwds=kwds, policies=policies, labels="hasdata-aio")
 
     if not execute:
         return coros

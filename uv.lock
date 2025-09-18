@@ -756,9 +756,10 @@ wheels = [
 
 [[package]]
 name = "cuery"
-version = "0.24.4"
+version = "0.25.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "async-lru" },
     { name = "datamodel-code-generator" },
     { name = "fastapi" },
@@ -809,6 +810,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9.0" },
     { name = "apify", marker = "extra == 'seo'" },
     { name = "async-lru", specifier = ">=2.0.5" },
     { name = "datamodel-code-generator", specifier = ">=0.32.0" },

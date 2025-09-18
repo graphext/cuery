@@ -1,7 +1,7 @@
 """cuery.asy
 =================
 
-Composable async "policy" wrappers (timeout, semaphore, retries, fallback, progress)
+Composable async "policy" wrappers (timeout, semaphore, retries, fallback, timer, progress)
 for coroutine *factories*.
 
 Why factories instead of raw coroutines?
@@ -27,16 +27,19 @@ Provided wrappers
 ``with_semaphore``    Limit concurrency with an ``asyncio.Semaphore``
 ``with_retries``      Exponential backoff retries using ``tenacity`` (returns after first success)
 ``with_fallback``     Provide a fallback value or callable if the wrapped factory raises
+``with_timer``        Time a single execution attempt and log the elapsed seconds
 ``with_progress``     Increment a ``tqdm`` progress bar and optionally call an
                        async progress callback
 ``with_policies``     Convenience function composing any subset of the above in a predictable order
 
 Composition order in ``with_policies``
 -------------------------------------
-The order is: timeout -> semaphore -> retries -> fallback -> progress.
+The order is: timeout -> semaphore -> retries -> fallback -> timer -> progress.
 This means, for example, that retries encompass timeout and semaphore acquisition,
-and that fallback is only engaged after retries are exhausted. Progress is only
-updated on *successful* completions of the wrapped call (i.e. after fallback if provided).
+and that fallback is only engaged after retries are exhausted. The timer (if enabled)
+measures only the final, successful execution path (after fallback if provided) and
+excludes progress update overhead. Progress is only updated on *successful* completions
+of the wrapped call.
 
 Tenacity retry semantics
 ------------------------
@@ -108,6 +111,7 @@ Design goals
 
 from asyncio import Semaphore, wait_for
 from collections.abc import Awaitable, Callable, Coroutine, Iterable
+from time import perf_counter
 from typing import Any
 
 from tenacity import AsyncRetrying, stop_after_attempt, wait_random_exponential
@@ -191,7 +195,6 @@ def with_progress(
     pbar: tqdm,
     progress_callback: Callable[[dict], Awaitable[None]] | None = None,
     min_iters: int = 1,
-    total: int | None = None,
 ) -> Callable[[], Awaitable]:
     """
     Wrap a coroutine factory to update a tqdm progress bar after completion,
@@ -202,9 +205,35 @@ def with_progress(
         result = await coro_factory()
         pbar.update()
         if progress_callback is not None:  # noqa: SIM102
-            if (pbar.n % min_iters == 0) or (total is not None and pbar.n == total):
+            if (pbar.n % min_iters == 0) or (pbar.total is not None and pbar.n == pbar.total):
                 await progress_callback(pbar.format_dict)  # type: ignore
         return result
+
+    return wrapper
+
+
+def with_timer(coro_factory: CoroFactory, label: str | None = None) -> CoroFactory:
+    """Wrap a coroutine factory with a simple elapsed time logger.
+
+    Logs the wall-clock seconds the coroutine took to resolve (successful or via fallback
+    if used outside). If the coroutine raises an exception the timing is still logged
+    before the exception is propagated.
+
+    Args:
+        coro_factory: Zero-arg coroutine factory to wrap.
+        label: Optional label to include in the log line for identification.
+    """
+    name = label or getattr(coro_factory, "__name__", "<factory>")
+
+    async def wrapper():
+        start = perf_counter()
+        try:
+            return await coro_factory()
+        except Exception:
+            raise
+        finally:
+            elapsed = perf_counter() - start
+            LOG.info(f"q({name}): t={elapsed:.2f}s")
 
     return wrapper
 
@@ -216,9 +245,11 @@ def with_policies(  # noqa: PLR0913
     retries: int = 0,
     wait_max: int = 60,
     fallback: Callable | Any = None,
+    timer: bool = False,
     pbar: tqdm | None = None,
     progress_callback: Callable[[dict], Awaitable[None]] | None = None,
     min_iters: int = 1,
+    label: str | None = None,
 ) -> CoroFactory:
     """Wrap a coroutine factory with multiple policies."""
     wrapped = coro_factory
@@ -231,13 +262,14 @@ def with_policies(  # noqa: PLR0913
         wrapped = with_retries(wrapped, attempts=retries, wait_max=wait_max)
     if fallback is not None:
         wrapped = with_fallback(wrapped, fallback)
+    if timer:
+        wrapped = with_timer(wrapped, label=label)
     if pbar is not None:
         wrapped = with_progress(
             wrapped,
-            pbar,
+            pbar=pbar,
             progress_callback=progress_callback,
             min_iters=min_iters,
-            total=pbar.total,
         )
 
     return wrapped
@@ -245,8 +277,9 @@ def with_policies(  # noqa: PLR0913
 
 def all_with_policies(
     func: AsyncFunc,
-    kwds: Iterable[dict] | None = None,
+    kwds: list[dict] | None = None,
     policies: dict[str, Any] | None = None,
+    labels: str | list | None = None,
 ) -> list[Coroutine]:
     """
     Create a list of wrapped coroutines for many parameter sets.
@@ -259,8 +292,11 @@ def all_with_policies(
     Returns:
         List of coroutines, each wrapped with the given policies, ready to be awaited or gathered
     """
-    kwds = kwds or {}
+    kwds = kwds or [{}]
     policies = policies or {}
+
+    if not isinstance(labels, list):
+        labels = [labels] * len(kwds)
 
     if (sem := policies.get("semaphore")) and isinstance(sem, int | float):
         policies["semaphore"] = Semaphore(int(sem))
@@ -268,9 +304,9 @@ def all_with_policies(
         policies["semaphore"] = Semaphore(int(policies.pop("n_concurrent")))
 
     factories = []
-    for params in kwds:
+    for params, label in zip(kwds, labels, strict=True):  # type: ignore
         factory = lambda kwds=params: func(**kwds)  # noqa: E731
-        wrapped = with_policies(factory, **policies)
+        wrapped = with_policies(factory, label=label, **policies)
         factories.append(wrapped)
 
     return [fac() for fac in factories]

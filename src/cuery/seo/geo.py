@@ -1,5 +1,6 @@
 """Tools to apply SEO to LLM responses."""
 
+import asyncio
 import json
 import re
 from collections.abc import Coroutine
@@ -11,11 +12,13 @@ import instructor
 import tldextract
 from pandas import DataFrame
 from pydantic import model_validator
+from tqdm.auto import tqdm
 
-from .. import Prompt, Response, ResponseSet, ask
+from .. import Prompt, Response, ResponseSet, ask, search
 from ..call import call
-from ..search import VALID_MODELS, SearchResult, query
-from ..utils import LOG, Configurable, dedent, gather_with_progress
+from ..search import SearchResult
+from ..utils import LOG, Configurable, dedent
+from .aio import hasdata
 
 DEFAULT_MODELS = ["openai/gpt-4.1-mini", "google/gemini-2.5-flash"]
 
@@ -56,8 +59,7 @@ async def find_competitors(
         prompt += f". Do NOT include these known competitors: {known}."
 
     LOG.info(f"Searching for competitor brands with prompt:\n{prompt}")
-    search_results: ResponseSet = await query(prompts=[prompt], model=model)
-    search_result: SearchResult = search_results[0]  # type: ignore
+    search_result: SearchResult = await search.gather(prompts=prompt, model=model)  # type: ignore
     search_str = (
         search_result.answer + "\n\n" + "\n".join(c.url for c in search_result.sources or [])
     )
@@ -145,36 +147,58 @@ async def generate_prompts(
     return queries
 
 
-async def query_with_models(
+async def query_ais(
     prompts: list[str],
     models: list[str],
     use_search: bool = True,
     progress_callback: Coroutine | None = None,
-) -> DataFrame | Any:
+    to_pandas: bool = True,
+) -> DataFrame | ResponseSet:
     """Run a list of prompts through a list of models and return a combined DataFrame.
 
     Gathers all model and prompt comnbinations concurrently.
     """
     coros = []
+    n_total = len(prompts) * len(models)
+    pbar = tqdm(total=n_total)
+    policies = {
+        "n_concurrent": 100,
+        "timeout": 300,
+        "retries": 3,
+        "wait_max": 60,
+        "fallback": SearchResult.fallback(),
+        "pbar": pbar,
+        "progress_callback": progress_callback,
+        "timer": True,
+        "min_iters": max(1, int(n_total / 20)),
+    }
+
     for model in models:
-        coros.extend(
-            await query(
-                prompts=prompts,
-                model=model,
-                use_search=use_search,
-                max_concurrent=100,
-                return_coros=True,
-                log=True,
+        if model == "google/ai-overview":
+            coros.extend(
+                await hasdata.gather(
+                    prompts=prompts,
+                    policies=policies.copy() | {"n_concurrent": 14},
+                    execute=False,
+                )
             )
-        )
+        else:
+            coros.extend(
+                await search.gather(
+                    prompts=prompts,
+                    model=model,
+                    use_search=use_search,
+                    policies=policies,
+                    execute=False,
+                )  # type: ignore
+            )
 
-    responses = await gather_with_progress(
-        coros,  # type: ignore
-        min_iters=max(1, int(len(coros) / 20)),
-        progress_callback=progress_callback,
-    )
+    responses = await asyncio.gather(*coros)
+    responses = ResponseSet(responses=responses, context=None, required=None)
+    if not to_pandas:
+        return responses
 
-    df = ResponseSet(responses=responses, context=None, required=None).to_pandas()
+    df = responses.to_pandas()
     df["prompt"] = prompts * len(models)
     df["model"] = [model for model in models for _ in range(len(prompts))]
 
@@ -423,7 +447,7 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
 
     # Execute searches
     LOG.info(f"Running {len(prompts)} prompts through {len(cfg.models)} models")  # type: ignore
-    df = await query_with_models(
+    df = await query_ais(
         prompts=prompts,
         models=cfg.models,  # type: ignore
         use_search=cfg.use_search,
@@ -454,7 +478,7 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
 
     # Clean up dataframe
     def remove_provider(name):
-        providers = VALID_MODELS.keys()
+        providers = search.VALID_MODELS.keys()
         for provider in providers:
             name = name.replace(f"{provider}/", "")
 

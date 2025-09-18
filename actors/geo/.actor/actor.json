@@ -1,8 +1,8 @@
 {
     "actorSpecification": 1,
-    "name": "llm-monitor",
-    "title": "LLM Monitor",
-    "description": "Generate localized commercial prompts, run them across multiple LLMs and detect brand mentions/ranks.",
+    "name": "llm-auditor",
+    "title": "LLM Auditor",
+    "description": "Generate customisable prompts, run them across multiple LLMs and detect brand mentions/ranks.",
     "version": "0.1",
     "buildTag": "latest",
     "dockerfile": "./Dockerfile",
@@ -20,6 +20,7 @@
         "OPENAI_API_KEY": "@OPENAI_API_KEY",
         "GOOGLE_API_KEY": "@GOOGLE_API_KEY",
         "XAI_API_KEY": "@XAI_API_KEY",
-        "DEEPSEEK_API_KEY": "@DEEPSEEK_API_KEY"
+        "DEEPSEEK_API_KEY": "@DEEPSEEK_API_KEY",
+        "HASDATA_API_KEY": "@HASDATA_API_KEY"
     }
 }

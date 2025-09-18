@@ -18,9 +18,8 @@ is raised (no silent fallbacks here – upstream caller can decide how to handle
 from __future__ import annotations
 
 import asyncio
-import time
-from asyncio import Semaphore
 from collections.abc import Coroutine
+from functools import partial
 from io import StringIO
 from typing import Any, Literal
 
@@ -33,15 +32,14 @@ from markdown import Markdown
 from openai import AsyncOpenAI
 from openai import types as oaitypes
 from pydantic import BaseModel
-from tenacity import retry, stop_after_attempt, wait_random_exponential
 from xai_sdk import AsyncClient as XaiAsyncClient
 from xai_sdk.chat import Response as XAIResponse
 from xai_sdk.chat import user as xai_user
 from xai_sdk.proto import chat_pb2
 from xai_sdk.search import SearchParameters, news_source, web_source, x_source
 
+from .asy import all_with_policies
 from .response import Response, ResponseSet
-from .utils import LOG, gather_with_progress
 
 OAIResponse = oaitypes.responses.response.Response  # type: ignore[attr-defined]
 
@@ -365,74 +363,55 @@ LLMS = {
 }
 
 
-async def query(  # noqa: PLR0913
-    prompts: list[str],
-    model: str = "openai/gpt-5",
+async def gather(  # noqa: PLR0913
+    prompts: str | list[str],
+    model: str = "openai/gpt-4.1-mini",
     use_search: bool = True,
-    max_concurrent: int = 100,
-    timeout: float | None = 90,
-    attempts: int = 3,
-    progress_callback: Coroutine | None = None,
-    return_coros: bool = False,
-    plain: bool = False,
-    log: bool = False,
+    validate: bool = True,
+    policies: dict[str, Any] | None = None,
+    execute: bool = True,
     **kwds,
-) -> ResponseSet | Any:
-    """Execute multiple web searches concurrently for a given provider."""
+) -> list[Coroutine] | Coroutine | ResponseSet | SearchResult:
+    """Simplified gather mirroring ``hasdata.gather`` using ``all_with_policies``.
+
+    Creates one coroutine per prompt for the selected model/provider with optional
+    policies (timeout, retries, semaphore, fallback, progress). When ``execute`` is
+    False the wrapped coroutine objects are returned for the caller to schedule.
+    """
+    if isinstance(prompts, str):
+        prompts = [prompts]
+        return_single = True
+    else:
+        return_single = False
+
+    if not prompts:
+        raise ValueError("No prompts provided.")
 
     client, model = model.split("/", 1)
     if client not in VALID_MODELS:
         raise ValueError(f"Unsupported client '{client}'. Supported: {list(VALID_MODELS.keys())}.")
-
     if model not in VALID_MODELS[client]:
         raise ValueError(
             f"Unsupported model '{model}' for client '{client}'. Supported: {VALID_MODELS[client]}"
         )
 
-    if not prompts:
-        raise ValueError("No prompts provided.")
-
-    query = LLMS[client]
-    sem = Semaphore(max_concurrent)
-
-    @retry(stop=stop_after_attempt(attempts), wait=wait_random_exponential(multiplier=1, max=60))
-    async def with_rate_limit(prompt: str):
-        async with sem:
-            start = time.perf_counter()
-            coro = query(
-                prompt=prompt,
-                model=model,
-                use_search=use_search,
-                **kwds,
-            )
-            try:
-                if (timeout is None) or timeout <= 0:
-                    return await coro
-
-                return await asyncio.wait_for(coro, timeout=timeout)
-            finally:
-                elapsed = time.perf_counter() - start
-                if log:
-                    LOG.info(f"{model} completed in {elapsed:.2f}s (prompt: {prompt[:60]})")
-
-    async def with_fallback(prompt: str):
-        try:
-            return await with_rate_limit(prompt)
-        except Exception as e:
-            LOG.error(
-                f"Search query failed after {attempts} attempts: {e} (prompt: {prompt[:80]})"
-            )
-            return SearchResult.fallback()
-
-    coros = [with_fallback(p) for p in prompts]
-    if return_coros:
-        return coros
-
-    responses = await gather_with_progress(
-        coros,  # type: ignore
-        min_iters=max(1, int(len(prompts) / 20)),
-        progress_callback=progress_callback,
+    # Partial of async function is a "coroutine factory" returning a coroutine when called
+    func = partial(
+        LLMS[client],
+        model=model,
+        use_search=use_search,
+        validate=validate,
+        **kwds,
     )
 
-    context = [{"prompt": p} for p in prompts]
-    return ResponseSet(responses=responses, context=context, required=["prompt"])  # type: ignore
+    kwds = [{"prompt": p} for p in prompts]
+    coros = all_with_policies(func, kwds=kwds, policies=policies, labels=model)
+
+    if not execute:
+        return coros if not return_single else coros[0]
+
+    responses = await asyncio.gather(*coros)
+    if return_single:
+        return responses[0]
+
+    return ResponseSet(responses=responses, context=kwds, required=["prompt"])  # type: ignore
