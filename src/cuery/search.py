@@ -196,8 +196,8 @@ def validate_xai(response, plain: bool = False) -> SearchResult:
 
 async def query_openai(
     prompt: str,
-    country: str | None = None,  # e.g. "US"
-    city: str | None = None,  # e.g. "Madrid"
+    country: str | None = None,  # 2-letter code, e.g. "US"
+    city: str | None = None,  # text string, e.g. "Madrid"
     context_size: Literal["low", "medium", "high"] | str = "medium",
     reaonsing_effort: Literal["low", "medium", "high"] | str = "low",
     model: str = "gpt-5",
@@ -287,7 +287,7 @@ async def query_xai(  # noqa: PLR0913
     mode: Literal["auto", "on", "off"] = "on",
     max_search_results: int = 15,
     sources: list[Literal["web", "news", "x"]] | None = None,  # type: ignore
-    country: str | None = None,
+    country: str | None = None,  # 2-letter code, e.g. "US"
     use_search: bool = True,
     validate: bool = True,
 ) -> SearchResult | XAIResponse:
@@ -363,10 +363,14 @@ LLMS = {
 }
 
 
+SUPPORT_COUNTRY = ["openai", "xai"]
+
+
 async def gather(  # noqa: PLR0913
     prompts: str | list[str],
     model: str = "openai/gpt-4.1-mini",
     use_search: bool = True,
+    country: str | None = None,  # 2-letter code, e.g. "US"
     validate: bool = True,
     policies: dict[str, Any] | None = None,
     execute: bool = True,
@@ -394,6 +398,9 @@ async def gather(  # noqa: PLR0913
         raise ValueError(
             f"Unsupported model '{model}' for client '{client}'. Supported: {VALID_MODELS[client]}"
         )
+
+    if use_search and country and client in SUPPORT_COUNTRY:
+        kwds["country"] = country
 
     # Partial of async function is a "coroutine factory" returning a coroutine when called
     func = partial(

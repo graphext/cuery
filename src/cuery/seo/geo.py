@@ -151,6 +151,7 @@ async def query_ais(
     prompts: list[str],
     models: list[str],
     use_search: bool = True,
+    search_country: str | None = None,
     progress_callback: Coroutine | None = None,
     to_pandas: bool = True,
 ) -> DataFrame | ResponseSet:
@@ -178,6 +179,7 @@ async def query_ais(
             coros.extend(
                 await hasdata.gather(
                     prompts=prompts,
+                    country=search_country,
                     policies=policies.copy() | {"n_concurrent": 14},
                     execute=False,
                 )
@@ -188,6 +190,7 @@ async def query_ais(
                     prompts=prompts,
                     model=model,
                     use_search=use_search,
+                    country=search_country,
                     policies=policies,
                     execute=False,
                 )  # type: ignore
@@ -395,6 +398,8 @@ class GeoConfig(Configurable):
     """Market to focus on."""
     use_search: bool = True
     """Whether to enable web/live search when evaluating LLMs."""
+    search_country: str | None = None
+    """Country code for search localisation, e.g. 'us', 'uk', 'de '."""
 
     @model_validator(mode="after")
     def check_params(self):

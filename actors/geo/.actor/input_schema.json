@@ -137,6 +137,12 @@
             "description": "If true, uses live search augmentation when querying models. Should be enabled for almost all use cases to improve relevance and factuality. Only disable specifically for testing LLM internal knowledge.",
             "editor": "checkbox",
             "default": true
+        },
+        "search_country": {
+            "title": "Search Localisation Country Code",
+            "type": "string",
+            "description": "Optional country code for search localisation (e.g., 'us', 'uk', 'de'). Helps get results more relevant to the target market. Only currently supported by OpenAI (GPT models), XAI (Grok), and Google's AI Overview (via hasdata API).",
+            "editor": "textfield"
         }
     },
     "required": [
