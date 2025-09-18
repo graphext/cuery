@@ -1,5 +1,5 @@
 {
-    "title": "LLM Monitor (Search & Brand Analysis)",
+    "title": "LLM Auditor (Search & Brand Analysis)",
     "description": "Generate or use seed commercial prompts, optionally expand competitor brands, and run them across multiple LLM models (with optional live search) to analyse brand presence and rankings.",
     "type": "object",
     "schemaVersion": 1,

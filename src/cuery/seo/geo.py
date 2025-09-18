@@ -218,6 +218,9 @@ def token_rank_in_text(
     whole_word: bool = True,
 ) -> list[str] or None:
     """Find mention of first(!) token in text, returning list of (token, rank) tuples."""
+    if not text or not tokens:
+        return None
+
     flags = re.IGNORECASE
     pattern = r"\b{token}\b" if whole_word else "({token})"
     matches = []
@@ -241,6 +244,9 @@ def token_pos_in_list(
     include_none: bool = False,
 ) -> list[dict] | None:
     """Find mention of first token in list of strings, returning list of (token, position) tuples."""
+    if not items or not tokens:
+        return None
+
     flags = re.IGNORECASE
     pattern = r"\b{token}\b" if whole_word else "({token})"
     matches = []

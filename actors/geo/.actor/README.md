@@ -1,4 +1,4 @@
-# LLM Monitor (Search & Brand Analysis)
+# LLM Auditor (Search & Brand Analysis)
 
 GEO brand & prompt monitoring workflow which:
 
