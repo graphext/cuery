@@ -19,7 +19,6 @@ import os
 import re
 from collections.abc import Iterable
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -66,13 +65,11 @@ ENTITIES = {
 }
 
 
-class SerpConfig(Configurable):
+class ApifySerpConfig(Configurable):
     """Configuration for fetching SERP data using Apify Google Search Scraper actor."""
 
-    keywords: tuple[str, ...] | None = None
-    """Keywords to fetch SERP data for. If None, pass keywords manually in calling functions."""
-    batch_size: int = 100
-    """Number of keywords to fetch in a single batch."""
+    keywords: tuple[str, ...]
+    """Keywords to fetch SERP data for."""
     resultsPerPage: int = 100
     """Number of results to fetch per page."""
     maxPagesPerQuery: int = 1
@@ -91,6 +88,13 @@ class SerpConfig(Configurable):
     """
     params: dict[str, Any] | None = Field(default_factory=dict)
     """Additional parameters to pass to the Apify actor."""
+    batch_size: int = 100
+    """Number of keywords to fetch in a single batch."""
+
+
+class SerpConfig(ApifySerpConfig):
+    """Configuration for SERP data fetching and analysis."""
+
     top_n: int = 10
     """Number of top organic results to consider for aggregation per keyword."""
     brands: str | list[str] | None = None
@@ -107,10 +111,12 @@ class SerpConfig(Configurable):
     """Model to use for intent classification from SERP organic results."""
     entity_model: str | None = "openai/gpt-4.1-mini"
     """Model to use for entity extraction from AI overviews."""
-    apify_token: str | Path | None = None
-    """Path to Apify API token file.
-    If not provided, will use the `APIFY_TOKEN` environment variable.
-    """
+
+    def apify_config(self) -> ApifySerpConfig:
+        """Parameters to pass to the Apify actor."""
+        keys = ApifySerpConfig.model_fields.keys()
+        params = {k: getattr(self, k) for k in keys}
+        return ApifySerpConfig(**params)
 
 
 async def fetch_batch(keywords: list[str], client: ApifyClientAsync, **params):
@@ -127,42 +133,17 @@ async def fetch_batch(keywords: list[str], client: ApifyClientAsync, **params):
 
 
 @alru_cache(maxsize=3)
-async def fetch_serps(
-    cfg: SerpConfig,
-    keywords: tuple[str, ...] | None = None,
-) -> list[dict]:
+async def fetch_serps(cfg: ApifySerpConfig) -> list[dict]:
     """Fetch SERP data for a list of keywords using the Apify Google Search Scraper actor."""
-    if isinstance(cfg.apify_token, str | Path):
-        with open(cfg.apify_token) as f:
-            token = f.read().strip()
-    else:
-        token = os.environ["APIFY_TOKEN"]
-
-    actor_param_names = (
-        "resultsPerPage",
-        "maxPagesPerQuery",
-        "countryCode",
-        "searchLanguage",
-        "languageCode",
-    )
-    actor_params = {p: getattr(cfg, p) for p in actor_param_names} | (cfg.params or {})
-
-    if cfg.keywords and keywords:
-        LOG.warning("Both cfg.keywords and keywords are provided, using cfg.keywords.")
-
-    keywords = cfg.keywords or keywords
-    if not keywords:
-        raise ValueError("No keywords provided for SERP data fetching!")
-
-    keywords_list = list(keywords)
-    LOG.info(f"Fetching SERP data for {len(keywords)} keywords")
-
-    keyword_batches = [
-        keywords_list[i : i + cfg.batch_size] for i in range(0, len(keywords_list), cfg.batch_size)
-    ]
-
+    token = os.environ["APIFY_TOKEN"]
     client = ApifyClientAsync(token)
-    tasks = [fetch_batch(batch, client, **actor_params) for batch in keyword_batches]
+
+    keywords = list(cfg.keywords)
+    batches = [keywords[i : i + cfg.batch_size] for i in range(0, len(keywords), cfg.batch_size)]
+    params = cfg.model_dump(exclude={"keywords", "batch_size"})
+    tasks = [fetch_batch(keywords=batch, client=client, **params) for batch in batches]
+
+    LOG.info(f"Fetching SERP data for {len(keywords)} keywords")
     batch_results = await asyncio.gather(*tasks)
 
     result = []
@@ -629,11 +610,10 @@ async def process_serps(
     return df
 
 
-async def serps(cfg: SerpConfig, keywords: Iterable[str] | None = None) -> DataFrame | None:
+async def serps(cfg: SerpConfig) -> DataFrame | None:
     """Fetch and process SERP data for a list of keywords."""
     LOG.info(f"Fetching SERP data with config:\n{cfg}")
-    keywords = tuple(keywords) if keywords is not None else None
-    response = await fetch_serps(cfg=cfg, keywords=keywords)
+    response = await fetch_serps(cfg=cfg.apify_config())
 
     if response is None or len(response) == 0:
         LOG.warning("No SERP results found.")

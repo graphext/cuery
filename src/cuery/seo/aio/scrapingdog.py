@@ -16,14 +16,18 @@ The ScrapingDog API exposes (at least) two relevant endpoints:
   AI Overview content when Google requires a secondary fetch.
 """
 
+import asyncio
 import json
 import os
-from collections.abc import Iterable
+from collections.abc import Coroutine, Iterable, Sequence
+from functools import partial
 from typing import Any
 
-import requests
+import aiohttp
 
+from ...asy import all_with_policies
 from ...search import SearchResult, Source
+from ...utils import LOG
 
 
 def flatten_text_blocks(blocks: Iterable[dict[str, Any]] | None) -> str:
@@ -48,7 +52,7 @@ def flatten_text_blocks(blocks: Iterable[dict[str, Any]] | None) -> str:
     return "\n".join(parts).strip()
 
 
-def parse_ai_overview(aio) -> SearchResult:
+def parse_aio(aio) -> SearchResult:
     """Extract AI Overview into a ``SearchResult``.
 
     Expected structure (subset):
@@ -84,45 +88,87 @@ def aio_api_url(aio) -> str | None:
     return None
 
 
-def query_scraping_dog(
+async def query(
     prompt: str,
     country: str | None = None,  # 2-letter country code, e.g. "us"
     language: str | None = None,  # 2-letter language code, e.g. "en"
-    n_results: int = 10,
     validate: bool = True,
-    timeout: int = 10,
+    log: bool = False,
+    session: aiohttp.ClientSession | None = None,
 ) -> SearchResult | dict[str, Any]:
     """Execute a Google search via ScrapingDog and extract AI Overview."""
     api_key = os.environ["SCRAPINGDOG_API_KEY"]
+    serp_endpoint = "https://api.scrapingdog.com/google"
+    aio_endpoint = "https://api.scrapingdog.com/google/ai_overview"
 
-    params = {"api_key": api_key, "query": prompt, "results": n_results}
+    params = {"api_key": api_key, "query": prompt, "results": 10}
     if country:
         params["country"] = country
     if language:
         params["language"] = language
 
-    resp = requests.get("https://api.scrapingdog.com/google", params=params, timeout=timeout)
-    resp.raise_for_status()
-    print(f"Request URL: {resp.request.url}")
-    content = resp.json()
-    print("Response:")
-    print(json.dumps(content, indent=2))
-    aio = content.get("ai_overview") or {}
+    close_session = False
+    if session is None:
+        session = aiohttp.ClientSession()
+        close_session = True
 
-    if aio_url := aio_api_url(aio):
-        params = {"api_key": api_key, "url": aio_url}
-        resp = requests.get(
-            "https://api.scrapingdog.com/google/ai_overview",
-            params=params,
-            timeout=timeout,
-        )
-        resp.raise_for_status()
-        content = resp.json()
+    try:
+        async with session.get(serp_endpoint, params=params) as resp:
+            resp.raise_for_status()
+            content = await resp.json()
+            if log:
+                LOG.info(f"Request URL: {str(resp.url)}")
+                LOG.info("Response:")
+                LOG.info(json.dumps(content, indent=2))
+
         aio = content.get("ai_overview") or {}
 
-    if not validate:
-        return aio
+        if aio_url := aio_api_url(aio):
+            LOG.warning(f"Need second request to get AI overview for prompt: {prompt}")
+            async with session.get(
+                aio_endpoint, params={"api_key": api_key, "url": aio_url}
+            ) as resp:
+                resp.raise_for_status()
+                content = await resp.json()
 
-    result = parse_ai_overview(aio)
-    result._raw_response = aio
-    return result
+            aio = content.get("ai_overview") or {}
+
+        if not validate:
+            return aio
+
+        result = parse_aio(aio)
+        result._raw_response = aio
+        return result
+    finally:
+        if close_session:
+            await session.close()
+
+
+async def gather(  # noqa: PLR0913
+    prompts: Sequence[str] | Iterable[str],
+    country: str | None = None,
+    language: str | None = None,
+    validate: bool = True,
+    log: bool = False,
+    session: aiohttp.ClientSession | None = None,
+    policies: dict[str, Any] | None = None,
+    execute: bool = True,
+) -> list[Coroutine] | list[SearchResult | dict[str, Any]]:
+    """Create zero-argument coroutine factories (with policies) for many prompts."""
+    policies = policies or {}
+    func = partial(
+        query,
+        country=country,
+        language=language,
+        validate=validate,
+        log=log,
+        session=session,
+    )
+
+    kwds = [{"prompt": p} for p in prompts]
+    coros = all_with_policies(func, kwds=kwds, policies=policies, labels="hasdata-aio")
+
+    if not execute:
+        return coros
+
+    return await asyncio.gather(*coros)

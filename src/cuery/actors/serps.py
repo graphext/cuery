@@ -10,7 +10,7 @@ async def main():
     async with Actor:
         input = await Actor.get_input()
         config = SerpConfig(**input)
-        df = await serps(config, keywords=None)  # Passed via input config
+        df = await serps(config)  # Passed via input config
 
         if df is None or len(df) == 0:
             raise ValueError("No SERP results were fetched!")
