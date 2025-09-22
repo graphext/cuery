@@ -182,9 +182,9 @@ async def query(
     try:
         params: dict[str, Any] = {"q": prompt}
         if country:
-            params["gl"] = country
+            params["gl"] = country.lower()
         if language:
-            params["hl"] = language
+            params["hl"] = language.lower()
 
         headers = {"x-api-key": api_key}
         # First request

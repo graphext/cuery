@@ -462,6 +462,7 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
         prompts=prompts,
         models=cfg.models,  # type: ignore
         use_search=cfg.use_search,
+        search_country=cfg.search_country,
         progress_callback=progress_callback,
     )
 
