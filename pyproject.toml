@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.28.0"
+version = "0.28.1"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -40,7 +40,7 @@ dependencies = [
     "instructor[anthropic,google-genai]>=1.11.2",
     "jsonschema>=4.17.0",
     "levenshtein>=0.27.1",
-    "litellm>=1.69.1",
+    "litellm>=1.69.1,<=1.77.1",
     "openai>=1.58.1",
     "xai-sdk>=1.1.0,<2.0.0",
     "pandas>=2.2.3",
