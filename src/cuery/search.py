@@ -39,6 +39,7 @@ from xai_sdk.proto import chat_pb2
 from xai_sdk.search import SearchParameters, news_source, web_source, x_source
 
 from .asy import all_with_policies
+from .resources import country_coords
 from .response import Response, ResponseSet
 
 OAIResponse = oaitypes.responses.response.Response  # type: ignore[attr-defined]
@@ -238,9 +239,18 @@ async def query_openai(
     return response
 
 
+def coords(country: str) -> gaitypes.LatLng | None:
+    latlng = country_coords(country)
+    if latlng is None:
+        return None
+    return gaitypes.LatLng(latitude=latlng[0], longitude=latlng[1])
+
+
 async def query_gemini(
     prompt: str,
     model: str = "gemini-2.0-flash",
+    country: str | None = None,  # 2-letter code, e.g. "US"
+    language: str | None = None,  # 2-letter code, e.g. "EN"
     thinking_budget: int = -1,
     use_search: bool = True,
     validate: bool = True,
@@ -263,6 +273,16 @@ async def query_gemini(
     if use_search:
         search_tool = gaitypes.Tool(google_search=gaitypes.GoogleSearch())
         config["tools"] = [search_tool]
+
+    lat_lng = coords(country) if country else None
+    if lat_lng or language:
+        tool_config = gaitypes.ToolConfig(
+            retrieval_config=gaitypes.RetrievalConfig(
+                lat_lng=lat_lng,
+                language_code=language,
+            ),
+        )
+        config["tool_config"] = tool_config
 
     if "2.5" in model:
         config["thinking_config"] = gaitypes.ThinkingConfig(thinking_budget=thinking_budget)
@@ -363,7 +383,7 @@ LLMS = {
 }
 
 
-SUPPORT_COUNTRY = ["openai", "xai"]
+SUPPORT_COUNTRY = ["openai", "xai", "google"]
 
 
 async def gather(  # noqa: PLR0913
