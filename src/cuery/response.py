@@ -229,7 +229,9 @@ class ResponseSet:
         else:
             for ctx, response in zip(contexts, responses, strict=True):  # type: ignore
                 if self.iterfield is not None:
-                    items = [self.to_dict(item) for item in getattr(response, self.iterfield)]
+                    items = [
+                        self.to_dict(item) for item in getattr(response, self.iterfield) or []
+                    ]
                     records.append(ctx | {self.iterfield: items})
                 else:
                     records.append(ctx | self.to_dict(response))
