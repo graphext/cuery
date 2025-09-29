@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.28.1"
+version = "0.29.0"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -36,12 +36,11 @@ dependencies = [
     "fastapi-mcp>=0.3.4",
     "glom>=24.11.0",
     "google-genai>=1.23.0,<1.24.0",
-    "gradio>=5.9.1",
     "instructor[anthropic,google-genai]>=1.11.2",
     "jsonschema>=4.17.0",
     "levenshtein>=0.27.1",
     "litellm>=1.69.1,<=1.77.1",
-    "openai>=1.58.1",
+    "openai>=1.109",
     "xai-sdk>=1.1.0,<2.0.0",
     "pandas>=2.2.3",
     "pre-commit",
@@ -63,7 +62,13 @@ cuery = "cuery.cli:app"
 
 
 [project.optional-dependencies]
-seo = ["apify", "google-ads<28.0.0"]
+seo = [
+    "apify",
+    "google-ads<28.0.0",
+    "gradio>=5.9.1",
+    "matplotlib",
+    "plotly[express]>=6.3.0",
+]
 
 
 [dependency-groups]

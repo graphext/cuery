@@ -202,7 +202,8 @@ async def query(
 
         aio = content.get("aiOverview") or {}
         if aio_params := aio_request_params(aio):
-            LOG.warning(f"Need second request to get AI overview for prompt: {prompt}")
+            if log:
+                LOG.warning(f"Need second request to get AI overview for prompt: {prompt}")
             headers = {"x-api-key": api_key, "Content-Type": "application/json"}
             async with session.get(
                 aio_endpoint,

@@ -204,6 +204,7 @@ async def query_openai(
     model: str = "gpt-5",
     use_search: bool = True,
     validate: bool = True,
+    response_format: Response | None = None,
 ) -> SearchResult | OAIResponse:
     """Call OpenAI Responses API with Web Search enabled (async).
 
@@ -232,11 +233,20 @@ async def query_openai(
         params["tools"] = [tool]
         params["tool_choice"] = "required"
 
-    response = await client.responses.create(**params)
-    if validate:
-        return validate_openai(response)
+    if response_format is None:
+        response = await client.responses.create(**params)
 
-    return response
+        if validate:
+            return validate_openai(response)
+
+        return response
+
+    # Use .parse endpoint to get structured response
+    params["response_format"] = response_format
+    params["messages"] = [{"role": "user", "content": params.pop("input")}]
+    response = await client.chat.completions.parse(**params)
+    message = response.choices[0].message
+    return message.parsed
 
 
 def coords(country: str) -> gaitypes.LatLng | None:

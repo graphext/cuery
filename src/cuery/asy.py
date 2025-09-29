@@ -256,14 +256,14 @@ def with_policies(  # noqa: PLR0913
 
     if timeout is not None:
         wrapped = with_timeout(wrapped, timeout)
+    if timer:
+        wrapped = with_timer(wrapped, label=label)
     if semaphore is not None:
         wrapped = with_semaphore(wrapped, semaphore)
     if retries > 0:
         wrapped = with_retries(wrapped, attempts=retries, wait_max=wait_max)
     if fallback is not None:
         wrapped = with_fallback(wrapped, fallback)
-    if timer:
-        wrapped = with_timer(wrapped, label=label)
     if pbar is not None:
         wrapped = with_progress(
             wrapped,

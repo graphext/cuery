@@ -18,6 +18,7 @@ from .. import Prompt, Response, ResponseSet, ask, search
 from ..call import call
 from ..search import SearchResult
 from ..utils import LOG, Configurable, dedent
+from . import sources
 from .aio import hasdata
 
 DEFAULT_MODELS = ["openai/gpt-4.1-mini", "google/gemini-2.5-flash"]
@@ -360,17 +361,17 @@ def summarize_ranks(
             )
 
     # Sum of own/competitor mentions across models per row/prompt
-    own_in_ans_cols = [f"brand_mentioned_in_answer_{model}" for model in models]
-    df["brand_mentioned_in_answer_count"] = df[own_in_ans_cols].sum(axis=1)
+    own_ans_cols = [f"brand_mentioned_in_answer_{model}" for model in models]
+    df["brand_mentioned_in_answer_count"] = df[own_ans_cols].sum(axis=1)
 
-    own_in_src_cols = [f"brand_mentioned_in_sources_{model}" for model in models]
-    df["brand_mentioned_in_sources_count"] = df[own_in_src_cols].sum(axis=1)
+    cmp_ans_cols = [f"competitor_mentioned_in_answer_{model}" for model in models]
+    df["competitor_mentioned_in_answer_count"] = df[cmp_ans_cols].sum(axis=1)
 
-    cmp_in_ans_cols = [f"competitor_mentioned_in_answer_{model}" for model in models]
-    df["competitor_mentioned_in_answer_count"] = df[cmp_in_ans_cols].sum(axis=1)
+    own_src_cols = [col for m in models if (col := f"brand_mentioned_in_sources_{m}") in df]
+    df["brand_mentioned_in_sources_count"] = df[own_src_cols].sum(axis=1)
 
-    cmp_in_refs_cols = [f"competitor_mentioned_in_sources_{model}" for model in models]
-    df["competitor_mentioned_in_sources_count"] = df[cmp_in_refs_cols].sum(axis=1)
+    cmp_src_cols = [col for m in models if (col := f"competitor_mentioned_in_sources_{m}") in df]
+    df["competitor_mentioned_in_sources_count"] = df[cmp_src_cols].sum(axis=1)
 
     return df
 
@@ -423,6 +424,7 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
     competitors = list({normalize_brand(comp) for comp in cfg.competitors or []})
     LOG.info(f"Using these seed brands: {brands}, and these competitors: {competitors}")
 
+    # Find competitors
     n_gen_comps = max(0, cfg.competitors_max - len(competitors))
     if (brands or cfg.sector) and (n_gen_comps > 0):
         competitors += await find_competitors(
@@ -458,16 +460,17 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
 
     # Execute searches
     LOG.info(f"Running {len(prompts)} prompts through {len(cfg.models)} models")  # type: ignore
-    df = await query_ais(
+    df: DataFrame = await query_ais(
         prompts=prompts,
         models=cfg.models,  # type: ignore
         use_search=cfg.use_search,
         search_country=cfg.search_country,
         progress_callback=progress_callback,
+        to_pandas=True,
     )
 
     # Analyse results
-    if cfg.use_search and brands:
+    if brands:
         LOG.info("Analysing brand ranks")
         try:
             df = add_brand_ranks(df, brands=all_brands)
@@ -485,21 +488,25 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
                     )
                 except Exception as e:
                     LOG.error(f"Error summarizing brand ranks: {e}")
-    elif not cfg.use_search:
-        df = df.drop(columns=[col for col in df.columns if col.startswith("references_")])
 
     # Clean up dataframe
-    def remove_provider(name):
+    def clean_name(name):
         providers = search.VALID_MODELS.keys()
         for provider in providers:
             name = name.replace(f"{provider}/", "")
 
-        return name
+        return re.sub(r"[^a-zA-Z0-9]", "_", name)
 
-    df.columns = [remove_provider(col) for col in df.columns]
-    df.columns = [re.sub(r"[^a-zA-Z0-9]", "_", col) for col in df.columns]
+    df.columns = [clean_name(col) for col in df.columns]
+    LOG.info(f"Cleaned dataframe columns: {df.columns.tolist()}")
 
-    # Column order: prompt, summary columns, text/references columns
+    # Extract and categorize sources
+    LOG.info("Processing and categorizing sources cited by LLMs")
+    df = await sources.process_sources(df, models=cfg.models)  # type: ignore
+
+    # Column order: prompt, answers, sources, summary columns, other columns
+    answer_cols = [f"answer_{clean_name(model)}" for model in cfg.models]  # type: ignore
+    source_cols = [f"sources_{clean_name(model)}" for model in cfg.models]  # type: ignore
     count_cols = [col for col in df.columns if re.search(r"(brand|competitor)_.*_count", col)]
     own_in_cols = [
         col
@@ -512,9 +519,9 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
         if re.search(r"competitor_mentioned_in_|competitor_position_in_", col)
         and col not in count_cols
     ]
-    summary_cols = count_cols + own_in_cols + cmp_in_cols
-    other_cols = [col for col in df.columns if col not in (["prompt"] + summary_cols)]
-    df = df[["prompt"] + summary_cols + other_cols]
+    sorted_cols = answer_cols + source_cols + count_cols + own_in_cols + cmp_in_cols
+    other_cols = [col for col in df.columns if col not in (["prompt"] + sorted_cols)]
+    df = df[["prompt"] + sorted_cols + other_cols]
 
     LOG.info(f"Got results dataframe:\n{df}")
     return df

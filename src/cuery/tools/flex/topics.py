@@ -10,7 +10,7 @@ from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator
 
-from ... import Prompt, Response, ResponseClass, templates
+from ... import Prompt, ResponseClass, templates
 from ...utils import dedent
 from ..topics import Topics, make_label_model, make_multi_label_model, make_topic_model
 from .base import FlexTool, preprocess_records
@@ -43,6 +43,8 @@ to assign the correct topic and subtopic to the data record you will receive.
 Make sure to consider all the attributes of the data record, and assign the most appropriate
 topic and subtopic based on the content of the attributes.
 
+${instructions}
+
 # Topics
 
 ${topics}
@@ -67,6 +69,8 @@ Make sure to consider all the attributes of the data record, and assign the most
 topics and subtopics based on the content of the attributes.
 
 A data record can be assigned multiple topics and subtopics if it covers multiple themes.
+
+${instructions}
 
 # Topics
 
@@ -133,6 +137,8 @@ class TopicAssigner(FlexTool):
 
     topics: Topics
     """Topics and subtopics to use for assignment, either as a Topics object or a dict."""
+    instructions: str = ""
+    """Additional use-case specific instructions or context for the topic extraction."""
 
     SYSTEM_PROMPT: ClassVar[str] = LABEL_PROMPT_SYSTEM
     USER_PROMPT: ClassVar[str] = LABEL_PROMPT_USER
@@ -156,6 +162,7 @@ class TopicAssigner(FlexTool):
 
         prompt_args = {
             "topics": json.dumps(self.topics.to_dict(), indent=2),
+            "instructions": self.instructions,
             "record_template": self.template,
         }
         return prompt.substitute(**prompt_args)
