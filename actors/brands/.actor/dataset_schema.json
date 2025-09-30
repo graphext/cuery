@@ -1,0 +1,74 @@
+{
+    "title": "Brand Information Dataset",
+    "description": "Detailed brand information including competitors, portfolios, and market positions.",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Official name of the brand."
+        },
+        "short_name": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "description": "Short, common or canonical name of the brand, if different from the official name."
+        },
+        "description": {
+            "type": "string",
+            "description": "Brief description of the brand and its main activities."
+        },
+        "domain": {
+            "type": "string",
+            "description": "Official website domain of the brand (normalized)."
+        },
+        "portfolio": {
+            "type": "array",
+            "description": "List of main products or services offered by the brand.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the product or service."
+                    },
+                    "category": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Category of the product or service."
+                    }
+                }
+            }
+        },
+        "market_position": {
+            "type": "string",
+            "enum": [
+                "leader",
+                "challenger",
+                "niche",
+                "follower"
+            ],
+            "description": "Market position of the brand."
+        },
+        "favicon": {
+            "type": [
+                "string",
+                "null"
+            ],
+            "description": "URL of the brand's favicon, if available."
+        },
+        "is_competitor": {
+            "type": "boolean",
+            "description": "Indicates if the brand is a competitor (or one of the original 'own' brands)."
+        }
+    },
+    "required": [
+        "name",
+        "description",
+        "domain",
+        "portfolio",
+        "market_position"
+    ]
+}

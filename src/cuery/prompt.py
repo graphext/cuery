@@ -22,7 +22,7 @@ from .pretty import (
     Syntax,
     Text,
 )
-from .utils import LOG, get_config, jinja_vars
+from .utils import LOG, get_config, jinja_vars, render_template
 
 ROLE_STYLES = {
     "system": "bold cyan",
@@ -123,6 +123,20 @@ class Prompt(BaseModel):
 
         self.check_required()
         return self
+
+    def render(self, with_roles: bool = False, **kwds) -> str:
+        """Render the prompt messages into single string with the given variables.
+
+        Not usually needed as Task, Tools etc. will do this automatically.
+        """
+        if with_roles:
+            content = "\n\n".join(
+                f"{message.role.upper()}:\n{message.content}" for message in self.messages
+            )
+        else:
+            content = "\n\n".join(message.content for message in self.messages)
+
+        return render_template(content, **kwds)
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         group = []

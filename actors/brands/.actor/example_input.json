@@ -1,0 +1,9 @@
+{
+    "brand": [
+        "Tesla"
+    ],
+    "sector": "electric cars",
+    "market": "global",
+    "strict_competitors": true,
+    "instructions": "Focus on direct competitors in the premium electric vehicle segment."
+}

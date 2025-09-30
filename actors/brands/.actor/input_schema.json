@@ -1,0 +1,48 @@
+{
+    "title": "Brand Researcher",
+    "description": "Discover competitors and fetch detailed brand information including portfolios, market positions, and official domains.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "brand": {
+            "title": "Brand(s) to Analyze",
+            "type": "array",
+            "description": "Initial brand or list of brands to find competitors for. Can be brand names (e.g., 'Tesla', 'Coca-Cola') or URLs.",
+            "editor": "stringList",
+            "prefill": [
+                "Tesla"
+            ]
+        },
+        "sector": {
+            "title": "Sector/Industry",
+            "type": "string",
+            "description": "Sector or industry the brand operates in, e.g., 'electric cars', 'soft drinks', 'insurance'. Helps identify relevant competitors.",
+            "editor": "textfield",
+            "prefill": "electric cars"
+        },
+        "market": {
+            "title": "Geographical Market",
+            "type": "string",
+            "description": "Geographical market or region, e.g., 'Spain', 'global', 'United States'. Used to focus competitor discovery on relevant markets.",
+            "editor": "textfield",
+            "prefill": "global"
+        },
+        "strict_competitors": {
+            "title": "Exclude Same Parent Company",
+            "type": "boolean",
+            "description": "If true, excludes competitors from the same parent company (e.g., Fanta would NOT be considered a competitor of Coca-Cola). If false, includes all relevant competitors regardless of ownership.",
+            "editor": "checkbox",
+            "default": true
+        },
+        "instructions": {
+            "title": "Additional Instructions",
+            "type": "string",
+            "description": "Optional additional instructions to guide the competitor search. For example, you can specify to focus on direct competitors, include emerging brands, or any other specific criteria.",
+            "editor": "textarea"
+        }
+    },
+    "required": [
+        "brand"
+    ],
+    "additionalProperties": false
+}

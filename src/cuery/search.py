@@ -38,9 +38,11 @@ from xai_sdk.chat import user as xai_user
 from xai_sdk.proto import chat_pb2
 from xai_sdk.search import SearchParameters, news_source, web_source, x_source
 
+from . import ask
 from .asy import all_with_policies
 from .resources import country_coords
 from .response import Response, ResponseSet
+from .utils import dedent
 
 OAIResponse = oaitypes.responses.response.Response  # type: ignore[attr-defined]
 
@@ -200,7 +202,7 @@ async def query_openai(
     country: str | None = None,  # 2-letter code, e.g. "US"
     city: str | None = None,  # text string, e.g. "Madrid"
     context_size: Literal["low", "medium", "high"] | str = "medium",
-    reaonsing_effort: Literal["low", "medium", "high"] | str = "low",
+    reasoning_effort: Literal["low", "medium", "high"] | str = "low",
     model: str = "gpt-5",
     use_search: bool = True,
     validate: bool = True,
@@ -215,7 +217,7 @@ async def query_openai(
 
     params: dict = {"model": model, "input": prompt}
     if "-5" in model:
-        params["reasoning"] = {"effort": reaonsing_effort}
+        params["reasoning"] = {"effort": reasoning_effort}
 
     if use_search:
         tool: dict = {
@@ -393,6 +395,71 @@ LLMS = {
 }
 
 
+def validate_model(client: str, model: str) -> None:
+    """Validate if the given client and model are supported."""
+    if client not in VALID_MODELS:
+        raise ValueError(f"Unsupported client '{client}'. Supported: {list(VALID_MODELS.keys())}.")
+    if model not in VALID_MODELS[client]:
+        raise ValueError(
+            f"Unsupported model '{model}' for client '{client}'. Supported: {VALID_MODELS[client]}"
+        )
+
+
+FORMATTED_SEARCH_PROMPT = dedent("""
+Based on the following search results, please format the information according
+to the requested structure:
+
+# Search Query
+
+{prompt}
+
+# Search Results
+
+{answer}
+
+# Sources
+
+{sources}
+
+Please extract and format the relevant information from these search results.
+""")
+
+
+async def search_with_format(
+    prompt: str,
+    model: str,
+    response_format: Response,
+    **kwds,
+) -> Response:
+    """Perform a web search using the specified model and return structured response."""
+
+    client, model = model.split("/", 1)
+    validate_model(client, model)
+
+    search_func = LLMS[client]
+    search_result = await search_func(
+        prompt=prompt,
+        model=model,
+        use_search=True,
+        validate=True,
+        **kwds,
+    )
+
+    sources = "\n".join([f"- {source.title}: {source.url}" for source in search_result.sources])
+
+    prompt = FORMATTED_SEARCH_PROMPT.format(
+        prompt=prompt,
+        answer=search_result.answer,
+        sources=sources,
+    )
+
+    return await ask(
+        prompt=prompt,
+        model="openai/gpt-4.1-mini",
+        response_model=response_format,
+    )
+
+
 SUPPORT_COUNTRY = ["openai", "xai", "google"]
 
 
@@ -422,12 +489,7 @@ async def gather(  # noqa: PLR0913
         raise ValueError("No prompts provided.")
 
     client, model = model.split("/", 1)
-    if client not in VALID_MODELS:
-        raise ValueError(f"Unsupported client '{client}'. Supported: {list(VALID_MODELS.keys())}.")
-    if model not in VALID_MODELS[client]:
-        raise ValueError(
-            f"Unsupported model '{model}' for client '{client}'. Supported: {VALID_MODELS[client]}"
-        )
+    validate_model(client, model)
 
     if use_search and country and client in SUPPORT_COUNTRY:
         kwds["country"] = country
