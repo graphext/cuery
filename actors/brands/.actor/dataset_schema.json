@@ -1,4 +1,5 @@
 {
+    "actorSpecification": 1,
     "title": "Brand Information Dataset",
     "description": "Detailed brand information including competitors, portfolios, and market positions.",
     "type": "object",
