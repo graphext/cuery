@@ -48,8 +48,7 @@
             "title": "Funnel Stages (optional)",
             "type": "array",
             "description": "Optional list of specific funnel stage names to generate keywords for. If empty, all stages are processed. Available stages: 'Awareness / Discovery', 'Consideration / Research', 'Decision / Evaluation', 'Conversion / Action', 'Post-Purchase / Retention & Advocacy'.",
-            "editor": "stringList",
-            "uniqueItems": true,
+            "editor": "select",
             "items": {
                 "type": "string",
                 "enum": [
