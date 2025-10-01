@@ -9,4 +9,4 @@ COPY . ./
 RUN useradd --create-home apify && chown -R apify:apify .
 USER apify
 
-CMD ["python", "-m", "cuery.actors.funnels"]
+CMD ["python", "-m", "cuery.actors.funnel"]
