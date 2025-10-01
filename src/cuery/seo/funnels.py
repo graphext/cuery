@@ -218,6 +218,8 @@ class Funnel(Configurable):
     """Country to contextualize the funnel as 2-letter ISO code, e.g. 'us'."""
     max_ideas_per_category: int = 200
     """Maximum number of keyword ideas to generate per category."""
+    stages: list[str] | None = None
+    """List of stage names to filter keyword generation. If None, all stages are processed."""
     funnel: list[dict] = FUNNEL
     """List of funnel stages and their categories."""
 
@@ -302,7 +304,11 @@ class Funnel(Configurable):
         }
 
         # Collect all levels with their stage and category indices
-        tasks_data = [(stage, cat, level) for stage, cat, level in self.enumerate()]
+        tasks_data = [
+            (stage, cat, level)
+            for stage, cat, level in self.enumerate()
+            if self.stages is None or level["stage"] in self.stages
+        ]
 
         coros = asy.all_with_policies(
             func=self.seed_keywords,
@@ -322,6 +328,9 @@ class Funnel(Configurable):
         """Generate keyword ideas for all funnel categories using the seed keywords."""
         dfs = []
         for stage, cat, info in tqdm(self.enumerate(), total=len(self)):
+            if self.stages is not None and info["stage"] not in self.stages:
+                continue
+
             if "seed" not in info or not info["seed"]:
                 LOG.warning(f"No seed keywords in {info}. Run seed() first.")
                 continue

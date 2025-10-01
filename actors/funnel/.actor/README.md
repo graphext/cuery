@@ -33,11 +33,13 @@ Not a good fit when you need: manual keyword curation, paid advertising keyword 
 | language (required) | string | (none) | Language for keyword generation as 2-letter ISO code (e.g., 'en', 'es'). |
 | country | string | null | Country to contextualize the funnel as 2-letter ISO code (e.g., 'us', 'gb'). Leave empty for global. |
 | max_ideas_per_category | integer | 200 | Maximum number of keyword ideas to generate per funnel category (10-1000). |
+| stages | array[string] | null | Optional list of specific funnel stage names to process. If empty, all stages are included. See available stages below. |
 
 Notes:
 1. Brand, sector, and language are required for meaningful keyword generation.
 2. Higher `max_ideas_per_category` values provide more comprehensive results but take longer to process.
-3. The actor uses live Google Keyword Planner data via API (requires proper credentials).
+3. The `stages` parameter allows you to target specific funnel stages (e.g., only "Awareness / Discovery" and "Consideration / Research") for faster, more focused results.
+4. The actor uses live Google Keyword Planner data via API (requires proper credentials).
 
 ---
 
@@ -143,3 +145,16 @@ Generates Spanish-language keywords for the Spanish fashion market.
 }
 ```
 Faster execution with fewer keywords per category for rapid funnel analysis.
+
+### 5. Targeted Stage Research
+```json
+{
+  "brand": "Shopify",
+  "sector": "e-commerce platform",
+  "language": "en",
+  "country": "us",
+  "stages": ["Awareness / Discovery", "Consideration / Research"],
+  "max_ideas_per_category": 200
+}
+```
+Focus keyword generation on top-of-funnel stages only for content marketing strategy.
