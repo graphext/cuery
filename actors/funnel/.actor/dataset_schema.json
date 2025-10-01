@@ -21,34 +21,110 @@
                 "type": "string",
                 "description": "The actual keyword phrase."
             },
-            "search_volume": {
+            "avg_monthly_searches": {
                 "type": [
                     "number",
                     "null"
                 ],
-                "description": "Average monthly search volume from Google Keyword Planner."
+                "description": "Average monthly searches from Google Keyword Planner."
             },
             "competition": {
                 "type": [
-                    "string",
+                    "number",
                     "null"
                 ],
                 "description": "Competition level (Low/Medium/High)."
             },
-            "cpc": {
+            "competition_index": {
                 "type": [
                     "number",
                     "null"
                 ],
-                "description": "Cost per click in the target currency."
+                "description": "Competition index value (0-100)."
+            },
+            "concepts": {
+                "type": [
+                    "array",
+                    "null"
+                ],
+                "items": {
+                    "type": "string"
+                },
+                "description": "Associated concepts for the keyword."
+            },
+            "concept_groups": {
+                "type": [
+                    "array",
+                    "null"
+                ],
+                "items": {
+                    "type": "string"
+                },
+                "description": "Concept groups for the keyword."
+            },
+            "search_volume": {
+                "type": [
+                    "array",
+                    "null"
+                ],
+                "items": {
+                    "type": "number"
+                },
+                "description": "Historical search volume data (array of numbers)."
+            },
+            "search_volume_date": {
+                "type": [
+                    "array",
+                    "null"
+                ],
+                "items": {
+                    "type": "string"
+                },
+                "description": "Dates corresponding to historical search volume (array of date strings)."
+            },
+            "average_cpc": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "Average cost per click in the target currency."
+            },
+            "low_top_of_page_bid": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "Low range of top of page bid."
+            },
+            "high_top_of_page_bid": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "High range of top of page bid."
+            },
+            "search_volume_growth_yoy": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "Year-over-year search volume growth rate."
+            },
+            "search_volume_growth_3m": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "3-month search volume growth rate."
+            },
+            "search_volume_trend": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "Overall search volume trend indicator."
             }
-        },
-        "required": [
-            "funnel_stage",
-            "funnel_category",
-            "funnel_seed_keyword",
-            "keyword"
-        ]
+        }
     },
     "views": {
         "overview": {
@@ -58,9 +134,12 @@
                     "funnel_stage",
                     "funnel_category",
                     "keyword",
-                    "search_volume",
+                    "avg_monthly_searches",
                     "competition",
-                    "cpc",
+                    "competition_index",
+                    "average_cpc",
+                    "search_volume_growth_yoy",
+                    "search_volume_growth_3m",
                     "funnel_seed_keyword"
                 ]
             },
@@ -79,16 +158,28 @@
                         "label": "Keyword",
                         "format": "text"
                     },
-                    "search_volume": {
-                        "label": "Search Volume",
+                    "avg_monthly_searches": {
+                        "label": "Avg Monthly Searches",
                         "format": "number"
                     },
                     "competition": {
                         "label": "Competition",
                         "format": "text"
                     },
-                    "cpc": {
-                        "label": "CPC",
+                    "competition_index": {
+                        "label": "Competition Index",
+                        "format": "number"
+                    },
+                    "average_cpc": {
+                        "label": "Avg CPC",
+                        "format": "number"
+                    },
+                    "search_volume_growth_yoy": {
+                        "label": "YoY Growth",
+                        "format": "number"
+                    },
+                    "search_volume_growth_3m": {
+                        "label": "3M Growth",
                         "format": "number"
                     },
                     "funnel_seed_keyword": {
@@ -105,7 +196,9 @@
                     "funnel_stage",
                     "funnel_category",
                     "keyword",
-                    "search_volume"
+                    "avg_monthly_searches",
+                    "competition",
+                    "average_cpc"
                 ],
                 "groupBy": "funnel_stage"
             },
