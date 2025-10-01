@@ -1,0 +1,54 @@
+{
+    "title": "Funnel Keyword Generator",
+    "description": "Generate keyword ideas across all marketing funnel stages (Awareness, Consideration, Decision, Conversion, Post-Purchase) based on your brand, sector, and target market.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "brand": {
+            "title": "Brand(s)",
+            "type": "array",
+            "description": "Brand or list of brands to contextualize the funnel. Can be a single brand name (e.g., 'Nike') or multiple brands.",
+            "editor": "stringList",
+            "prefill": [
+                "Nike"
+            ]
+        },
+        "sector": {
+            "title": "Sector/Industry",
+            "type": "string",
+            "description": "Sector to contextualize the funnel, e.g., 'running shoes', 'CRM software', 'electric cars'.",
+            "editor": "textfield",
+            "prefill": "running shoes"
+        },
+        "language": {
+            "title": "Language",
+            "type": "string",
+            "description": "Language for keyword generation as 2-letter ISO code, e.g., 'en', 'es', 'fr'.",
+            "editor": "textfield",
+            "prefill": "en",
+            "pattern": "^[a-z]{2}$"
+        },
+        "country": {
+            "title": "Country (optional)",
+            "type": "string",
+            "description": "Country to contextualize the funnel as 2-letter ISO code, e.g., 'us', 'es', 'gb'. Leave empty for global.",
+            "editor": "textfield",
+            "pattern": "^[a-z]{2}$"
+        },
+        "max_ideas_per_category": {
+            "title": "Max Ideas per Category",
+            "type": "integer",
+            "description": "Maximum number of keyword ideas to generate per funnel category. Higher values provide more comprehensive results but take longer.",
+            "editor": "number",
+            "default": 200,
+            "minimum": 10,
+            "maximum": 1000
+        }
+    },
+    "required": [
+        "brand",
+        "sector",
+        "language"
+    ],
+    "additionalProperties": false
+}

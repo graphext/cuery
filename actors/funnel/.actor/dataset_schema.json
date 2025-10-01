@@ -1,0 +1,117 @@
+{
+    "actorSpecification": 1,
+    "fields": {
+        "title": "Funnel Keyword Dataset",
+        "description": "Keyword ideas mapped to marketing funnel stages and categories.",
+        "type": "object",
+        "properties": {
+            "funnel_stage": {
+                "type": "string",
+                "description": "Marketing funnel stage (e.g., 'Awareness / Discovery', 'Consideration / Research')."
+            },
+            "funnel_category": {
+                "type": "string",
+                "description": "Specific category within the funnel stage (e.g., 'Problem Identification', 'Comparisons')."
+            },
+            "funnel_seed_keyword": {
+                "type": "string",
+                "description": "Original seed keyword that generated this keyword idea."
+            },
+            "keyword": {
+                "type": "string",
+                "description": "The actual keyword phrase."
+            },
+            "search_volume": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "Average monthly search volume from Google Keyword Planner."
+            },
+            "competition": {
+                "type": [
+                    "string",
+                    "null"
+                ],
+                "description": "Competition level (Low/Medium/High)."
+            },
+            "cpc": {
+                "type": [
+                    "number",
+                    "null"
+                ],
+                "description": "Cost per click in the target currency."
+            }
+        },
+        "required": [
+            "funnel_stage",
+            "funnel_category",
+            "funnel_seed_keyword",
+            "keyword"
+        ]
+    },
+    "views": {
+        "overview": {
+            "title": "Overview",
+            "transformation": {
+                "fields": [
+                    "funnel_stage",
+                    "funnel_category",
+                    "keyword",
+                    "search_volume",
+                    "competition",
+                    "cpc",
+                    "funnel_seed_keyword"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "funnel_stage": {
+                        "label": "Funnel Stage",
+                        "format": "text"
+                    },
+                    "funnel_category": {
+                        "label": "Category",
+                        "format": "text"
+                    },
+                    "keyword": {
+                        "label": "Keyword",
+                        "format": "text"
+                    },
+                    "search_volume": {
+                        "label": "Search Volume",
+                        "format": "number"
+                    },
+                    "competition": {
+                        "label": "Competition",
+                        "format": "text"
+                    },
+                    "cpc": {
+                        "label": "CPC",
+                        "format": "number"
+                    },
+                    "funnel_seed_keyword": {
+                        "label": "Seed Keyword",
+                        "format": "text"
+                    }
+                }
+            }
+        },
+        "by_stage": {
+            "title": "By Funnel Stage",
+            "transformation": {
+                "fields": [
+                    "funnel_stage",
+                    "funnel_category",
+                    "keyword",
+                    "search_volume"
+                ],
+                "groupBy": "funnel_stage"
+            },
+            "display": {
+                "component": "table"
+            }
+        }
+    }
+}

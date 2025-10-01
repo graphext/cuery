@@ -1,0 +1,9 @@
+{
+    "brand": [
+        "Nike"
+    ],
+    "sector": "running shoes",
+    "language": "en",
+    "country": "us",
+    "max_ideas_per_category": 200
+}

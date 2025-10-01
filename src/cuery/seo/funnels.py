@@ -213,9 +213,11 @@ class Funnel(Configurable):
     sector: str
     """Sector to contextualize the funnel."""
     language: str
-    """Language for keyword generation."""
-    market: str = "global"
-    """Market to contextualize the funnel."""
+    """Language for keyword generation as 2-letter ISO code, e.g. 'en'."""
+    country: str | None = None
+    """Country to contextualize the funnel as 2-letter ISO code, e.g. 'us'."""
+    max_ideas_per_category: int = 200
+    """Maximum number of keyword ideas to generate per category."""
     funnel: list[dict] = FUNNEL
     """List of funnel stages and their categories."""
 
@@ -274,7 +276,7 @@ class Funnel(Configurable):
         """Generate initial keyword examples for a particular funnel stage and category"""
         record_template = load_template("record_to_text")
         prompt = EXAMPLES_PROMPT.format(
-            market=self.market,
+            market=self.country or "global",
             sector=self.sector,
             language=self.language,
             brand=", ".join(self.brand) if isinstance(self.brand, list) else self.brand,
@@ -316,7 +318,7 @@ class Funnel(Configurable):
 
         return self
 
-    def keywords(self, country: str = "us", max_ideas: int = 200) -> DataFrame:
+    def keywords(self) -> DataFrame:
         """Generate keyword ideas for all funnel categories using the seed keywords."""
         dfs = []
         for stage, cat, info in tqdm(self.enumerate(), total=len(self)):
@@ -331,9 +333,9 @@ class Funnel(Configurable):
                 cfg = keywords.GoogleKwdConfig(
                     keywords=(seed_kwd,),
                     ideas=True,
-                    max_ideas=max_ideas,
+                    max_ideas=self.max_ideas_per_category,
                     language=self.language,
-                    country=country,
+                    country=self.country or "",
                 )
 
                 try:

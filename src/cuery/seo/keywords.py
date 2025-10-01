@@ -194,16 +194,11 @@ def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClie
             try:
                 json_key = json.loads(json_key)
             except json.JSONDecodeError:
-                LOG.warning("Failed to decode JSON key. Will try base64 decoding.")
                 json_key = decode_json_b64(json_key)
             with tempfile.NamedTemporaryFile("w", suffix=".json") as fp:
                 json.dump(json_key, fp)
                 fp.flush()
                 config["json_key_file_path"] = fp.name
-                safe_config = {
-                    k: v for k, v in config.items() if k not in ("json_key", "developer_token")
-                }
-                LOG.info(f"Connecting to Google Ads API with credentials dict:\n{safe_config}")
                 client = GoogleAdsClient.load_from_dict(config)
 
             return client  # noqa: RET504
@@ -484,7 +479,6 @@ def keywords(cfg: GoogleKwdConfig) -> DataFrame:
             "Check your configuration, credentials, and network connection."
         )
 
-    LOG.info("Processing metrics response into DataFrame.")
     df = process_keywords(response, collect_volumes=True)
     LOG.info(f"Got keyword dataframe:\n{df}")
     return df
