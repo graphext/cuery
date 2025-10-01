@@ -1,6 +1,5 @@
 """Module for handling SEO source categorization and related utilities."""
 
-import tldextract
 from numpy import ndarray
 from pandas import DataFrame, Series
 
@@ -145,23 +144,12 @@ Your task is to categorize each domain/url into one of the predefined categories
 """)
 
 
-def url_domain(url: str | None, with_subdomain: bool = False) -> str | None:
-    if not url:
-        return None
-
-    parsed = tldextract.extract(url)
-    return (
-        parsed.fqdn.replace("www.", "")
-        if with_subdomain
-        else parsed.top_domain_under_public_suffix
-    )
-
-
 def find_all_strings(
     df: DataFrame,
     keys: list[str] | None = None,
     unique: bool = False,
-) -> list[str]:
+    to_pandas: bool = True,
+) -> list[str] | Series:
     """Extract all urls from a DataFrame's columns containing url lists.
 
     For each column, checks the first valid row to determine if it contains scalar values,
@@ -188,21 +176,10 @@ def find_all_strings(
     if unique:
         values = list(set(values))
 
+    if to_pandas:
+        return Series(values, name="domain")
+
     return values
-
-
-def find_all_domains(
-    df: DataFrame,
-    keys: list[str] | None = None,
-    with_subdomain: bool = True,
-    unique: bool = False,
-) -> Series:
-    """Extract all (unique) domains from a DataFrame's columns."""
-    values = find_all_strings(df, keys=keys, unique=unique)
-    domains = [domain for x in values if (domain := url_domain(x, with_subdomain=with_subdomain))]
-    if unique:
-        domains = list(set(domains))
-    return Series(list(domains), name="domain")
 
 
 async def categorize(
@@ -243,24 +220,12 @@ def mapper(
     return domain_mapper
 
 
-def categorize_url(url, mapper: dict, extract_domain: bool = True) -> dict | None:
-    """Categorize a single URL using the provided mapping dictionary."""
-    if extract_domain:
-        url = url_domain(url)
-
-    return mapper.get(url)
-
-
 def flat_domains(sources: list[dict] | None, with_subdomain: bool = True) -> list[str]:
     """Extract and flatten domains from a list of source dictionaries."""
     if not sources:
         return []
 
-    return [
-        domain
-        for src in sources
-        if (url := src.get("url")) and (domain := url_domain(url, with_subdomain=with_subdomain))
-    ]
+    return [domain for src in sources if (domain := src.get("domain"))]
 
 
 def source_domains(sources: Series, with_subdomain: bool = True) -> Series:
@@ -280,7 +245,7 @@ def map_domains(domains: Series, mapper: dict) -> tuple[Series, Series]:
         categories = []
         subcategories = []
         for domain in domains:
-            if category := categorize_url(domain, mapper=mapper, extract_domain=False):
+            if category := mapper.get(domain):
                 categories.append(category["category"])
                 subcategories.append(category["subcategory"])
             else:
@@ -304,9 +269,8 @@ def enrich_sources(ser: Series, mapper: dict):
             continue
 
         for source in sources:
-            if isinstance(source, dict) and (url := source.get("url")):
-                source["domain"] = url_domain(url)
-                categories = categorize_url(source["domain"], mapper=mapper)
+            if isinstance(source, dict) and (domain := source.get("domain")):
+                categories = mapper.get(domain)
                 if categories:
                     source["category"] = categories["category"]
                     source["subcategory"] = categories["subcategory"]
@@ -318,9 +282,7 @@ async def process_sources(
     domain_mapper: dict | None = None,
 ) -> DataFrame:
     """Process and enrich DataFrame columns containing source lists with categorized domains."""
-    model_names = [m.split("/")[-1] for m in models]
-    model_names = [m.replace(".", "_").replace("-", "_") for m in model_names]
-    source_cols = [col for m in model_names if (col := f"sources_{m}") in df]
+    source_cols = [col for m in models if (col := f"sources_{m}") in df]
 
     if source_cols:
         LOG.info(f"Analysing following source columns: {source_cols}")
@@ -336,7 +298,7 @@ async def process_sources(
     # All unique domains across all models
     if domain_mapper is None:
         LOG.info("Extracting and categorizing all unique cited domains...")
-        domains = find_all_domains(df[source_cols], keys=["url"], unique=True)
+        domains = find_all_strings(df[source_cols], keys=["domain"], unique=True)
         domain_categories = await categorize(domains)
         domain_mapper = mapper(domain_categories)
 

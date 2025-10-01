@@ -16,6 +16,7 @@ from tqdm.auto import tqdm
 
 from .. import Prompt, Response, ResponseSet, ask, search
 from ..call import call
+from ..models import ModelId
 from ..search import SearchResult
 from ..utils import LOG, Configurable, dedent
 from . import sources
@@ -204,7 +205,7 @@ async def query_ais(
 
     df = responses.to_pandas()
     df["prompt"] = prompts * len(models)
-    df["model"] = [model for model in models for _ in range(len(prompts))]
+    df["model"] = [ModelId.parse(m).column_name() for m in models for _ in range(len(prompts))]
 
     # Pivot the dataframe so that unique values in "prompt" become rows, and "text" and "reference"
     # columns are prefixed with the model name
@@ -469,6 +470,9 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
         to_pandas=True,
     )
 
+    # Name of models in column-friendly format, as used in df
+    model_names = [ModelId.parse(m).column_name() for m in cfg.models]  # type: ignore
+
     # Analyse results
     if brands:
         LOG.info("Analysing brand ranks")
@@ -484,29 +488,18 @@ async def analyse(cfg: GeoConfig, progress_callback: Coroutine | None = None) ->
                         df,
                         own=cfg.brands,
                         competitors=competitors,
-                        models=cfg.models,  # type: ignore
+                        models=model_names,  # type: ignore
                     )
                 except Exception as e:
                     LOG.error(f"Error summarizing brand ranks: {e}")
 
-    # Clean up dataframe
-    def clean_name(name):
-        providers = search.VALID_MODELS.keys()
-        for provider in providers:
-            name = name.replace(f"{provider}/", "")
-
-        return re.sub(r"[^a-zA-Z0-9]", "_", name)
-
-    df.columns = [clean_name(col) for col in df.columns]
-    LOG.info(f"Cleaned dataframe columns: {df.columns.tolist()}")
-
     # Extract and categorize sources
     LOG.info("Processing and categorizing sources cited by LLMs")
-    df = await sources.process_sources(df, models=cfg.models)  # type: ignore
+    df = await sources.process_sources(df, models=model_names)  # type: ignore
 
     # Column order: prompt, answers, sources, summary columns, other columns
-    answer_cols = [f"answer_{clean_name(model)}" for model in cfg.models]  # type: ignore
-    source_cols = [f"sources_{clean_name(model)}" for model in cfg.models]  # type: ignore
+    answer_cols = [f"answer_{model}" for model in model_names]  # type: ignore
+    source_cols = [f"sources_{model}" for model in model_names]  # type: ignore
     count_cols = [col for col in df.columns if re.search(r"(brand|competitor)_.*_count", col)]
     own_in_cols = [
         col

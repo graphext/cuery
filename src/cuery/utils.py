@@ -15,6 +15,7 @@ from math import inf as INF
 from pathlib import Path
 from textwrap import dedent as pydedent
 from typing import Any, get_args
+from urllib.parse import ParseResult, parse_qs, urlparse
 
 import dotenv
 import numpy as np
@@ -30,6 +31,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefinedType
 from tiktoken import Encoding, encoding_for_model, get_encoding
+from tldextract import TLDExtract
 from tqdm.auto import tqdm as auto_tqdm
 
 from .cost import cost_per_token
@@ -432,3 +434,49 @@ async def gather_with_progress(
 
     coros = [with_progress(c) for c in coros]
     return await asyncio.gather(*coros)
+
+
+def parse_url(url: str) -> ParseResult:
+    """Parse a URL, adding scheme if missing."""
+    if not url.startswith(("http://", "https://", "//")):
+        url = "http://" + url
+
+    return urlparse(url)
+
+
+def is_google_translate_url(url: str | ParseResult) -> bool:
+    """Check if a URL is a Google Translate URL."""
+    if not isinstance(url, ParseResult):
+        url = parse_url(url)
+
+    return (
+        url.netloc == "translate.google.com"
+        and url.path.startswith("/translate")
+        and "u=" in url.query
+    )
+
+
+def extract_domain(
+    url: str | None,
+    with_subdomain: bool = False,
+    resolve_google_translate: bool = True,
+) -> str | None:
+    """ "Extract the domain from a URL."""
+    if not url:
+        return None
+
+    parsed = parse_url(url)
+    if resolve_google_translate and is_google_translate_url(parsed):
+        original_url = parse_qs(parsed.query)["u"][0]
+        parsed = urlparse(original_url)
+
+    tld = TLDExtract().extract_urllib(parsed)
+    if with_subdomain:
+        return tld.fqdn.replace("www.", "")
+
+    return tld.top_domain_under_public_suffix
+
+
+def clean_column_name(name: str) -> str:
+    """Clean a string to be used as a pandas DataFrame column name."""
+    return re.sub(r"[^a-zA-Z0-9]", "_", name)

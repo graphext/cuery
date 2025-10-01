@@ -11,10 +11,9 @@ from .. import asy
 from ..response import Response, ResponseSet
 from ..search import search_with_format
 from ..templates import load_template
-from ..utils import LOG, Configurable, dedent, render_template
-from .sources import url_domain
+from ..utils import LOG, Configurable, dedent, extract_domain, render_template
 
-DEFAULT_SEARCH_MODEL = "openai/gpt-4.1-mini"
+DEFAULT_SEARCH_MODEL = "openai/gpt-4.1"
 
 
 COMPETITORS_PROMPT = dedent("""
@@ -220,7 +219,8 @@ async def search_brands(
 
     for response in responses:
         if response.domain:
-            response.domain = url_domain(response.domain)
+            clean_domain = extract_domain(response.domain)
+            response.domain = clean_domain or response.domain
 
     rs = ResponseSet(responses, context=None, required=None)  # type: ignore
 

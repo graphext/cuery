@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
-from functools import partial
+from functools import cached_property, partial
 from io import StringIO
 from typing import Any, Literal
 
@@ -31,7 +31,7 @@ from google.genai.types import GenerateContentResponse as GGResponse
 from markdown import Markdown
 from openai import AsyncOpenAI
 from openai import types as oaitypes
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from xai_sdk import AsyncClient as XaiAsyncClient
 from xai_sdk.chat import Response as XAIResponse
 from xai_sdk.chat import user as xai_user
@@ -42,7 +42,7 @@ from . import ask
 from .asy import all_with_policies
 from .resources import country_coords
 from .response import Response, ResponseSet
-from .utils import dedent
+from .utils import dedent, extract_domain
 
 OAIResponse = oaitypes.responses.response.Response  # type: ignore[attr-defined]
 
@@ -104,6 +104,12 @@ class Source(Response):
 
     title: str
     url: str
+
+    @computed_field
+    @cached_property
+    def domain(self) -> str | None:
+        """Extract domain from URL."""
+        return extract_domain(self.url)
 
 
 class SearchResult(Response):
@@ -203,7 +209,7 @@ async def query_openai(
     city: str | None = None,  # text string, e.g. "Madrid"
     context_size: Literal["low", "medium", "high"] | str = "medium",
     reasoning_effort: Literal["low", "medium", "high"] | str = "low",
-    model: str = "gpt-5",
+    model: str = "gpt-4.1-mini",
     use_search: bool = True,
     validate: bool = True,
     response_format: Response | None = None,
