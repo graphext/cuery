@@ -166,6 +166,32 @@ FUNNEL = [
     },
 ]
 
+SIMPLE_FUNNEL = {
+    "Awareness / Discovery": [
+        "Problem Identification",
+        "Category Education",
+        "Trends & Inspiration",
+    ],
+    "Consideration / Research": [
+        "Features & Specifications",
+        "Comparisons",
+        "Suitability & Use Cases",
+        "Social Proof & Reviews",
+    ],
+    "Decision / Evaluation": [
+        "Pricing & Packages",
+        "Availability & Location",
+        "Intent-to-Act Signals",
+    ],
+    "Conversion / Action": ["Purchase / Signup", "Immediate Offers & Promotions"],
+    "Post-Purchase / Retention & Advocacy": [
+        "Usage & How-To",
+        "Troubleshooting & Support",
+        "Upgrades & Add-ons",
+        "Community & Advocacy",
+    ],
+}
+
 EXAMPLES_PROMPT = dedent("""
 You task is to generate 2 to 5 initial Google search keyword examples for a particular
 marketing funnel stage and category (details below). I.e. keywords a person may use in that stage

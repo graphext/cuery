@@ -1,8 +1,8 @@
 {
 	"actorSpecification": 1,
-	"name": "keyword-planner",
-	"title": "Keyword Planner",
-	"description": "Fetch, expand and enrich keywords using Google Ads API. Generates detailed keyword metrics including search volumes and trends, CPC, competition data etc.",
+	"name": "keyword-meter",
+	"title": "Keyword Meter",
+	"description": "Fetches keyword metrics for input keywords including search volumes and trends, CPC, competition data etc. Note: does NOT generate new keyword ideas!",
 	"version": "1.0",
 	"buildTag": "latest",
 	"dockerfile": "./Dockerfile",

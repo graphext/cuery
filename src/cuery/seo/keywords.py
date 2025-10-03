@@ -93,15 +93,6 @@ class GoogleKwdConfig(Configurable):
     """End date (year and month) for metrics in YYYY-MM format (e.g., '2023-12').
     Either provide both `metrics_start` and `metrics_end` or neither.
     """
-    credentials: str | Path | dict | None = None
-    """Path to Google Ads API credentials file or a dictionary with credentials.
-    If not provided, will look for environment variables with prefix `GOOGLE_ADS_`.
-    """
-    customer: str | None = None
-    """Google Ads customer ID to use for API requests.
-    If not provided, will use the `GOOGLE_ADS_CUSTOMER_ID` or `GOOGLE_ADS_LOGIN_CUSTOMER_ID`
-    environment variable.
-    """
 
     @field_validator("ideas")
     @classmethod
@@ -184,10 +175,9 @@ def config_from_env() -> dict:
     }
 
 
-def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClient:
+def connect_ads_client() -> GoogleAdsClient:
     """Load Google Ads client from credentials."""
-    if config is None:
-        config = config_from_env()
+    config = config_from_env()
 
     if isinstance(config, dict):
         if json_key := config.pop("json_key", None):
@@ -203,7 +193,6 @@ def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClie
 
             return client  # noqa: RET504
 
-        LOG.info(f"Connecting to Google Ads API with credentials dict:\n{config}")
         return GoogleAdsClient.load_from_dict(config)
 
     if isinstance(config, str | Path):
@@ -242,7 +231,7 @@ def fetch_keywords(
     cfg: GoogleKwdConfig,
 ) -> GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse:
     """Fetch metrics for a fixed list of keywords or generate keyword ideas from Google Ads API."""
-    client = connect_ads_client(cfg.credentials)
+    client = connect_ads_client()
     ads_service = client.get_service("GoogleAdsService")
     kwd_service = client.get_service("KeywordPlanIdeaService")
 
@@ -288,7 +277,7 @@ def fetch_keywords(
 
     request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
 
-    request.customer_id = cfg.customer or os.environ.get(
+    request.customer_id = os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
 
@@ -482,113 +471,3 @@ def keywords(cfg: GoogleKwdConfig) -> DataFrame:
     df = process_keywords(response, collect_volumes=True)
     LOG.info(f"Got keyword dataframe:\n{df}")
     return df
-
-
-SYSTEM_PROMPT = dedent("""
-You're an expert SEO specialist analyzing google keyword searches for a specific domain.
-
-Your task is to simplify a list of search keywords (short phrases) into a smaller group of clean
-keywords that make sense to later group, aggregate and analyze together. The idea is to remove
-duplicate keywords that are identical in meaning but are spelled differently
-(misspelling, singular vs. plural etc.), while preserving different search intents and
-meaningful variations.
-
-The keywords come from a dataset of '%(domain)s'. %(extra)s
-""")
-
-USER_PROMPT = dedent("""
-Extract a clean, deduplicated list of search keywords of no more than %(n_max)s items
-from the following list.
-
-# Keywords
-
-{{keywords}}
-""")
-
-ASSIGNMENT_PROMPT_SYSTEM = dedent("""
-You're task is to use the following list of clean keywords,
-and select and return the best semantically matching keyword for a given input phrase.
-
-# Keywords
-
-%(keywords)s
-""")
-
-ASSIGNMENT_PROMPT_USER = dedent("""
-Assign the correct keyword to the following phrase: {{text}}.
-""")
-
-
-class KeywordCleaner:
-    """A class to clean and deduplicate search keywords from a list of texts."""
-
-    def __init__(
-        self,
-        domain: str,
-        n_max: int = 10,
-        extra: str | None = None,
-    ):
-        prompt = Prompt(
-            messages=[
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT % {"domain": domain, "extra": extra},
-                },
-                {
-                    "role": "user",
-                    "content": USER_PROMPT % {"n_max": n_max},
-                },
-            ],  # type: ignore
-            required=["keywords"],
-        )
-
-        class Keywords(Response):
-            keywords: list[str] = Field(
-                ...,
-                description="A list of clean google search keywords.",
-                max_length=n_max,
-            )
-
-        self.task = Task(prompt=prompt, response=Keywords)
-
-    async def __call__(
-        self,
-        keywords: Iterable[str],
-        model: str,
-        max_dollars: float,
-        max_tokens: float | None = None,
-        max_texts: float | None = None,
-    ) -> Response:
-        """Extracts a two-level topic hierarchy from a list of texts."""
-        text = utils.concat_up_to(
-            keywords,
-            model=model,
-            max_dollars=max_dollars,
-            max_tokens=max_tokens,
-            max_texts=max_texts,
-            separator="\n",
-        )
-        responses = await self.task.call(context={"keywords": text}, model=model)
-        return responses[0]
-
-
-class KeywordAssigner:
-    """Enforce correct clean keyword assignment."""
-
-    def __init__(self, keywords: Response):
-        keywords = keywords.to_dict()["keywords"]
-        prompt = Prompt(
-            messages=[
-                {"role": "system", "content": ASSIGNMENT_PROMPT_SYSTEM % {"keywords": keywords}},
-                {"role": "user", "content": ASSIGNMENT_PROMPT_USER},
-            ],  # type: ignore
-            required=["text"],
-        )
-
-        class Match(Response):
-            keyword: Literal[*keywords]
-
-        self.task = Task(prompt=prompt, response=Match)
-
-    async def __call__(self, texts: AnyContext, model: str, **kwds) -> ResponseSet:
-        return await self.task(context=texts, model=model, **kwds)

@@ -1,21 +1,20 @@
-# Google Ads Keyword Planning Actor
+# Google Ads Keyword Metrics Fetcher
 
-Analyze and expand keywords using the Google Ads API to generate comprehensive keyword research data. Features intelligent keyword expansion from seed terms or URLs, historical search volume analysis with trend calculations, and competition metrics for strategic SEO and PPC planning.
+Fetch comprehensive keyword metrics using the Google Ads API for existing keywords. Get detailed historical search volume data, competition metrics, CPC estimates, and trend analysis for strategic SEO and PPC planning.
 
-## What does Google Ads Keyword Planning Actor do?
+## What does Google Ads Keyword Metrics Fetcher do?
 
-This Actor connects to the Google Ads API to provide comprehensive keyword planning data for SEO and PPC professionals:
+This Actor connects to the Google Ads API to retrieve detailed metrics for your existing keyword list:
 
-- **Expand seed keywords** into thousands of related keyword suggestions using Google's keyword planner
-- **Generate keyword ideas** from landing pages or websites with configurable limits
 - **Analyze search volumes** with up to 4 years of historical data and monthly breakdowns
 - **Calculate growth trends** including year-over-year, 3-month, and 1-month growth rates
 - **Extract competition metrics** including average CPC, competition scores, and bid estimates
 - **Perform trend analysis** using linear regression to identify keyword momentum
 - **Support multiple markets** with configurable language and country targeting
 - **Generate structured data** ready for SEO analysis, PPC planning, and content strategy
+- **Process large keyword lists** without the 20-keyword limit of idea generation
 
-**Perfect for**: SEO professionals, PPC specialists, content marketers, digital agencies, and businesses planning their keyword strategy and content optimization.
+**Perfect for**: SEO professionals tracking keyword performance, PPC specialists analyzing keyword portfolios, content marketers measuring topic popularity, and digital agencies monitoring keyword metrics for clients.
 
 ## Input
 
@@ -25,8 +24,7 @@ Configure your keyword analysis with these simple parameters:
 
 ```json
 {
-  "keywords": ["digital marketing", "seo", "keyword research"],
-  "ideas": false,
+  "keywords": ["digital marketing", "seo", "keyword research", "content marketing", "social media marketing"],
   "language": "en",
   "country": "us",
   "metrics_start": "2024-01",
@@ -34,13 +32,11 @@ Configure your keyword analysis with these simple parameters:
 }
 ```
 
-### Example with Keyword Ideas Generation
+### Example with Historical Metrics
 
 ```json
 {
-  "keywords": ["content marketing", "blog writing"],
-  "ideas": true,
-  "max_ideas": 500,
+  "keywords": ["python programming", "machine learning", "data science", "artificial intelligence"],
   "language": "en",
   "country": "us",
   "metrics_start": "2023-06",
@@ -48,18 +44,13 @@ Configure your keyword analysis with these simple parameters:
 }
 ```
 
-### Example with URL-based Keyword Ideas
+### Example for Multiple Markets
 
 ```json
 {
-  "url": "https://example.com/",
-  "whole_site": true,
-  "ideas": true,
-  "max_ideas": 300,
-  "language": "en",
-  "country": "us",
-  "metrics_start": "2024-01",
-  "metrics_end": "2025-01"
+  "keywords": ["seo", "marketing digital", "posicionamiento web"],
+  "language": "es",
+  "country": "es"
 }
 ```
 
@@ -67,17 +58,11 @@ Configure your keyword analysis with these simple parameters:
 
 | Field | Type | Description | Required | Default |
 |-------|------|-------------|----------|---------|
-| `keywords` | Array | List of seed keywords to expand and analyze | Optional* | - |
-| `url` | String | Landing page or website URL for keyword ideas generation | Optional* | - |
-| `whole_site` | Boolean | Generate ideas for entire website (requires `url` to be domain only) | Optional | `false` |
-| `ideas` | Boolean | Generate additional keyword ideas (limited to ≤20 seed keywords) | Optional | `false` |
-| `max_ideas` | Integer | Maximum keyword ideas to generate (when `ideas` is enabled) | Optional | - |
-| `language` | String | Language code for targeting (e.g., "en", "es", "fr") | Optional | `""` (all languages/keywords) |
+| `keywords` | Array | List of keywords to fetch metrics for (no limit on quantity) | Required | - |
+| `language` | String | Language code for targeting (e.g., "en", "es", "fr") | Optional | `""` (all languages) |
 | `country` | String | Geographic target code (e.g., "us", "es", "uk") | Optional | `""` (all locations) |
 | `metrics_start` | String | Start date for historical metrics (YYYY-MM format) | Optional | - |
 | `metrics_end` | String | End date for historical metrics (YYYY-MM format) | Optional | - |
-
-*Either `keywords` or `url` must be provided.
 
 ### Quick Reference
 
@@ -120,18 +105,11 @@ Leave empty to include keywords from all regions/locations.
   - Calendar year: `"2024-01"` to `"2024-12"`
   - Two-year analysis: `"2023-01"` to `"2025-01"`
 
-**Keyword Ideas Generation:**
-- Set `ideas: true` to generate additional keyword suggestions from Google's keyword planner
-- **Important**: Only available when providing 20 or fewer seed keywords
-- Use `max_ideas` to limit the number of generated keywords (recommended: 100-1000)
-- If more than 20 keywords are provided only the first 20 will be used
-- **Alternative**: Use `url` parameter to generate ideas from a landing page or website
-- **Whole Site Mode**: Set `whole_site: true` with domain-only URL to get site-wide keyword ideas
-
-**URL-based Keyword Generation:**
-- Provide a `url` parameter to generate keyword ideas from a specific landing page
-- For whole-site analysis, use domain-only URL (e.g., "example.com") and set `whole_site: true`
-- Works independently of the `keywords` parameter - you can use either or both
+**Keywords:**
+- This actor fetches metrics for your existing keyword list
+- **No limit** on the number of keywords you can provide
+- Use this actor when you already have a keyword list and want detailed metrics
+- For discovering new keywords, use the Keyword Ideas Generator actor instead
 
 ## Output
 

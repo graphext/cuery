@@ -1,0 +1,59 @@
+{
+    "title": "SEO Keyword Planner",
+    "description": "Fetch, expand and enrich keywords using Google Ads API. Generates detailed keyword metrics including search volumes and trends, CPC, competition data etc.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "keywords": {
+            "title": "Keywords",
+            "type": "array",
+            "description": "A list of keywords to fetch data for.",
+            "editor": "stringList",
+            "prefill": [
+                "digital marketing",
+                "seo",
+                "web positioning"
+            ]
+        },
+        "keyword_dataset": {
+            "title": "Keyword Dataset",
+            "type": "string",
+            "description": "Dataset containing keywords to process. Either an Apify dataset ID or a URL to a parquet file.",
+            "editor": "textfield"
+        },
+        "keyword_column": {
+            "title": "Keyword Column",
+            "type": "string",
+            "description": "The name of the column in the keyword dataset that contains the keywords to process.",
+            "editor": "textfield",
+            "default": "keyword"
+        },
+        "language": {
+            "title": "Language Code",
+            "type": "string",
+            "description": "The language to use for keyword data (e.g., ‘en’ for English). Leave empty to include all languages.",
+            "editor": "textfield"
+        },
+        "country": {
+            "title": "Target Country",
+            "type": "string",
+            "description": "The geographical target for keyword data (e.g., ‘us’ for United States). Leave empty to not filter geographically.",
+            "editor": "textfield"
+        },
+        "metrics_start": {
+            "title": "Metrics Start Date",
+            "type": "string",
+            "description": "Start date (year and month) for metrics in YYYY-MM format (e.g., ‘2023-01’). This determines the beginning of the historical search volume data range.\n\n**Important Limitations:**\n• Google Ads API typically provides data for the last 2 years only\n• Dates older than 2 years may result in errors\n• Must be before the end date\n• Cannot be in the future\n\n**Examples:**\n• 2024-07 (July 2024)\n• 2023-12 (December 2023)\n• 2024-01 (January 2024)\n\n**Recommended:** Use recent dates within the last 12-24 months for best data availability.",
+            "editor": "textfield",
+            "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "metrics_end": {
+            "title": "Metrics End Date",
+            "type": "string",
+            "description": "End date (year and month) for metrics in YYYY-MM format (e.g., ‘2023-12’). This determines the end of the historical search volume data range.\n\n**Important Limitations:**\n• Cannot be in the future\n• Must be after the start date\n• Maximum 2-year range from start date\n• Should not exceed current month\n\n**Examples:**\n• 2025-07 (July 2025)\n• 2024-12 (December 2024)\n• 2025-01 (January 2025)\n\n**Tip:** For most current data, use the current month or the previous month as the end date.",
+            "editor": "textfield",
+            "pattern": "^\\d{4}-\\d{2}$"
+        }
+    },
+    "required": []
+}

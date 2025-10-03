@@ -1,5 +1,11 @@
 """Apify actors that wrap cuery.seo functionalities."""
 
-from . import keywords, serps, topics, geo
+from . import geo, keyword_ideas, keyword_metrics, serps, topics
 
-__all__ = ["keywords", "serps", "topics", "geo"]
+__all__ = [
+    "keyword_ideas",
+    "keyword_metrics",
+    "serps",
+    "topics",
+    "geo",
+]

@@ -1,0 +1,25 @@
+{
+	"actorSpecification": 1,
+	"name": "keyword-ideator",
+	"title": "Keyword Ideator",
+	"description": "Generate keyword ideas and fetch associated metrics including search volumes and trends, CPC, competition data etc.",
+	"version": "1.0",
+	"buildTag": "latest",
+	"dockerfile": "./Dockerfile",
+	"dockerContextDir": "../..",
+	"input": "./input_schema.json",
+	"storages": {
+		"dataset": "./dataset_schema.json"
+	},
+	"main": "python -m cuery.actors.keywords",
+	"readme": "./README.md",
+	"minMemoryMbytes": 256,
+	"maxMemoryMbytes": 4096,
+	"usesStandbyMode": false,
+	"environmentVariables": {
+		"GOOGLE_ADS_DEVELOPER_TOKEN": "@GOOGLE_ADS_DEVELOPER_TOKEN",
+		"GOOGLE_ADS_LOGIN_CUSTOMER_ID": "@GOOGLE_ADS_LOGIN_CUSTOMER_ID",
+		"GOOGLE_ADS_USE_PROTO_PLUS": "true",
+		"GOOGLE_ADS_JSON_KEY": "@GOOGLE_ADS_JSON_KEY"
+	}
+}

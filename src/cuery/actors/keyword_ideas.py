@@ -9,6 +9,7 @@ from ..seo.keywords import GoogleKwdConfig, keywords
 async def main():
     async with Actor:
         input = await Actor.get_input()
+        input |= {"ideas": True}
         config = GoogleKwdConfig(**input)
         df = keywords(config)
         records = json.loads(df.to_json(orient="records", date_format="iso", index=False))
