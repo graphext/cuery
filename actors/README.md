@@ -160,7 +160,7 @@ graph TB
     style SC fill:#fff4e1
 ```
 
-**Key Questions & Insights from the Final Dataset:**
+# Key Questions & Insights from the Final Dataset
 
 The enriched dataset enables powerful competitive intelligence analysis for AI visibility:
 
