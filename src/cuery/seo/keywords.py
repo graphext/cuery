@@ -21,18 +21,17 @@ Useful documentation:
     - ID/Code references:
         - https://developers.google.com/google-ads/api/data/codes-formats#expandable-7
         - https://developers.google.com/google-ads/api/data/geotargets
-
+    - Limits and quotas:
+        - https://developers.google.com/google-ads/api/docs/best-practices/quotas
 """
 
 import json
 import os
 import tempfile
 import urllib.parse
-from collections.abc import Iterable
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
 
 import numpy as np
 from google.ads.googleads.client import GoogleAdsClient
@@ -49,12 +48,8 @@ from numpy import ndarray
 from pandas import DataFrame, Series
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
-from .. import resources, utils
-from ..context import AnyContext
-from ..prompt import Prompt
-from ..response import Response, ResponseSet
-from ..task import Task
-from ..utils import LOG, Configurable, decode_json_b64, dedent
+from .. import resources
+from ..utils import LOG, Configurable, decode_json_b64
 
 
 class GoogleKwdConfig(Configurable):
@@ -112,7 +107,7 @@ class GoogleKwdConfig(Configurable):
         if not v:
             return v
         try:
-            return resources.google_lang_id(v)
+            return str(resources.google_lang_id(v))
         except ValueError as e:
             raise ValueError(f"Invalid language code: {v}") from e
 
@@ -122,7 +117,7 @@ class GoogleKwdConfig(Configurable):
         if not v:
             return v
         try:
-            return resources.google_country_id(v)
+            return str(resources.google_country_id(v))
         except ValueError as e:
             raise ValueError(f"Invalid country code: {v}") from e
 
@@ -349,7 +344,11 @@ def linreg_trend(y: list | ndarray | None) -> float | None:
     intercept, slope = theta
     # y_pred = X @ theta  # noqa: ERA001
 
-    return slope / y.mean()
+    mean_y = y.mean()
+    if mean_y == 0 or np.isnan(mean_y):
+        return None
+
+    return slope / mean_y
 
 
 def add_trend_columns(df: DataFrame) -> DataFrame:
