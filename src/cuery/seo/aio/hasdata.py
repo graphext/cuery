@@ -9,6 +9,7 @@ from functools import partial
 from typing import Any
 
 import aiohttp
+from async_lru import alru_cache
 
 from ...asy import all_with_policies
 from ...search import SearchResult, Source
@@ -151,6 +152,7 @@ def aio_request_params(aio: dict) -> dict | None:
     return None
 
 
+@alru_cache(maxsize=100)
 async def query(
     prompt: str,
     country: str | None = None,
@@ -176,7 +178,8 @@ async def query(
 
     close_session = False
     if session is None:
-        session = aiohttp.ClientSession()
+        timeout = aiohttp.ClientTimeout(total=60, connect=10, sock_read=30)
+        session = aiohttp.ClientSession(timeout=timeout)
         close_session = True
 
     try:
