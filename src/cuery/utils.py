@@ -2,11 +2,14 @@
 
 import asyncio
 import base64
+import functools
+import inspect
 import json
 import logging
 import os
 import re
 from collections.abc import Coroutine, Iterable
+from contextlib import contextmanager
 from datetime import date, datetime
 from importlib.resources import as_file, files
 from importlib.resources.abc import Traversable
@@ -61,6 +64,53 @@ BaseModelClass = type(BaseModel)
 NpNa = float
 Missing = None | NAType | NpNa
 """Type hint for missing values."""
+
+
+def with_log_level(logger: logging.Logger):
+    """Decorator factory that adds a `log_level` parameter to the wrapped function.
+
+    Temporarily sets the given logger's level during the call, then restores it.
+    """
+
+    def decorator(func):
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args, log_level=None, **kwargs):
+                old_level = logger.level
+                if log_level is not None:
+                    logger.setLevel(log_level)
+                try:
+                    return await func(*args, **kwargs)
+                finally:
+                    logger.setLevel(old_level)
+
+            return async_wrapper
+
+        @functools.wraps(func)
+        def sync_wrapper(*args, log_level=None, **kwargs):
+            old_level = logger.level
+            if log_level is not None:
+                logger.setLevel(log_level)
+            try:
+                return func(*args, **kwargs)
+            finally:
+                logger.setLevel(old_level)
+
+        return sync_wrapper
+
+    return decorator
+
+
+@contextmanager
+def set_log_level(logger: logging.Logger, level: int | str):
+    """Context manager to temporarily set the log level of a logger."""
+    old_level = logger.level
+    logger.setLevel(level)
+    try:
+        yield
+    finally:
+        logger.setLevel(old_level)
 
 
 class progress(auto_tqdm):
