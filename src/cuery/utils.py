@@ -506,6 +506,9 @@ def is_google_translate_url(url: str | ParseResult) -> bool:
     )
 
 
+TLD_EXTRACTOR = TLDExtract()
+
+
 def extract_domain(
     url: str | None,
     with_subdomain: bool = False,
@@ -520,7 +523,7 @@ def extract_domain(
         original_url = parse_qs(parsed.query)["u"][0]
         parsed = urlparse(original_url)
 
-    tld = TLDExtract().extract_urllib(parsed)
+    tld = TLD_EXTRACTOR.extract_urllib(parsed)
     if with_subdomain:
         return tld.fqdn.replace("www.", "")
 
