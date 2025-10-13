@@ -152,7 +152,7 @@ def aio_request_params(aio: dict) -> dict | None:
     return None
 
 
-@alru_cache(maxsize=100)
+@alru_cache(maxsize=1000)
 async def query(
     prompt: str,
     country: str | None = None,

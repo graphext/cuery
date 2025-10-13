@@ -25,6 +25,7 @@ from typing import Any, Literal
 
 import instructor
 import requests
+from async_lru import alru_cache
 from google import genai as gai
 from google.genai import types as gaitypes
 from google.genai.types import GenerateContentResponse as GGResponse
@@ -203,6 +204,7 @@ def validate_xai(response, plain: bool = False) -> SearchResult:
     return result
 
 
+@alru_cache(maxsize=1000)
 async def query_openai(
     prompt: str,
     country: str | None = None,  # 2-letter code, e.g. "US"
