@@ -166,13 +166,13 @@ async def query_ais(
     pbar = tqdm(total=n_total)
     policies = {
         "n_concurrent": 100,
-        "timeout": 300,
-        "retries": 3,
-        "wait_max": 60,
+        "timeout": 100,
+        "retries": 2,
+        "wait_max": 30,
         "fallback": SearchResult.fallback(),
         "pbar": pbar,
         "progress_callback": progress_callback,
-        "timer": True,
+        "timer": False,
         "min_iters": max(1, int(n_total / 20)),
     }
 
@@ -198,7 +198,17 @@ async def query_ais(
                 )  # type: ignore
             )
 
-    responses = await asyncio.gather(*coros)
+    # Execute with return_exceptions=True to prevent one failure from blocking all
+    responses = await asyncio.gather(*coros, return_exceptions=True)
+    LOG.info(f"Gathered {len(responses)} responses from {len(models)} models.")
+
+    # Replace any exceptions with fallback SearchResult
+    fallback = SearchResult.fallback()
+    for i, response in enumerate(tqdm(responses, desc="Filtering failed responses")):
+        if isinstance(response, Exception):
+            LOG.warning(f"Coroutine {i} failed with {type(response).__name__}: {response}")
+            responses[i] = fallback
+
     responses = ResponseSet(responses=responses, context=None, required=None)
     if not to_pandas:
         return responses
