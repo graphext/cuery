@@ -1,0 +1,8 @@
+name: cuery
+channels:
+  - conda-forge
+dependencies:
+  - ipykernel
+  - ipython
+  - jupyter
+  - ruff

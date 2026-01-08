@@ -905,7 +905,7 @@ requires-dist = [
     { name = "google-ads", marker = "extra == 'seo'", specifier = "<28.0.0" },
     { name = "google-genai", specifier = ">=1.56.0" },
     { name = "gradio", marker = "extra == 'seo'", specifier = ">=5.9.1" },
-    { name = "instructor", extras = ["anthropic", "google-genai"], specifier = ">=1.13.0" },
+    { name = "instructor", extras = ["anthropic", "google-genai"], specifier = ">=1.11.0" },
     { name = "jsonschema", specifier = ">=4.17.0" },
     { name = "levenshtein", specifier = ">=0.27.1" },
     { name = "litellm", specifier = ">=1.69.1,<=1.77.1" },

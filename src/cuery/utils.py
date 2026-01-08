@@ -12,7 +12,8 @@ from collections.abc import Coroutine, Iterable
 from contextlib import contextmanager
 from datetime import date, datetime
 from importlib.resources import as_file, files
-from importlib.resources.abc import Traversable
+
+# from importlib.resources.abc import Traversable
 from inspect import cleandoc
 from math import inf as INF
 from pathlib import Path
@@ -212,7 +213,7 @@ def set_env(
     return None
 
 
-def resource_path(relpath: str | Path) -> Traversable:
+def resource_path(relpath: str | Path):  # -> Traversable:
     """Get the absolute path to a resource file within the cuery package."""
     relpath = Path(relpath)
     dp, fn = relpath.parent, relpath.name
