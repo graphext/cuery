@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.33.3"
+version = "0.33.4"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -57,7 +57,7 @@ dependencies = [
 ]
 
 [tool.rattler]
-build = 16
+build = 0
 
 [project.scripts]
 cuery = "cuery.cli:app"
