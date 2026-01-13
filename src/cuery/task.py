@@ -201,7 +201,7 @@ class Task:
 
             return await self.iter(context, model, **kwds)
 
-        return await self.call(context, model)
+        return await self.call(context, model, **kwds)
 
     @classmethod
     def from_config(cls, prompt: AnyCfg, response: AnyCfg) -> "Task":

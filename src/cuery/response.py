@@ -251,8 +251,8 @@ class ResponseSet:
             # Convert single column with list of dicts to one list column per key
             try:
                 df[self.iterfield] = df[self.iterfield].apply(transpose)
-            except:  # noqa: E722, S110
-                pass
+            except Exception as exc:
+                LOG.warning(f"Failed to transpose field '{self.iterfield}': {exc}")
             else:
                 response_df = pd.json_normalize(df.pop(self.iterfield))
                 prefix = prefix if prefix is not None else self.iterfield

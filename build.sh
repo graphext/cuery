@@ -11,7 +11,7 @@ TOKEN_FILE="$1"
 # This allows the script to be called with or without specifying an upload flag.
 UPLOAD="${2:---no-upload}"
 
-micromamba install -y -c conda-forge python=3.10 rattler-build requests tqdm
+micromamba install -y -c conda-forge python=3.11 rattler-build requests tqdm
 rattler-build auth login https://repo.prefix.dev --token $(cat "$TOKEN_FILE")
 rattler-build build \
     -c https://repo.prefix.dev/graphext -c conda-forge \

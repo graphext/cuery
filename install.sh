@@ -12,7 +12,7 @@ if ! hash micromamba 2>/dev/null && ! hash mamba 2>/dev/null && [ "$CONDA_DEFAUL
     exit 1
 fi
 
-PREFIX_RO_TOKEN="pfx-TjYnC7XWSwSH9UMlpMPl1yCdl4e0B2h096Qt"
+PREFIX_RO_TOKEN="pfx-dzxSY3nineoExbLRFY4S6wSrOvOEvAObnFQ3"
 micromamba auth login https://repo.prefix.dev --bearer $PREFIX_RO_TOKEN
 
 micromamba install -y -c https://repo.prefix.dev/graphext -c conda-forge cuery hatchling
