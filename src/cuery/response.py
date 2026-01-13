@@ -160,7 +160,9 @@ ResponseClass = type[Response]
 
 def transpose(dicts: list[dict]) -> dict[str, list]:
     """Transpose a list of dictionaries into a dictionary of lists."""
-    return {k: [dic[k] for dic in dicts] for k in dicts[0]}
+    if not dicts:
+        return {}
+    return {k: [dic.get(k) for dic in dicts] for k in dicts[0]}
 
 
 class ResponseSet:
