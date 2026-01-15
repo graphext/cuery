@@ -20,6 +20,7 @@ Example usage:
     >>> # Returns ClusteredEntities with clusters and canonical names
 """
 
+import json
 from collections.abc import Iterable
 from functools import cached_property
 from typing import ClassVar
@@ -48,10 +49,19 @@ Examples of entities that should be clustered together:
 - "long lines", "queues too long", "long wait times", "waiting too long" → canonical: "long wait times"
 - "staff was rude", "unfriendly employees", "rude service" → canonical: "rude staff"
 
-Important:
+CLUSTERING GUIDELINES:
+1. Merge entities that refer to the SAME specific concept (e.g., "expensive food" and "overpriced meals")
+2. Keep entities SEPARATE if they refer to different aspects, even if related:
+   - "expensive food" vs "expensive tickets" → SEPARATE (different targets)
+   - "long ride queues" vs "long food lines" → SEPARATE (different contexts)
+   - "rude staff" vs "unhelpful staff" → SEPARATE (different complaints)
+3. Aim for meaningful granularity - typically 1 cluster per 5-20 input entities on average
+4. Single-member clusters are fine for truly unique concepts
+
+IMPORTANT:
 - Every input entity must appear in exactly one cluster
-- Entities that are unique (no semantic duplicates) should be in their own single-member cluster
-- Be aggressive about merging - if two phrases refer to the same complaint/concept, merge them
+- Be consistent: if you merge "X is expensive" with "costly X", do the same pattern throughout
+- Do NOT over-merge into just a few giant clusters - preserve meaningful distinctions
 
 ${instructions}
 """)
@@ -78,10 +88,18 @@ Your task is to:
 4. Combine all members from merged clusters
 5. Keep clusters that have no semantic equivalent unchanged
 
-Guidelines:
-- Be aggressive about merging - if two clusters could reasonably refer to the same concept, merge them
-- The final canonical name should be the clearest, most representative option
+MERGING GUIDELINES:
+1. Merge clusters ONLY if they refer to the SAME specific concept
+2. Keep clusters SEPARATE if they refer to different aspects, even if related:
+   - "expensive food" vs "expensive parking" → SEPARATE
+   - "long wait times" vs "long ride duration" → SEPARATE
+3. Preserve meaningful distinctions - don't collapse everything into a few mega-clusters
+4. The goal is to consolidate TRUE duplicates, not to minimize cluster count
+
+IMPORTANT:
 - Preserve all unique member entities when merging
+- If unsure whether to merge, keep separate
+- The final canonical name should be the clearest, most representative option
 
 ${instructions}
 """)
@@ -223,7 +241,9 @@ class EntityClusterer(Tool):
     batch_size: int = 2000
     """Max entities per LLM call. Default handles most use cases in a single call."""
     merge_clusters: bool = True
-    """If True and multiple batches, merge similar clusters across batches (single LLM call)."""
+    """If True, merge similar clusters (across batches or within single batch for consolidation)."""
+    consolidate: bool = True
+    """If True, always run a merge pass even on single-batch results to consolidate similar clusters."""
 
     response_model: ClassVar[ResponseClass] = ClusteredEntities
 
@@ -308,19 +328,23 @@ class EntityClusterer(Tool):
         LOG.info(
             f"Batch results: {len(combined.clusters)} clusters, {total_members} entities covered"
         )
+        LOG.info(f"Clusters: {json.dumps(combined.to_dict(), indent=2)}")
 
-        # Optionally merge clusters across batches (single LLM call)
-        if self.merge_clusters and len(batch_results) > 1:
-            LOG.info(f"Merging {len(combined.clusters)} clusters across batches...")
+        # Optionally merge clusters (across batches or for consolidation)
+        should_merge = self.merge_clusters and (len(batch_results) > 1 or self.consolidate)
+        if should_merge and len(combined.clusters) > 1:
+            action = "Consolidating" if len(batch_results) == 1 else "Merging"
+            LOG.info(f"{action} {len(combined.clusters)} clusters...")
             merger = ClusterMerger(
                 clusters=combined.clusters,
                 instructions=self.instructions,
                 model=self.model,
             )
-            combined = await merger(**kwargs)  # type: ignore
+            merge_result = await merger(**kwargs)
+            combined = merge_result[0]  # Get ClusteredEntities from ResponseSet
             total_members_after = sum(len(c.members) for c in combined.clusters)
             LOG.info(
-                f"After merge: {len(combined.clusters)} clusters, {total_members_after} entities"
+                f"After {action.lower()}: {len(combined.clusters)} clusters, {total_members_after} entities"
             )
 
         # Expand to include pre-deduplicated variants
