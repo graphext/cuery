@@ -9,7 +9,7 @@ TOKEN_FILE="$1"
 # Set the UPLOAD variable to the second command-line argument ($2) if provided,
 # otherwise default to "--upload" if no second argument is given.
 # This allows the script to be called with or without specifying an upload flag.
-UPLOAD="${2:---no-upload}"
+UPLOAD="${2:---upload}"
 
 micromamba install -y -c conda-forge python=3.11 rattler-build requests tqdm
 rattler-build auth login https://repo.prefix.dev --token $(cat "$TOKEN_FILE")

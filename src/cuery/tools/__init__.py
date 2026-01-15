@@ -1,4 +1,11 @@
 from .abs import AspectEntities, AspectSentimentExtractor
+from .dedupe import (
+    ClusteredEntities,
+    ClusterMerger,
+    EntityCluster,
+    EntityClusterer,
+    deduplicate_entities,
+)
 from .flex.classify import Classifier
 from .flex.entities import EntityExtractor
 from .flex.generic import Auto, Generic
@@ -11,6 +18,11 @@ __all__ = [
     "AspectEntities",
     "AspectSentimentExtractor",
     "Classifier",
+    "ClusteredEntities",
+    "ClusterMerger",
+    "deduplicate_entities",
+    "EntityCluster",
+    "EntityClusterer",
     "EntityExtractor",
     "Generic",
     "SchemaGenerator",
