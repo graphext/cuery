@@ -23,11 +23,13 @@ Example usage:
 import json
 from collections.abc import Iterable
 from functools import cached_property
-from typing import ClassVar
+from typing import ClassVar, Self
 
 from loguru import logger as LOG
+from pydantic import model_validator
 
 from .. import AnyContext, Prompt, Response, ResponseClass, Tool
+from ..task import Task
 from ..utils import dedent
 
 
@@ -36,39 +38,50 @@ from ..utils import dedent
 # -----------------------------------------------------------------------------
 
 CLUSTER_PROMPT_SYSTEM = dedent("""
-You are an expert at grouping semantically equivalent phrases.
+You are an expert at grouping semantically equivalent phrases for deduplication.
 
 Given a list of entities, group them into clusters where each cluster contains entities that
-express the same underlying concept, complaint, or sentiment target - even if worded differently.
+express the same underlying concept - even if worded differently. The goal is DEDUPLICATION:
+reducing redundant phrases to a smaller set of canonical forms.
 
 For each cluster, provide a canonical (representative) name that best captures the shared meaning.
 The canonical name should be clear, concise, and grammatically correct.
 
-Examples of entities that should be clustered together:
-- "food too expensive", "overpriced food", "high food prices" → canonical: "expensive food"
-- "long lines", "queues too long", "long wait times", "waiting too long" → canonical: "long wait times"
-- "staff was rude", "unfriendly employees", "rude service" → canonical: "rude staff"
+EXAMPLES OF ENTITIES TO CLUSTER TOGETHER:
+- "food too expensive", "overpriced food", "high food prices", "costly meals" → canonical: "expensive food"
+- "long lines", "queues too long", "long wait times", "waiting forever" → canonical: "long wait times"
+- "staff was rude", "unfriendly employees", "rude service", "impolite workers" → canonical: "rude staff"
+- "excellent ride", "great ride", "amazing ride", "fantastic ride" → canonical: "excellent ride"
+- "poor food quality", "bad food", "terrible food", "food was awful" → canonical: "poor food quality"
 
-CLUSTERING GUIDELINES:
-1. Merge entities that refer to the SAME specific concept (e.g., "expensive food" and "overpriced meals")
-2. Keep entities SEPARATE if they refer to different aspects, even if related:
-   - "expensive food" vs "expensive tickets" → SEPARATE (different targets)
-   - "long ride queues" vs "long food lines" → SEPARATE (different contexts)
-   - "rude staff" vs "unhelpful staff" → SEPARATE (different complaints)
-3. Aim for meaningful granularity - typically 1 cluster per 5-20 input entities on average
-4. Single-member clusters are fine for truly unique concepts
+WHEN TO MERGE (same cluster):
+- Same target + same sentiment: "expensive food" = "overpriced food" = "food costs too much"
+- Synonyms: "long wait" = "long queue" = "waiting forever"
+- Spelling/phrasing variations: "crowded park" = "park too crowded" = "overcrowded park"
 
-IMPORTANT:
-- Every input entity must appear in exactly one cluster
-- Be consistent: if you merge "X is expensive" with "costly X", do the same pattern throughout
-- Do NOT over-merge into just a few giant clusters - preserve meaningful distinctions
+WHEN TO KEEP SEPARATE (different clusters):
+- Different targets: "expensive food" ≠ "expensive tickets" (different things being expensive)
+- Different sentiments: "excellent food" ≠ "poor food" (opposite sentiments)
+- Genuinely different concepts: "rude staff" ≠ "slow service" (different complaints)
+
+CLUSTERING TARGETS:
+- Aim to REDUCE the entity count significantly - typically 3-10 input entities per cluster on average
+- Most clusters should have 2+ members; single-member clusters only for truly unique concepts
+- If you see many similar phrasings, merge them aggressively
+
+NEVER DO THIS:
+- NEVER create catch-all clusters like "general feedback", "all feedback", "miscellaneous", "other"
+- NEVER put more than 50 entities in a single cluster
+- NEVER create single-member clusters for entities that have synonyms in the list
+- NEVER give up - process ALL entities with equal care
 
 ${instructions}
 """)
 
 CLUSTER_PROMPT_USER = dedent("""
-Group the following {{count}} entities into semantic clusters. Return ALL entities - each entity
-must appear in exactly one cluster.
+Group the following {{count}} entities into semantic clusters for deduplication.
+Merge aggressively - if two phrases mean the same thing, they belong together.
+Return ALL entities - each must appear in exactly one cluster.
 
 # Entities
 
@@ -76,37 +89,60 @@ must appear in exactly one cluster.
 """)
 
 MERGE_PROMPT_SYSTEM = dedent("""
-You are an expert at identifying semantically equivalent clusters and merging them.
+You are an expert at identifying semantically equivalent clusters.
 
-You will be given a list of clusters, where each cluster has a canonical name and member entities.
-Some clusters from different batches may be semantically equivalent and should be merged.
+You will be given a list of clusters in JSON format, where each key is the canonical name and
+the value is a sample of member entities. Your task is to identify which clusters should be
+merged because they represent the same underlying concept.
 
-Your task is to:
-1. Identify clusters that are semantically equivalent (their canonical names or members overlap in meaning)
-2. Merge equivalent clusters into single clusters
-3. Choose the best canonical name for each merged cluster
-4. Combine all members from merged clusters
-5. Keep clusters that have no semantic equivalent unchanged
+For each group of clusters that should be merged:
+1. Choose the best canonical name to keep
+2. List the other canonical names that should be merged into it
 
 MERGING GUIDELINES:
 1. Merge clusters ONLY if they refer to the SAME specific concept
 2. Keep clusters SEPARATE if they refer to different aspects, even if related:
-   - "expensive food" vs "expensive parking" → SEPARATE
-   - "long wait times" vs "long ride duration" → SEPARATE
-3. Preserve meaningful distinctions - don't collapse everything into a few mega-clusters
-4. The goal is to consolidate TRUE duplicates, not to minimize cluster count
+   - "expensive food" vs "expensive parking" → SEPARATE (different targets)
+   - "long wait times" vs "long ride duration" → SEPARATE (different things)
+   - "rude staff" vs "unhelpful staff" → SEPARATE (different complaints)
+3. The goal is to consolidate TRUE duplicates, not to minimize cluster count
+4. When in doubt, keep clusters separate
+5. Only output clusters that need merging - skip clusters that should remain standalone
 
-IMPORTANT:
-- Preserve all unique member entities when merging
-- If unsure whether to merge, keep separate
-- The final canonical name should be the clearest, most representative option
+EXAMPLE:
+
+Input clusters:
+{
+  "expensive food": ["food too expensive", "overpriced food"],
+  "high food prices": ["high prices for food", "costly meals"],
+  "long wait times": ["waiting too long", "long queues"],
+  "long ride duration": ["rides are too short", "brief ride times"],
+  "rude staff": ["staff was rude", "unfriendly employees"]
+}
+
+Correct output:
+{
+  "groups": [
+    {"canonical": "expensive food", "merge": ["high food prices"]}
+  ]
+}
+
+Explanation:
+- "expensive food" and "high food prices" → MERGE (same concept: food is too expensive)
+- "long wait times" and "long ride duration" → SEPARATE (different: waiting in line vs ride length)
+- "rude staff" → no merge candidates, so not included in output
 
 ${instructions}
 """)
 
 MERGE_PROMPT_USER = dedent("""
-Review the following {{count}} clusters and merge any that are semantically equivalent.
-Return ALL member entities - each must appear in exactly one cluster.
+Review the following {{count}} clusters and identify which ones should be merged.
+
+Only output groups of clusters that should be merged together. For each group, specify:
+- "canonical": The canonical name to keep (the best representative)
+- "merge": List of other canonical names to merge into it
+
+If no clusters should be merged, return {"groups": []}.
 
 # Clusters
 
@@ -133,6 +169,89 @@ class ClusteredEntities(Response):
     clusters: list[EntityCluster]
     """List of entity clusters."""
 
+    # Class variable for max cluster size validation (can be set dynamically)
+    _max_cluster_size: ClassVar[int | None] = None
+    _total_entities: ClassVar[int | None] = None
+
+    @model_validator(mode="after")
+    def validate_no_degenerate_clusters(self) -> Self:
+        """Reject catch-all clusters and other degenerate patterns."""
+        # Check for catch-all cluster names
+        catch_all_names = {
+            "all feedback",
+            "all_feedback",
+            "general feedback",
+            "general_feedback",
+            "miscellaneous",
+            "misc",
+            "other",
+            "various",
+            "various issues",
+            "all issues",
+            "all_issues",
+            "everything",
+            "all",
+            "placeholder",
+        }
+        for cluster in self.clusters:
+            if cluster.canonical.lower().strip() in catch_all_names:
+                raise ValueError(
+                    f"Catch-all cluster '{cluster.canonical}' is not allowed. "
+                    f"Create specific clusters instead."
+                )
+
+        # Check for empty clusters
+        for cluster in self.clusters:
+            if not cluster.members:
+                raise ValueError(f"Empty cluster '{cluster.canonical}' is not allowed.")
+
+        # Check for oversized clusters (if limit is set)
+        max_size = self._max_cluster_size
+        if max_size is not None:
+            for cluster in self.clusters:
+                if len(cluster.members) > max_size:
+                    raise ValueError(
+                        f"Cluster '{cluster.canonical}' has {len(cluster.members)} members, "
+                        f"exceeding max of {max_size}. Split into more specific clusters."
+                    )
+
+        # Check that we don't have too few clusters relative to entity count (over-merging)
+        total = self._total_entities
+        if total is not None and total > 20:
+            min_clusters = max(2, total // 50)
+            if len(self.clusters) < min_clusters:
+                raise ValueError(
+                    f"Only {len(self.clusters)} clusters for {total} entities is too few. "
+                    f"Expected at least {min_clusters} clusters. Create more specific groupings."
+                )
+
+        # Check for too many single-member clusters (under-clustering)
+        if total is not None and total > 20:
+            single_member_clusters = sum(1 for c in self.clusters if len(c.members) == 1)
+            single_member_ratio = (
+                single_member_clusters / len(self.clusters) if self.clusters else 0
+            )
+            # If more than 60% of clusters have only 1 member, that's too atomic
+            if single_member_ratio > 0.6 and single_member_clusters > 10:
+                raise ValueError(
+                    f"Too many single-member clusters: {single_member_clusters} of {len(self.clusters)} "
+                    f"({single_member_ratio:.0%}). Merge similar entities more aggressively."
+                )
+
+        return self
+
+    @classmethod
+    def with_validation_limits(
+        cls, max_cluster_size: int | None = None, total_entities: int | None = None
+    ) -> type["ClusteredEntities"]:
+        """Create a subclass with validation limits baked in."""
+
+        class BoundClusteredEntities(cls):
+            _max_cluster_size: ClassVar[int | None] = max_cluster_size
+            _total_entities: ClassVar[int | None] = total_entities
+
+        return BoundClusteredEntities
+
     @cached_property
     def canonicals(self) -> list[str]:
         """Get all canonical names."""
@@ -155,6 +274,11 @@ class ClusteredEntities(Response):
         """Get all member entities across all clusters (normalized)."""
         return {_normalize(member) for cluster in self.clusters for member in cluster.members}
 
+    @property
+    def member_count(self) -> int:
+        """Get the total number of member entities across all clusters."""
+        return sum(len(c.members) for c in self.clusters)
+
     def coverage(self, entities: Iterable[str]) -> float:
         """Calculate what fraction of entities are covered by clusters."""
         entities_set = {_normalize(e) for e in entities}
@@ -170,6 +294,86 @@ class ClusteredEntities(Response):
     def to_dict(self) -> dict[str, list[str]]:
         """Convert to a dictionary mapping canonical names to members."""
         return {c.canonical: c.members for c in self.clusters}
+
+
+class MergeGroup(Response):
+    """A group of clusters that should be merged together."""
+
+    canonical: str
+    """The canonical name to keep (best representative for the merged cluster)."""
+    merge: list[str]
+    """Other canonical names that should be merged into this cluster."""
+
+    @model_validator(mode="after")
+    def validate_no_self_reference(self) -> Self:
+        """Ensure canonical name is not in its own merge list."""
+        if self.canonical in self.merge:
+            raise ValueError(
+                f"Canonical name '{self.canonical}' cannot appear in its own merge list"
+            )
+        return self
+
+
+class MergeInstructions(Response):
+    """Instructions for which clusters to merge."""
+
+    groups: list[MergeGroup]
+    """Groups of clusters to merge. Each group specifies a canonical to keep and others to merge into it."""
+
+    # Class variable to hold valid canonicals for validation (set dynamically)
+    _valid_canonicals: ClassVar[set[str] | None] = None
+
+    @model_validator(mode="after")
+    def validate_merge_instructions(self) -> Self:
+        """Validate merge instructions for consistency and against valid canonicals."""
+        seen_canonicals: set[str] = set()
+        seen_merges: set[str] = set()
+        valid = self._valid_canonicals  # May be None if not using dynamic validation
+
+        for group in self.groups:
+            # Check canonical isn't used multiple times
+            if group.canonical in seen_canonicals:
+                raise ValueError(f"Canonical name '{group.canonical}' appears in multiple groups")
+            seen_canonicals.add(group.canonical)
+
+            # Check canonical exists in valid set (if provided)
+            if valid is not None and group.canonical not in valid:
+                raise ValueError(
+                    f"Unknown canonical name '{group.canonical}' - not in original clusters"
+                )
+
+            # Check merge targets aren't duplicated and exist
+            for name in group.merge:
+                if name in seen_merges:
+                    raise ValueError(f"Name '{name}' appears in multiple merge lists")
+                if name in seen_canonicals:
+                    raise ValueError(f"Name '{name}' is both a canonical and a merge target")
+                seen_merges.add(name)
+
+                # Check merge target exists in valid set (if provided)
+                if valid is not None and name not in valid:
+                    raise ValueError(f"Unknown merge name '{name}' - not in original clusters")
+
+        return self
+
+    @classmethod
+    def with_valid_canonicals(cls, valid_canonicals: set[str]) -> type["MergeInstructions"]:
+        """Create a subclass with valid canonicals baked in for validation.
+
+        This allows validation to happen during Pydantic parsing, triggering
+        LLM retries on invalid responses.
+
+        Args:
+            valid_canonicals: Set of valid canonical names from the original clusters.
+
+        Returns:
+            A dynamically created MergeInstructions subclass with validation.
+        """
+
+        class BoundMergeInstructions(cls):
+            _valid_canonicals: ClassVar[set[str] | None] = valid_canonicals
+
+        return BoundMergeInstructions
 
 
 # -----------------------------------------------------------------------------
@@ -244,8 +448,8 @@ class EntityClusterer(Tool):
     """If True, merge similar clusters (across batches or within single batch for consolidation)."""
     consolidate: bool = True
     """If True, always run a merge pass even on single-batch results to consolidate similar clusters."""
-
-    response_model: ClassVar[ResponseClass] = ClusteredEntities
+    max_cluster_size: int = 100
+    """Maximum allowed members per cluster. Larger clusters trigger validation error and retry."""
 
     # Internal state for tracking pre-deduplication
     _unique_entities: list[str] | None = None
@@ -258,6 +462,15 @@ class EntityClusterer(Tool):
         LOG.info(
             f"Pre-dedup: {len(entity_list)} entities → {len(self._unique_entities)} unique "
             f"({len(entity_list) - len(self._unique_entities)} exact duplicates removed)"
+        )
+
+    @cached_property
+    def response_model(self) -> ResponseClass:
+        """Create response model with validation limits for cluster size."""
+        n_entities = len(self._unique_entities or [])
+        return ClusteredEntities.with_validation_limits(
+            max_cluster_size=self.max_cluster_size,
+            total_entities=n_entities,
         )
 
     @cached_property
@@ -334,18 +547,22 @@ class EntityClusterer(Tool):
         should_merge = self.merge_clusters and (len(batch_results) > 1 or self.consolidate)
         if should_merge and len(combined.clusters) > 1:
             action = "Consolidating" if len(batch_results) == 1 else "Merging"
-            LOG.info(f"{action} {len(combined.clusters)} clusters...")
+            LOG.info(f"{action} {len(combined.clusters)} clusters ({total_members} entities)...")
             merger = ClusterMerger(
                 clusters=combined.clusters,
                 instructions=self.instructions,
                 model=self.model,
             )
-            merge_result = await merger(**kwargs)
-            combined = merge_result[0]  # Get ClusteredEntities from ResponseSet
-            total_members_after = sum(len(c.members) for c in combined.clusters)
+            # ClusterMerger applies merges programmatically - no data loss possible
+            merged = await merger(**kwargs)
+            total_members_after = merged.member_count
+
+            # Log merged clusters for debugging
+            LOG.info(f"Merged clusters: {json.dumps(merged.to_dict(), indent=2)}")
             LOG.info(
-                f"After {action.lower()}: {len(combined.clusters)} clusters, {total_members_after} entities"
+                f"After {action.lower()}: {len(merged.clusters)} clusters, {total_members_after} entities"
             )
+            combined = merged
 
         # Expand to include pre-deduplicated variants
         expanded = self._expand_clusters(combined.clusters)
@@ -358,10 +575,13 @@ class EntityClusterer(Tool):
 
 
 class ClusterMerger(Tool):
-    """Merge semantically equivalent clusters (single LLM call).
+    """Merge semantically equivalent clusters using LLM-guided instructions.
 
-    This tool takes a list of clusters and merges those that are semantically equivalent.
-    Used internally by EntityClusterer when processing multiple batches.
+    This tool asks the LLM to identify which clusters should be merged (by canonical name),
+    then applies the merges programmatically. This approach:
+    - Never loses entities (merging is done in code, not by LLM)
+    - Requires much smaller LLM output (just canonical names, not all entities)
+    - Is more reliable than asking LLM to output all entities again
 
     Args:
         clusters: List of EntityCluster objects to merge
@@ -373,7 +593,13 @@ class ClusterMerger(Tool):
     instructions: str = ""
     """Additional domain-specific instructions."""
 
-    response_model: ClassVar[ResponseClass] = ClusteredEntities
+    # Note: response_model is set dynamically via property to include valid canonicals
+
+    @cached_property
+    def response_model(self) -> ResponseClass:
+        """Create response model with valid canonicals baked in for validation."""
+        valid_canonicals = {c.canonical for c in self.clusters}
+        return MergeInstructions.with_valid_canonicals(valid_canonicals)
 
     @cached_property
     def prompt(self) -> Prompt:
@@ -387,20 +613,77 @@ class ClusterMerger(Tool):
 
     @cached_property
     def context(self) -> AnyContext:
+        # Just show canonical names with a sample of members for context
+        cluster_info = {}
+        for c in self.clusters:
+            # Show up to 5 members as examples
+            sample = c.members[:5]
+            if len(c.members) > 5:
+                sample.append(f"... and {len(c.members) - 5} more")
+            cluster_info[c.canonical] = sample
         return {
             "count": len(self.clusters),
-            "clusters": _format_clusters(self.clusters),
+            "clusters": json.dumps(cluster_info, indent=2),
         }
 
+    def _apply_merge_instructions(self, instructions: MergeInstructions) -> ClusteredEntities:
+        """Apply merge instructions to clusters programmatically."""
+        # Build map of canonical name -> cluster
+        cluster_map: dict[str, EntityCluster] = {c.canonical: c for c in self.clusters}
 
-def _format_clusters(clusters: list[EntityCluster]) -> str:
-    """Format clusters for display in prompts."""
-    lines = []
-    for i, cluster in enumerate(clusters, 1):
-        lines.append(f"{i}. **{cluster.canonical}**")
-        for member in cluster.members:
-            lines.append(f"   - {member}")
-    return "\n".join(lines)
+        # Track which clusters have been merged away
+        merged_away: set[str] = set()
+
+        # Process each merge group
+        for group in instructions.groups:
+            if group.canonical not in cluster_map:
+                LOG.warning(f"Merge target '{group.canonical}' not found in clusters, skipping")
+                continue
+
+            # Collect all members from clusters to merge
+            target_cluster = cluster_map[group.canonical]
+            all_members = list(target_cluster.members)
+
+            for source_name in group.merge:
+                if source_name in merged_away:
+                    LOG.warning(f"'{source_name}' already merged, skipping")
+                    continue
+                if source_name not in cluster_map:
+                    LOG.warning(f"Merge source '{source_name}' not found in clusters, skipping")
+                    continue
+
+                source_cluster = cluster_map[source_name]
+                all_members.extend(source_cluster.members)
+                merged_away.add(source_name)
+
+            # Update the target cluster with combined members
+            cluster_map[group.canonical] = EntityCluster(
+                canonical=group.canonical,
+                members=all_members,
+            )
+
+        # Build final list: all clusters except those merged away
+        final_clusters = [
+            cluster for name, cluster in cluster_map.items() if name not in merged_away
+        ]
+
+        return ClusteredEntities(clusters=final_clusters)
+
+    async def __call__(self, **kwargs) -> ClusteredEntities:  # type: ignore[override]
+        """Get merge instructions from LLM and apply them programmatically."""
+        # Get merge instructions from LLM (validation happens during parsing, triggers retries)
+        result = await self.task(context=self.context, **kwargs)
+        instructions: MergeInstructions = result[0]  # type: ignore
+
+        # Log what merges were requested
+        if instructions.groups:
+            merge_summary = {g.canonical: g.merge for g in instructions.groups}
+            LOG.info(f"Merge instructions: {json.dumps(merge_summary, indent=2)}")
+        else:
+            LOG.info("No merges suggested by LLM")
+
+        # Apply merges programmatically (guaranteed to preserve all entities)
+        return self._apply_merge_instructions(instructions)
 
 
 def deduplicate_entities(

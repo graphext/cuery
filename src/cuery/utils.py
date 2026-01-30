@@ -478,6 +478,8 @@ async def gather_with_progress(
     async def with_progress(coro: Coroutine):
         result = await coro
         pbar.update()
+        # pbar.refresh()  # Force display update
+        # await asyncio.sleep(0)  # Yield to event loop
         if progress_callback is not None:  # noqa: SIM102
             if (pbar.n % min_iters == 0) or (pbar.n == total):
                 await progress_callback(pbar.format_dict)  # type: ignore
