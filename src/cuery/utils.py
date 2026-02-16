@@ -67,6 +67,11 @@ Missing = None | NAType | NpNa
 """Type hint for missing values."""
 
 
+def coerce_missing(values: Iterable) -> list:
+    """Convert pandas NA/NaN values to None in an iterable."""
+    return [None if isna(x) else x for x in values]
+
+
 def with_log_level(logger: logging.Logger):
     """Decorator factory that adds a `log_level` parameter to the wrapped function.
 
