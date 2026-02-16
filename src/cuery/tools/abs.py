@@ -14,8 +14,10 @@ from collections.abc import Iterable
 from functools import cached_property
 from typing import ClassVar, Literal
 
+from pydantic import field_validator
+
 from .. import AnyContext, Prompt, Response, ResponseClass, Tool
-from ..utils import dedent
+from ..utils import coerce_missing, dedent
 
 ABS_PROMPT_SYSTEM = dedent("""
 You're an expert in Aspect-Based Sentiment Analysis (ABSA). Your task involves identifying specific
@@ -119,6 +121,12 @@ class AspectSentimentExtractor(Tool):
     """Optional list of aspect categories to map entities to (e.g., ['food', 'service', 'pricing'])."""
 
     response_model: ClassVar[ResponseClass] = AspectEntities
+
+    @field_validator("texts", mode="before")
+    @classmethod
+    def _coerce_na(cls, v):
+        """Convert pandas NA/NaN values to None so Pydantic accepts them."""
+        return coerce_missing(v)
 
     @cached_property
     def prompt(self) -> Prompt:

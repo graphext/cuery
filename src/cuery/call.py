@@ -40,6 +40,10 @@ async def call(
                 f"Missing required keys in context: {', '.join(missing)}\nContext:\n{context}"
             )
 
+    # Skip LLM call if all required context values are None (e.g. from NA-coerced texts)
+    if context and prompt.required and all(context.get(k) is None for k in prompt.required):
+        return response_model.fallback()
+
     if log_prompt:
         pprint(prompt)
 

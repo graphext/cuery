@@ -21,7 +21,7 @@ from Levenshtein import distance as ldist
 from pydantic import field_validator, model_validator
 
 from .. import AnyContext, Field, Prompt, Response, ResponseClass, Tool, utils
-from ..utils import customize_fields, dedent
+from ..utils import coerce_missing, customize_fields, dedent
 
 TOPICS_PROMPT = dedent("""
 From the list of texts below (separated by line breaks), extract a two-level nested list of topics.
@@ -228,12 +228,19 @@ class TopicExtractor(Tool):
     """Prompt instructions to add with details for the topic extraction."""
     texts: Iterable[str | float | None]
     """The texts to extract topics from."""
+
     max_dollars: float | None = None
     """The maximum to spend on the query."""
     max_tokens: float | None = None
     """The maximum number of tokens to spend."""
     max_texts: float | None = None
     """The maximum number of texts to process."""
+
+    @field_validator("texts", mode="before")
+    @classmethod
+    def _coerce_na(cls, v):
+        """Convert pandas NA/NaN values to None so Pydantic accepts them."""
+        return coerce_missing(v)
 
     @cached_property
     def response_model(self) -> ResponseClass:
@@ -276,6 +283,12 @@ class TopicAssigner(Tool):
 
     SYSTEM_PROMPT: ClassVar[str] = LABEL_PROMPT_SYSTEM
     USER_PROMPT: ClassVar[str] = LABEL_PROMPT_USER
+
+    @field_validator("texts", mode="before")
+    @classmethod
+    def _coerce_na(cls, v):
+        """Convert pandas NA/NaN values to None so Pydantic accepts them."""
+        return coerce_missing(v)
 
     @field_validator("topics", mode="before", json_schema_input_type=dict[str, list[str]] | Topics)
     @classmethod
