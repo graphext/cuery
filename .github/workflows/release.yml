@@ -3,8 +3,8 @@ name: Release
 on:
   push:
     branches: [main]
-    # paths:
-    #   - 'pyproject.toml'
+    paths:
+      - 'pyproject.toml'
 
 jobs:
   release:
