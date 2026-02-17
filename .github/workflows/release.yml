@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pyproject.toml'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check version change
+        id: version
+        run: |
+          OLD=$(git show HEAD^:pyproject.toml | python3 -c "
+          import sys, tomllib
+          data = tomllib.loads(sys.stdin.read())
+          print(data.get('project', {}).get('version', ''))
+          ")
+          NEW=$(python3 -c "
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              data = tomllib.load(f)
+          print(data.get('project', {}).get('version', ''))
+          ")
+          echo "old=$OLD" >> $GITHUB_OUTPUT
+          echo "new=$NEW" >> $GITHUB_OUTPUT
+          if [ "$OLD" != "$NEW" ] && [ -n "$NEW" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup micromamba
+        if: steps.version.outputs.changed == 'true'
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: 'latest'
+          init-shell: bash
+
+      - name: Write token file
+        if: steps.version.outputs.changed == 'true'
+        run: echo "$PREFIX_DEV_TOKEN" > /tmp/prefix-token.txt
+        env:
+          PREFIX_DEV_TOKEN: ${{ secrets.PREFIX_DEV_TOKEN }}
+
+      - name: Build and publish to prefix.dev
+        if: steps.version.outputs.changed == 'true'
+        shell: bash -el {0}
+        run: bash build.sh /tmp/prefix-token.txt --upload
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.new }}
+          generate_release_notes: true
