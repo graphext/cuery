@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'pyproject.toml'
+      - '.github/workflows/release.yml'
+      - 'build.sh'
 
 jobs:
   release:
@@ -31,9 +33,20 @@ jobs:
               data = tomllib.load(f)
           print(data.get('project', {}).get('version', ''))
           ")
+          OLD_BUILD=$(git show HEAD^:pyproject.toml | python3 -c "
+          import sys, tomllib
+          data = tomllib.loads(sys.stdin.read())
+          print(data.get('tool', {}).get('rattler', {}).get('build', 0))
+          ")
+          NEW_BUILD=$(python3 -c "
+          import tomllib
+          with open('pyproject.toml', 'rb') as f:
+              data = tomllib.load(f)
+          print(data.get('tool', {}).get('rattler', {}).get('build', 0))
+          ")
           echo "old=$OLD" >> $GITHUB_OUTPUT
           echo "new=$NEW" >> $GITHUB_OUTPUT
-          if [ "$OLD" != "$NEW" ] && [ -n "$NEW" ]; then
+          if { [ "$OLD" != "$NEW" ] && [ -n "$NEW" ]; } || [ "$OLD_BUILD" != "$NEW_BUILD" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
