@@ -12,6 +12,8 @@ TOKEN_FILE="$1"
 UPLOAD="${2:---upload}"
 
 micromamba install -y -c conda-forge python=3.11 rattler-build requests tqdm
+eval "$(micromamba shell hook -s bash)"
+micromamba activate
 rattler-build auth login https://repo.prefix.dev --token $(cat "$TOKEN_FILE")
 rattler-build build \
     -c https://repo.prefix.dev/graphext -c conda-forge \
