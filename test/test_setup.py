@@ -6,6 +6,7 @@ from cuery import Response, ask, set_env
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not os.environ.get("OPENAI_API_KEY"), reason="requires OPENAI_API_KEY")
 async def test_ask():
     set_env(apify_secrets=False, path="/Users/thomas/code/cuery/.env")
 
