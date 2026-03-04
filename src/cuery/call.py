@@ -56,6 +56,13 @@ async def call(
         )
         response._raw_response = completion
     except Exception as exception:
+        # Never silently swallow authentication/permission errors — these are permanent
+        # configuration issues (wrong API key, insufficient permissions) that the user
+        # must fix. Falling back would hide the problem.
+        status = getattr(exception, "status_code", None)
+        if status in (401, 403):
+            raise
+
         if not fallback:
             raise
 
