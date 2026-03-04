@@ -57,7 +57,7 @@ dependencies = [
 ]
 
 [tool.rattler]
-build = 4
+build = 5
 
 [project.scripts]
 cuery = "cuery.cli:app"
