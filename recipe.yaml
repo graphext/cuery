@@ -32,6 +32,7 @@ requirements:
     - instructor >=1.11.3,<1.12
     - jsonref
     - jsonschema
+    - loguru
     - levenshtein
     - litellm
     - openai >=1.109.1
