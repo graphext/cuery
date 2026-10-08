@@ -8,6 +8,7 @@ from instructor import Instructor
 from pandas import DataFrame
 from rich import print as pprint
 
+from .clients import prepare_parameters
 from .context import iter_context
 from .prompt import Prompt
 from .response import Response, ResponseClass
@@ -52,7 +53,7 @@ async def call(
             messages=list(prompt),  # type: ignore
             response_model=response_model,
             context=context,
-            **kwds,
+            **prepare_parameters(client, kwds),
         )
         response._raw_response = completion
     except Exception as exception:

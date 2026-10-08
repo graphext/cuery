@@ -27,7 +27,7 @@ class Tool(Configurable, ABC):
 
     model_config = ConfigDict(frozen=True)
 
-    model: str = Field("openai/gpt-3.5-turbo", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    model: str = Field("openai/gpt-6-luna", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
     """The LLM provider and model to use."""
 
     @property

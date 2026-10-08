@@ -107,9 +107,9 @@ class SerpConfig(ApifySerpConfig):
     """Model to use for topic extraction from SERP organic results."""
     topic_min_ldist: int = 2
     """Minimum Levenshtein distance between topic labels."""
-    assignment_model: str | None = "openai/gpt-4.1-mini"
+    assignment_model: str | None = "openai/gpt-6-luna"
     """Model to use for intent classification from SERP organic results."""
-    entity_model: str | None = "openai/gpt-4.1-mini"
+    entity_model: str | None = "openai/gpt-6-luna"
     """Model to use for entity extraction from AI overviews."""
 
     def apify_config(self) -> ApifySerpConfig:
@@ -396,7 +396,7 @@ async def topic_and_intent(  # noqa: PLR0913
     df: DataFrame,
     max_samples: int,
     topic_model: str = "google/gemini-2.5-flash-preview-05-20",
-    assignment_model: str = "openai/gpt-4.1-mini",
+    assignment_model: str = "openai/gpt-6-luna",
     max_retries: int = 5,
     text_column: str = "term",
     extra_columns: list[str] | None = None,
@@ -451,7 +451,7 @@ async def topic_and_intent(  # noqa: PLR0913
 
 async def extract_aio_entities(
     df: DataFrame,
-    entity_model: str = "openai/gpt-4.1-mini",
+    entity_model: str = "openai/gpt-6-luna",
     id_column: str = "term",
 ) -> DataFrame | None:
     """Process AI overviews in SERP data and extract entities."""

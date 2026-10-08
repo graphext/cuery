@@ -29,12 +29,12 @@ requirements:
     - fastapi-mcp
     - glom >=24.11.0
     - google-genai >=1.56.0
-    - instructor 1.11.*
+    - instructor >=1.11.3,<1.12
     - jsonref
     - jsonschema
     - levenshtein
     - litellm
-    - openai >=1.109
+    - openai >=1.109.1
     # - xai-sdk
     - pandas <2.3.0
     - pre-commit

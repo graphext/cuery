@@ -22,7 +22,9 @@ from pandas import DataFrame, Series
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import to_jsonable_python
 
+from .clients import gpt6_model
 from .context import AnyContext, iter_context
+from .cost import cost_per_token
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
 from .utils import LOG, get_config, pretty_field_info
 
@@ -62,12 +64,13 @@ class Response(BaseModel):
 
     def token_usage(self) -> dict | None:
         """Get the token usage from the raw response."""
-        if self._raw_response is None:
+        usage = getattr(self._raw_response, "usage", None)
+        if usage is None:
             return None
 
         return {
-            "prompt": self._raw_response.usage.prompt_tokens,
-            "completion": self._raw_response.usage.completion_tokens,
+            "prompt": getattr(usage, "input_tokens", getattr(usage, "prompt_tokens", 0)),
+            "completion": getattr(usage, "output_tokens", getattr(usage, "completion_tokens", 0)),
         }
 
     def to_dict(self) -> dict:
@@ -145,14 +148,36 @@ def token_usage(responses: Iterable[Response]) -> DataFrame:
     return DataFrame([r.token_usage() for r in responses])
 
 
-def with_cost(usage: DataFrame, model: str) -> DataFrame:
-    cost = Series(
-        [
-            calculate_cost(model, prompt, compl)  # type: ignore
-            for prompt, compl in zip(usage.prompt, usage.completion, strict=True)
-        ]
-    )
-    return pd.concat([usage, cost.rename("cost")], axis=1)
+def with_cost(
+    usage: DataFrame, model: str, responses: list["Response"] | None = None
+) -> DataFrame:
+    costs = []
+    for index, (prompt, completion) in enumerate(zip(usage.prompt, usage.completion, strict=True)):
+        raw = responses[index]._raw_response if responses is not None else None
+        family = gpt6_model(getattr(raw, "model", model))
+        if family is None:
+            costs.append(calculate_cost(model, prompt, completion))
+            continue
+        raw_usage = getattr(raw, "usage", None)
+        details = getattr(
+            raw_usage, "input_tokens_details", getattr(raw_usage, "prompt_tokens_details", None)
+        )
+        cached = getattr(details, "cached_tokens", 0) or 0
+        written = getattr(details, "cache_write_tokens", 0) or 0
+        # Standard token estimate, excluding tool fees. Cache writes are only
+        # distinguished when the API reports them; older SDKs may omit them.
+        input_rate = cost_per_token(family, "input")
+        input_cost = (
+            max(0, prompt - cached - written) * input_rate
+            + cached * cost_per_token(family, "cached_input")
+            + written * input_rate * 1.25
+        )
+        output_cost = completion * cost_per_token(family, "output")
+        long_context = prompt > 272_000
+        costs.append(
+            input_cost * (2 if long_context else 1) + output_cost * (1.5 if long_context else 1)
+        )
+    return pd.concat([usage, Series(costs, index=usage.index, name="cost")], axis=1)
 
 
 ResponseClass = type[Response]
@@ -267,7 +292,7 @@ class ResponseSet:
         """Get the token usage for all responses."""
         usage = token_usage(self.responses)
         try:
-            usage = with_cost(usage, self.responses[0]._raw_response.model)  # type: ignore
+            usage = with_cost(usage, self.responses[0]._raw_response.model, self.responses)  # type: ignore
         except Exception as exc:
             LOG.error(f"Failed to calculate cost: {exc}")
 

@@ -410,7 +410,7 @@ class KeywordFunnel(Configurable):
         prompt = render_template(prompt, record=level)
         seeds = await ask(
             prompt=prompt,
-            model="openai/gpt-4.1-mini",
+            model="openai/gpt-6-luna",
             response_model=Seeds,
         )  # type: ignore
         return seeds.seeds

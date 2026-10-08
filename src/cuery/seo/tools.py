@@ -341,7 +341,7 @@ class SerpTopicAssigner(Configurable):
     """Column name in the DataFrame containing the main texts."""
     extra_columns: list[str] = Field(default_factory=list)
     """List of additional columns to include in the context for topic extraction."""
-    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    model: str = Field("openai/gpt-6-luna", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
     """Model to use for topic extraction."""
 
     _task: Task | None = None
@@ -405,7 +405,7 @@ class SerpMultiTopicAssigner(Configurable):
     """Column name in the DataFrame containing the main texts."""
     extra_columns: list[str] = Field(default_factory=list)
     """List of additional columns to include in the context for topic extraction."""
-    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    model: str = Field("openai/gpt-6-luna", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
     """Model to use for topic extraction."""
     max_labels: int = Field(3, ge=1, le=10)
     """Maximum number of topic-subtopic pairs to assign per keyword (default 3)."""
@@ -465,7 +465,7 @@ class SerpIntentAssigner(Configurable):
     """Column name in the DataFrame containing the main texts."""
     extra_columns: list[str] = Field(default_factory=list)
     """List of additional columns to include in the context for topic extraction."""
-    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    model: str = Field("openai/gpt-6-luna", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
     """Model to use for topic extraction."""
 
     _task: Task | None = None
@@ -514,7 +514,7 @@ class EntityExtractor(Configurable):
 
     columns: list[str]
     """List of columns to include in the context for entity extraction."""
-    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    model: str = Field("openai/gpt-6-luna", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
     """Model to use for topic extraction."""
 
     _task: Task | None = None
@@ -539,7 +539,7 @@ class PurchaseProbAssigner(Configurable):
     """Column name in the DataFrame containing the main texts."""
     extra_columns: list[str] = Field(default_factory=list)
     """List of additional columns to include in the context."""
-    model: str = Field("openai/gpt-4.1-mini", pattern=r"^[\w\.-]+/[\w\.-]+$")
+    model: str = Field("openai/gpt-6-luna", pattern=r"^[\w\.-]+/[\w\.-]+$")
     """Model to use for purchase probability estimation."""
 
     _task: Task | None = None
