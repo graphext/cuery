@@ -18,6 +18,25 @@ TQDM_POSITION = -1 if on_apify() else None
 """On Apify log each tqdm update on a separate line (line breaks trigger log updates)."""
 
 
+def _has_auth_error(exception: BaseException) -> bool:
+    """Recognize permanent HTTP errors inside Instructor/Tenacity wrappers."""
+    pending = [exception]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if getattr(current, "status_code", None) in (401, 403):
+            return True
+        pending.extend(
+            nested
+            for nested in (current.__cause__, current.__context__, *current.args)
+            if isinstance(nested, BaseException)
+        )
+    return False
+
+
 async def call(
     client: Instructor,
     prompt: Prompt,
@@ -60,8 +79,7 @@ async def call(
         # Never silently swallow authentication/permission errors — these are permanent
         # configuration issues (wrong API key, insufficient permissions) that the user
         # must fix. Falling back would hide the problem.
-        status = getattr(exception, "status_code", None)
-        if status in (401, 403):
+        if _has_auth_error(exception):
             raise
 
         if not fallback:
