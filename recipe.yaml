@@ -33,7 +33,7 @@ requirements:
     - jsonref
     - jsonschema
     - loguru
-    - levenshtein
+    - rapidfuzz >=3.13.0,<4.0
     - litellm
     - openai >=1.109.1
     # - xai-sdk
