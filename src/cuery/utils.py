@@ -38,6 +38,7 @@ from tiktoken import Encoding, encoding_for_model, get_encoding
 from tldextract import TLDExtract
 from tqdm.auto import tqdm as auto_tqdm
 
+from .clients import gpt6_model
 from .cost import cost_per_token
 from .pretty import DEFAULT_BOX, Group, Padding, Panel, Pretty, Text
 
@@ -345,6 +346,12 @@ def model_encoding(model: str) -> Encoding:
     try:
         return encoding_for_model(model)
     except LookupError:
+        if gpt6_model(model):
+            LOG.warning(
+                f"No tokenizer mapping for {model}; using o200k_base to estimate input size. "
+                "Actual API token usage may differ."
+            )
+            return get_encoding("o200k_base")
         if "gpt-4.1" in model.lower():
             return encoding_for_model("gpt-4o")
         if model.lower().startswith("o4"):

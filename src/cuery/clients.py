@@ -21,7 +21,9 @@ def gpt6_model(model: str) -> str | None:
 
 def create_client(model: str = DEFAULT_MODEL):
     """Create an async Instructor client with the appropriate API transport."""
-    options = {"mode": Mode.RESPONSES_TOOLS} if gpt6_model(model) else {}
+    # Instructor 1.11's basic Responses parser assumes output[0] is a tool call.
+    # The mixed-output parser locates the named function after reasoning items.
+    options = {"mode": Mode.RESPONSES_TOOLS_WITH_INBUILT_TOOLS} if gpt6_model(model) else {}
     return instructor.from_provider(model, async_client=True, **options)
 
 

@@ -35,6 +35,7 @@ def sdk(monkeypatch):
             if mode == "retry" and len(state["bodies"]) == 1:
                 arguments = {"result": "invalid integer"}
             output = [
+                {"type": "reasoning", "id": "rs_test", "summary": []},
                 {
                     "type": "function_call",
                     "id": "fc_test",
@@ -42,7 +43,7 @@ def sdk(monkeypatch):
                     "name": tool["name"],
                     "arguments": json.dumps(arguments),
                     "status": "completed",
-                }
+                },
             ]
         else:
             output = [
@@ -151,3 +152,19 @@ def test_search_cache_and_model_key(sdk):
     assert len(sdk["bodies"]) == 2
     assert sdk["bodies"][0]["reasoning"]["effort"] == "none"
     assert sdk["bodies"][1]["reasoning"]["effort"] == "medium"
+
+
+@pytest.mark.parametrize("model", ["openai/gpt-6-luna", "openai/gpt-6.1-sol"])
+def test_topic_context_preparation_with_unmapped_tokenizer(monkeypatch, model):
+    from cuery import utils
+    from cuery.tools.topics import TopicExtractor
+
+    def unsupported_model(name):
+        raise KeyError(name)
+
+    monkeypatch.setattr(utils, "encoding_for_model", unsupported_model)
+    extractor = TopicExtractor(
+        model=model, texts=["Cats are pets.", "Football is a sport."], max_texts=2
+    )
+    assert "Cats are pets." in extractor.context["texts"]
+    assert "Football is a sport." in extractor.context["texts"]

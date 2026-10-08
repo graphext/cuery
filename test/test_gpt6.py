@@ -32,6 +32,7 @@ def transport(monkeypatch):
                 "status": "completed",
                 "model": body["model"],
                 "output": [
+                    {"type": "reasoning", "id": "rs_offline", "summary": []},
                     {
                         "type": "function_call",
                         "id": "fc_offline",
@@ -39,7 +40,7 @@ def transport(monkeypatch):
                         "name": body["tools"][0]["name"],
                         "arguments": '{"result":4}',
                         "status": "completed",
-                    }
+                    },
                 ],
                 "usage": {
                     "input_tokens": 20,
