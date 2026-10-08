@@ -17,8 +17,8 @@ from collections.abc import Iterable
 from functools import cached_property
 from typing import ClassVar, Literal, Self
 
-from Levenshtein import distance as ldist
 from pydantic import field_validator, model_validator
+from rapidfuzz.distance.Levenshtein import distance as ldist
 
 from .. import AnyContext, Field, Prompt, Response, ResponseClass, Tool, utils
 from ..utils import coerce_missing, customize_fields, dedent

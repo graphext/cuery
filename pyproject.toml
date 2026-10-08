@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.33.12"
+version = "0.33.13"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -39,7 +39,7 @@ dependencies = [
     "instructor[anthropic,google-genai]>=1.11.3",
     "jsonschema",
     "loguru",
-    "levenshtein>=0.27.1",
+    "rapidfuzz>=3.13.0,<4.0",
     "litellm>=1.69.1,<=1.77.1",
     "openai>=1.109.1",
     "pandas>=2.2.3",
@@ -58,7 +58,7 @@ dependencies = [
 ]
 
 [tool.rattler]
-build = 1
+build = 0
 
 [project.scripts]
 cuery = "cuery.cli:app"
