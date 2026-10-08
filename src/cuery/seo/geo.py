@@ -22,7 +22,7 @@ from ..utils import LOG, Configurable, dedent
 from . import sources
 from .aio import hasdata
 
-DEFAULT_MODELS = ["openai/gpt-4.1-mini", "google/gemini-2.5-flash"]
+DEFAULT_MODELS = ["openai/gpt-6-luna", "google/gemini-2.5-flash"]
 
 
 class Brands(Response):

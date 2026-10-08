@@ -185,7 +185,7 @@ def find_all_strings(
 async def categorize(
     domains: DataFrame | Series | list[str],
     attrs: list[str] | None = None,
-    model: str = "openai/gpt-4.1-mini",
+    model: str = "openai/gpt-6-luna",
     n_concurrent: int = 100,
     **kwds,
 ) -> DataFrame:

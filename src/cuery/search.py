@@ -21,7 +21,7 @@ import asyncio
 from collections.abc import Coroutine
 from functools import cached_property, partial
 from io import StringIO
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import instructor
 import requests
@@ -33,30 +33,27 @@ from markdown import Markdown
 from openai import AsyncOpenAI
 from openai import types as oaitypes
 from pydantic import BaseModel, computed_field
-from xai_sdk import AsyncClient as XaiAsyncClient
-from xai_sdk.chat import Response as XAIResponse
-from xai_sdk.chat import user as xai_user
-from xai_sdk.proto import chat_pb2
-from xai_sdk.search import SearchParameters, news_source, web_source, x_source
 
 from . import ask
 from .asy import all_with_policies
+from .clients import gpt6_model, responses_parameters
 from .resources import country_coords
 from .response import Response, ResponseSet
 from .utils import dedent, extract_domain
+
+if TYPE_CHECKING:
+    from xai_sdk.chat import Response as XAIResponse
 
 OAIResponse = oaitypes.responses.response.Response  # type: ignore[attr-defined]
 
 VALID_MODELS = {
     "openai": [
-        "gpt-4o-mini",
+        "gpt-6.1-sol",
         "gpt-4o",
-        "gpt-4.1-mini",
+        "gpt-6-luna",
         "gpt-4.1",
-        "o4-mini",
         "o3",
         "gpt-5",
-        "gpt-5-mini",
     ],
     "google": [
         "gemini-2.5-pro",
@@ -134,22 +131,24 @@ def resolve_redirect(redirect_url: str, timeout: int = 2) -> str:
 
 def validate_openai(response, plain: bool = False) -> SearchResult:
     """Convert a raw web search response into a ``SearchResult`` instance."""
-    output = response.output
-    answer: str = ""
+    texts: list[str] = []
     sources: list[Source] = []
 
-    if len(output) < 2:  # noqa: PLR2004, without search tool output
-        # Only model response
-        answer = output[0].content[0].text
-    else:
-        if output[0].type != "web_search_call":
-            raise ValueError("First output must be of type 'web_search_call'.")
-
-        content = output[1].content[0]
-        if content.type == "output_text":
-            answer = content.text
-            if hasattr(content, "annotations"):
-                sources = [Source(title=ann.title, url=ann.url) for ann in content.annotations]
+    # Reasoning and tool calls can precede or interleave the final message.
+    for item in response.output:
+        if item.type != "message":
+            continue
+        for content in item.content:
+            if content.type == "output_text":
+                texts.append(content.text)
+                sources.extend(
+                    Source(title=ann.title, url=ann.url)
+                    for ann in getattr(content, "annotations", [])
+                    if ann.type == "url_citation"
+                )
+    if not texts:
+        raise ValueError("OpenAI response has no output text.")
+    answer = "\n".join(texts)
 
     if plain:
         answer = unmark(answer)
@@ -210,8 +209,8 @@ async def query_openai(
     country: str | None = None,  # 2-letter code, e.g. "US"
     city: str | None = None,  # text string, e.g. "Madrid"
     context_size: Literal["low", "medium", "high"] | str = "medium",
-    reasoning_effort: Literal["low", "medium", "high"] | str = "low",
-    model: str = "gpt-4.1-mini",
+    reasoning_effort: str | None = None,
+    model: str = "gpt-6-luna",
     use_search: bool = True,
     validate: bool = True,
     response_format: Response | None = None,
@@ -224,8 +223,12 @@ async def query_openai(
     client = AsyncOpenAI()
 
     params: dict = {"model": model, "input": prompt}
-    if "-5" in model:
-        params["reasoning"] = {"effort": reasoning_effort}
+    if gpt6_model(model):
+        if reasoning_effort is not None:
+            params["reasoning_effort"] = reasoning_effort
+        params = responses_parameters(model, params)
+    elif "-5" in model:
+        params["reasoning"] = {"effort": reasoning_effort or "low"}
 
     if use_search:
         tool: dict = {
@@ -251,12 +254,8 @@ async def query_openai(
 
         return response
 
-    # Use .parse endpoint to get structured response
-    params["response_format"] = response_format
-    params["messages"] = [{"role": "user", "content": params.pop("input")}]
-    response = await client.chat.completions.parse(**params)
-    message = response.choices[0].message
-    return message.parsed
+    response = await client.responses.parse(text_format=response_format, **params)
+    return response.output_parsed
 
 
 def coords(country: str) -> gaitypes.LatLng | None:
@@ -336,6 +335,12 @@ async def query_xai(  # noqa: PLR0913
     API Docs:
     - https://docs.x.ai/docs/guides/live-search
     """
+    # xAI is optional and is not part of the Conda package's dependencies.
+    from xai_sdk import AsyncClient as XaiAsyncClient
+    from xai_sdk.chat import user as xai_user
+    from xai_sdk.proto import chat_pb2
+    from xai_sdk.search import SearchParameters, news_source, web_source, x_source
+
     params: dict = {"model": model}
 
     if use_search:
@@ -463,7 +468,7 @@ async def search_with_format(
 
     return await ask(
         prompt=prompt,
-        model="openai/gpt-4.1-mini",
+        model="openai/gpt-6-luna",
         response_model=response_format,
     )
 
@@ -473,7 +478,7 @@ SUPPORT_COUNTRY = ["openai", "xai", "google"]
 
 async def gather(  # noqa: PLR0913
     prompts: str | list[str],
-    model: str = "openai/gpt-4.1-mini",
+    model: str = "openai/gpt-6-luna",
     use_search: bool = True,
     country: str | None = None,  # 2-letter code, e.g. "US"
     validate: bool = True,

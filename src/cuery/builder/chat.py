@@ -144,7 +144,8 @@ def ai_chat(message: str, history: list) -> tuple[str, str, DataFrame | None]:
     print(json.dumps(messages, indent=2))
 
     response = CLIENT.chat.completions.create(
-        model="gpt-4.1-mini",
+        model="gpt-6-luna",
+        reasoning_effort="none",
         messages=messages,  # type: ignore
         response_model=SchemaResponse,
         max_retries=5,

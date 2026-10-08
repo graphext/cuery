@@ -3,12 +3,12 @@
 from collections.abc import Callable
 from pathlib import Path
 
-import instructor
 import pandas as pd
 from instructor import Instructor
 from pandas import DataFrame
 
 from . import call
+from .clients import DEFAULT_MODEL, create_client
 from .context import AnyContext, context_is_iterable
 from .pretty import Console, ConsoleOptions, Group, Padding, Panel, RenderResult, Text
 from .prompt import Prompt
@@ -69,11 +69,9 @@ class Task:
         if isinstance(prompt, str | Path):
             self.prompt = Prompt.from_config(prompt)
 
-        if model is None:
-            self.client = instructor.from_provider("openai/gpt-3.5-turbo", async_client=True)
-        else:
-            check_model_name(model)
-            self.client = instructor.from_provider(model, async_client=True)
+        model = model or DEFAULT_MODEL
+        check_model_name(model)
+        self.client = create_client(model)
 
         if name:
             Task.registry[name] = self
@@ -86,7 +84,7 @@ class Task:
             return self.client
 
         check_model_name(model)
-        return instructor.from_provider(model, async_client=True) or self.client
+        return create_client(model)
 
     def reset_loggers(self, client: Instructor) -> None:
         """Reset the error and query loggers."""

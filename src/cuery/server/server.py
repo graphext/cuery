@@ -25,7 +25,7 @@ class ExtractTopicsRequest(BaseModel):
         None, description="Extra instructions for the topic extraction prompt."
     )
     model: str = Field(
-        ..., description="The language model to use for extraction (e.g., 'openai/gpt-3.5-turbo')."
+        ..., description="The language model to use for extraction (e.g., 'openai/gpt-6-luna')."
     )
     max_dollars: float | None = Field(
         None, description="Maximum cost in dollars for processing texts for topic extraction."
@@ -44,7 +44,7 @@ class AssignTopicsRequest(BaseModel):
         ..., description="The topic hierarchy (JSON) to use for assignment."
     )
     model: str = Field(
-        ..., description="The language model to use for assignment (e.g., 'openai/gpt-3.5-turbo')."
+        ..., description="The language model to use for assignment (e.g., 'openai/gpt-6-luna')."
     )
 
 

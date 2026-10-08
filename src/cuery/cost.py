@@ -3,6 +3,21 @@
 from typing import Literal
 
 COST = [
+    # Standard USD per million tokens, https://developers.openai.com/api/docs/pricing
+    {
+        "model": "gpt-6-luna",
+        "version": "gpt-6-luna",
+        "input": "0.10",
+        "cached_input": "0.01",
+        "output": "0.50",
+    },
+    {
+        "model": "gpt-6.1-sol",
+        "version": "gpt-6.1-sol",
+        "input": "2.00",
+        "cached_input": "0.10",
+        "output": "10.00",
+    },
     {
         "model": "gpt-4.1",
         "version": "gpt-4.1-2025-04-14",

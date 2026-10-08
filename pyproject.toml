@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.33.10"
+version = "0.33.11"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -36,11 +36,11 @@ dependencies = [
     "fastapi-mcp",
     "glom",
     "google-genai>=1.56.0",
-    "instructor[anthropic,google-genai]>=1.11.0",
+    "instructor[anthropic,google-genai]>=1.11.3",
     "jsonschema",
     "levenshtein>=0.27.1",
     "litellm>=1.69.1,<=1.77.1",
-    "openai>=1.109",
+    "openai>=1.109.1",
     "pandas>=2.2.3",
     "pre-commit",
     "pyarrow>=19.0.0,<20.0",
@@ -57,7 +57,7 @@ dependencies = [
 ]
 
 [tool.rattler]
-build = 7
+build = 0
 
 [project.scripts]
 cuery = "cuery.cli:app"
