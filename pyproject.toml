@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.33.13"
+version = "0.33.16"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -30,18 +30,18 @@ urls = { Homepage = "https://github.com/graphext/cuery", Documentation = "https:
 requires-python = ">=3.11"
 dependencies = [
     "async-lru",
-    "aiohttp",
+    "aiohttp>=3.14.4",
     "datamodel-code-generator>=0.32.0",
     "fastapi",
     "fastapi-mcp",
     "glom",
     "google-genai>=1.56.0",
-    "instructor[anthropic,google-genai]>=1.11.3",
+    "instructor[anthropic,google-genai]>=1.14.5,<1.15",
     "jsonschema",
     "loguru",
     "rapidfuzz>=3.13.0,<4.0",
-    "litellm>=1.69.1,<=1.77.1",
-    "openai>=1.109.1",
+    "litellm>=1.105,<1.106",
+    "openai>=2.20.0",
     "pandas>=2.2.3",
     "pre-commit",
     "pyarrow>=19.0.0,<20.0",
@@ -66,9 +66,11 @@ cuery = "cuery.cli:app"
 
 [project.optional-dependencies]
 seo = [
-    "apify",
+    "apify>=3.4.1,<4",
+    "apify-client>=2.5.1,<3",
+    "crawlee>=1.7.0,<2",
     "google-ads<28.0.0",
-    "gradio>=5.9.1",
+    "gradio>=6.30.0,<7",
     "matplotlib",
     "plotly[express]>=6.3.0",
 ]

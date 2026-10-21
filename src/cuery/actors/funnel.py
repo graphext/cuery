@@ -2,7 +2,7 @@ import asyncio
 import json
 
 from apify import Actor
-from apify_client._errors import ApifyApiError
+from apify_client.errors import ApifyApiError
 from pandas import DataFrame
 
 from ..seo.funnels import Funnel

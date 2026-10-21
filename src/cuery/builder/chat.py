@@ -119,18 +119,45 @@ def connect():
     CLIENT = instructor.from_openai(OpenAI())
 
 
+def _history_text(content: Any) -> str:
+    """Accept text only; never interpret Gradio file or component payloads."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list) and all(
+        isinstance(block, dict)
+        and block.get("type") == "text"
+        and isinstance(block.get("text"), str)
+        for block in content
+    ):
+        return "\n".join(block["text"] for block in content)
+    raise ValueError("Schema builder history supports text content only")
+
+
+def _history_messages(history: list) -> list[dict[str, str]]:
+    """Normalize message dictionaries and legacy (user, assistant) pairs."""
+    messages = []
+    for entry in history:
+        if isinstance(entry, dict) and entry.get("role") in ("user", "assistant"):
+            messages.append(
+                {"role": entry["role"], "content": _history_text(entry.get("content"))}
+            )
+        elif isinstance(entry, tuple) and len(entry) == 2:
+            for role, content in zip(("user", "assistant"), entry, strict=True):
+                if content is not None:
+                    messages.append({"role": role, "content": _history_text(content)})
+        else:
+            raise ValueError("Schema builder history requires user or assistant messages")
+    return messages
+
+
 def ai_chat(message: str, history: list) -> tuple[str, str, DataFrame | None]:
     """Send message to OpenAI and get response with structured output."""
     global CURRENT_SCHEMA  # noqa: PLW0603
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    # Add conversation history
-    for msg in history:
-        if isinstance(msg, tuple) and len(msg) == 2:
-            user_msg, assistant_msg = msg
-            messages.append({"role": "user", "content": str(user_msg)})
-            messages.append({"role": "assistant", "content": str(assistant_msg)})
+    # Gradio 6 supplies message dictionaries, including structured text blocks.
+    messages.extend(_history_messages(history))
 
     # Add current schema context if available
     if CURRENT_SCHEMA is not None:

@@ -9,7 +9,7 @@ source:
 build:
   noarch: python
   script:
-    - python -m pip install . -vv --no-deps --ignore-installed
+    - python -m pip install . -vv --no-deps --no-build-isolation --ignore-installed
   number: ${{ load_from_file("pyproject.toml").tool.rattler.build }}
   skip: ["win"]
 
@@ -22,20 +22,20 @@ requirements:
     - wheel
   run:
     - async-lru
-    - aiohttp
+    - aiohttp >=3.14.4
     - datamodel-code-generator
     - email-validator
     - fastapi
     - fastapi-mcp
     - glom >=24.11.0
     - google-genai >=1.56.0
-    - instructor >=1.11.3,<1.12
+    - instructor >=1.14.5,<1.15
     - jsonref
     - jsonschema
     - loguru
     - rapidfuzz >=3.13.0,<4.0
-    - litellm
-    - openai >=1.109.1
+    - litellm >=1.105,<1.106
+    - openai >=2.20.0
     # - xai-sdk
     - pandas <2.3.0
     - pre-commit

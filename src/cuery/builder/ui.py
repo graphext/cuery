@@ -1,9 +1,9 @@
 import gradio as gr
-from .chat import ai_chat, chat
+from .chat import ai_chat
 
 
 def make_ui():
-    with gr.Blocks(theme=gr.themes.Citrus()) as ui:
+    with gr.Blocks() as ui:
         # Predefine but render later in different order
         schema_preview = gr.Code("...", language="json", container=True, render=False)
         example_preview = gr.DataFrame(render=False)
@@ -16,9 +16,10 @@ def make_ui():
                 gr.Markdown("# Schema Preview", container=False)
         with gr.Row(equal_height=True):
             with gr.Column():
-                chatui = gr.ChatInterface(
+                gr.ChatInterface(
                     fn=ai_chat,
-                    type="messages",
+                    api_name="chat",
+                    chatbot=gr.Chatbot(allow_tags=False),
                     additional_outputs=[schema_preview, example_preview],
                     examples=[
                         ["I need a schema for extracting product information"],
@@ -38,4 +39,4 @@ def make_ui():
 
 def launch():
     ui = make_ui()
-    ui.launch()
+    ui.launch(theme=gr.themes.Citrus())
