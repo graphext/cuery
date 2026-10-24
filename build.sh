@@ -26,7 +26,8 @@ rattler-build build \
 
 if [ "$UPLOAD" == "--upload" ]; then
     LATEST_PACKAGE=$(ls -t ~/.rattler-build/noarch/cuery-*.conda | head -n 1)
-    rattler-build upload prefix -c graphext "$LATEST_PACKAGE"
+    PREFIX_API_KEY="$(cat "$TOKEN_FILE")" rattler-build upload prefix -c graphext "$LATEST_PACKAGE"
+    env -u PREFIX_API_KEY rattler-build upload prefix -c graphext/cuery "$LATEST_PACKAGE"
 else
     echo "Upload disabled, skipping upload."
 fi
