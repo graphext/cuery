@@ -9,7 +9,6 @@ from rich.console import Console
 from rich.table import Table
 
 from .actors.scaffold.flex import make_scaffold
-from .builder.ui import launch
 from .seo import SeoConfig
 from .task import Task
 from .utils import set_env
@@ -52,6 +51,16 @@ def run_task(task_name: str, csv: Path, output: Path):
 @app.command("builder")
 def launch_builder():
     """Launch the interactive schema builder interface."""
+    try:
+        from .builder.ui import launch
+    except ModuleNotFoundError as exc:
+        if exc.name != "gradio":
+            raise
+        typer.echo(
+            "The visual builder is unavailable: Gradio is no longer included with Cuery.",
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
     launch()
 
 

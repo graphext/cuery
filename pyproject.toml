@@ -1,6 +1,6 @@
 [project]
 name = "cuery"
-version = "0.33.16"
+version = "0.33.17"
 description = "Prompt (cue) management and execution for tabular data."
 readme = "README.md"
 license = "Apache-2.0"
@@ -70,8 +70,8 @@ seo = [
     "apify-client>=2.5.1,<3",
     "crawlee>=1.7.0,<2",
     "google-ads<28.0.0",
-    "gradio>=6.30.0,<7",
     "matplotlib",
+    "pillow>=13.0.0",
     "plotly[express]>=6.3.0",
 ]
 

@@ -2,6 +2,13 @@
 
 [Cuery](https://cuery.readthedocs.io/en/latest/) is a Python library for LLM prompting that extends the capabilities of the Instructor library. It provides a structured approach to working with prompts, contexts, response models, and tasks for effective LLM workflow management. It's main motivation is to make it easier to iterate prompts over tabular data (DataFrames).
 
+## SEO dependencies
+
+Install `cuery[seo]` for the SEO tools and Apify actors. This extra requires
+Pillow 13 or newer and no longer installs Gradio. The legacy `cuery builder`
+visual interface is unavailable without Gradio; the other commands and library
+APIs do not load it.
+
 ## Quick start
 
 ```python
