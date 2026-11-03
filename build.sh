@@ -16,8 +16,7 @@ eval "$(micromamba shell hook -s bash)"
 micromamba activate
 rattler-build auth login https://repo.prefix.dev --token $(cat "$TOKEN_FILE")
 CUTOFF=$(python -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(days=7)).isoformat())')
-# Use the channel's classic repodata; the sharded endpoint currently returns 403.
-RATTLER_SHARDED=false rattler-build build \
+rattler-build build \
     -c https://repo.prefix.dev/graphext -c conda-forge \
     --experimental \
     --channel-priority disabled \
