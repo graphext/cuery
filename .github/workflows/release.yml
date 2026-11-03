@@ -58,16 +58,10 @@ jobs:
           micromamba-version: 'latest'
           init-shell: bash
 
-      - name: Write token file
-        if: steps.version.outputs.changed == 'true'
-        run: echo "$PREFIX_DEV_TOKEN" > /tmp/prefix-token.txt
-        env:
-          PREFIX_DEV_TOKEN: ${{ secrets.PREFIX_DEV_TOKEN }}
-
       - name: Build and publish to prefix.dev
         if: steps.version.outputs.changed == 'true'
         shell: bash -el {0}
-        run: bash build.sh /tmp/prefix-token.txt --upload
+        run: bash build.sh --upload
 
       - name: Create GitHub Release
         if: steps.version.outputs.changed == 'true'
