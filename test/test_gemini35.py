@@ -328,3 +328,12 @@ def test_retry_wire_uses_user_role(monkeypatch):
     assert contents[-1]["role"] == "user"
     assert contents[-1]["parts"][0]["functionResponse"]["id"] == "native-1"
     assert base64.urlsafe_b64decode(contents[-2]["parts"][0]["thoughtSignature"]) == b"signed-part"
+
+
+def test_grounded_search_defaults_to_gemini35(requests):
+    asyncio.run(search.query_gemini("Test", validate=False))
+    request = requests[0]
+    assert request["model"] == "gemini-3.5-flash-lite"
+    assert request["config"].thinking_config.thinking_level.value == "MINIMAL"
+    assert request["config"].thinking_config.thinking_budget is None
+    assert request["config"].tools[0].google_search is not None

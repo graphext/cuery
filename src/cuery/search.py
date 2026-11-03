@@ -268,7 +268,7 @@ def coords(country: str) -> gaitypes.LatLng | None:
 
 async def query_gemini(
     prompt: str,
-    model: str = "gemini-2.0-flash",
+    model: str = "gemini-3.5-flash-lite",
     country: str | None = None,  # 2-letter code, e.g. "US"
     language: str | None = None,  # 2-letter code, e.g. "EN"
     thinking_budget: int = -1,
@@ -276,7 +276,7 @@ async def query_gemini(
     validate: bool = True,
     thinking_level: Literal["minimal", "low", "medium", "high"] = "minimal",
 ) -> SearchResult | GGResponse:
-    """Call Gemini with Google Search grounding (supports Gemini > 2.0 only).
+    """Call a supported Gemini model with Google Search grounding.
 
     Gemini 3.5 uses thinking_level (minimal by default); thinking_budget is
     retained for explicit Gemini 2.5 calls. Use medium/high for deeper reasoning.
