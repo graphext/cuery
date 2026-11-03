@@ -182,7 +182,7 @@ The serps module collects and analyzes search engine results:
         searchLanguage="en",
         brands=["your_brand"],
         competitors=["competitor1", "competitor2"],
-        topic_model="google/gemini-2.5-flash-preview-05-20",
+        topic_model="google/gemini-3.5-flash-lite",
     )
 
     # Analyze SERPs for keywords
@@ -238,7 +238,7 @@ The tasks module provides intelligent analysis of SERP data:
 
     # Extract topics from SERP data
     topic_extractor = SerpTopicExtractor(
-        model="google/gemini-2.5-flash-preview-05-20",
+        model="google/gemini-3.5-flash-lite",
         n_topics=10,
         n_subtopics=5,
     )
@@ -295,7 +295,7 @@ Here's a comprehensive example combining all SEO components:
                 "ahrefs",
                 "moz"
             ],
-            "topic_model": "google/gemini-2.5-flash-preview-05-20",
+            "topic_model": "google/gemini-3.5-flash-lite",
             "assignment_model": "openai/gpt-4.1-mini",
         },
         traffic_cfg={

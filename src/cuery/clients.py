@@ -1,4 +1,4 @@
-"""Client and request settings for the GPT-6 text models.
+"""Client and request settings for supported text models.
 
 These models need Responses for structured tool output with reasoning. Legacy model
 IDs are intentionally not rewritten here: saved configurations must be migrated.
@@ -8,6 +8,8 @@ import re
 
 import instructor
 from instructor import Mode
+
+from .gemini import Gemini35Hooks
 
 DEFAULT_MODEL = "openai/gpt-6-luna"
 
@@ -24,6 +26,8 @@ def create_client(model: str = DEFAULT_MODEL):
     # Instructor 1.11's basic Responses parser assumes output[0] is a tool call.
     # The mixed-output parser locates the named function after reasoning items.
     options = {"mode": Mode.RESPONSES_TOOLS_WITH_INBUILT_TOOLS} if gpt6_model(model) else {}
+    if model.removeprefix("google/") == "gemini-3.5-flash-lite":
+        options["hooks"] = Gemini35Hooks()
     return instructor.from_provider(model, async_client=True, **options)
 
 
@@ -61,7 +65,52 @@ def responses_parameters(model: str, parameters: dict) -> dict:
     return params
 
 
+def gemini_parameters(model: str, parameters: dict) -> dict:
+    """Normalize Gemini 3.5 settings while preserving explicit legacy model calls."""
+    if model.removeprefix("google/") != "gemini-3.5-flash-lite":
+        return parameters.copy()
+
+    from google.genai.types import ThinkingConfig
+
+    params = parameters.copy()
+    generation = dict(params.get("generation_config") or {})
+    for settings in (params, generation):
+        # Gemini 3.5 ignores sampling controls; do not forward stale settings.
+        for key in ("temperature", "top_p", "top_k", "presence_penalty", "frequency_penalty"):
+            settings.pop(key, None)
+        for key in ("n", "candidate_count"):
+            count = settings.pop(key, None)
+            if count is not None and count != 1:
+                raise ValueError("Gemini 3.5 supports only one candidate per request")
+    if "generation_config" in params:
+        params["generation_config"] = generation
+    config = params.get("config")
+    nested_thinking = (
+        config.get("thinking_config")
+        if isinstance(config, dict)
+        else getattr(config, "thinking_config", None)
+    )
+    thinking = {}
+    # Explicit top-level settings win over config, then generation_config.
+    for setting in (
+        generation.pop("thinking_config", None),
+        nested_thinking,
+        params.pop("thinking_config", None),
+    ):
+        if isinstance(setting, ThinkingConfig):
+            setting = setting.model_dump(exclude_none=True)
+        thinking.update(
+            {key: value for key, value in (setting or {}).items() if value is not None}
+        )
+    thinking.pop("thinking_budget", None)
+    params.pop("thinking_budget", None)
+    level = params.pop("thinking_level", thinking.get("thinking_level", "minimal"))
+    thinking["thinking_level"] = level
+    params["thinking_config"] = ThinkingConfig(**thinking)
+    return params
+
+
 def prepare_parameters(client, parameters: dict) -> dict:
     """Normalize parameters for the model selected by an Instructor client."""
     model = parameters.get("model", client.kwargs.get("model", ""))
-    return responses_parameters(model, parameters)
+    return gemini_parameters(model, responses_parameters(model, parameters))

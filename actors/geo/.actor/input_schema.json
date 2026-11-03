@@ -16,7 +16,7 @@
         "models": {
             "title": "LLMs to Evaluate",
             "type": "array",
-            "description": "List of LLM provider/model identifiers to evaluate. If empty, sensible defaults are used (openai/gpt-4.1, google/gemini-2.5-flash). Format: provider/model (e.g., openai/gpt-4.1, google/gemini-2.5-flash).",
+            "description": "List of LLM provider/model identifiers to evaluate. If empty, sensible defaults are used (openai/gpt-4.1, google/gemini-3.5-flash-lite). Format: provider/model (e.g., openai/gpt-4.1, google/gemini-3.5-flash-lite).",
             "editor": "select",
             "items": {
                 "type": "string",
@@ -30,7 +30,7 @@
                     "openai/gpt-5",
                     "google/ai-overview",
                     "google/gemini-2.5-pro",
-                    "google/gemini-2.5-flash",
+                    "google/gemini-3.5-flash-lite",
                     "google/gemini-2.5-flash-lite",
                     "google/gemini-2.0-flash",
                     "xai/grok-4",
@@ -42,11 +42,11 @@
             },
             "default": [
                 "openai/gpt-4.1-mini",
-                "google/gemini-2.5-flash"
+                "google/gemini-3.5-flash-lite"
             ],
             "prefill": [
                 "openai/gpt-4.1-mini",
-                "google/gemini-2.5-flash"
+                "google/gemini-3.5-flash-lite"
             ]
         },
         "prompts": {

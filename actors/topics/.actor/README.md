@@ -101,7 +101,7 @@ The actor supports any AI model by OpenAI, Google or Anthropic. The format shoul
 
 - `openai/gpt-3.5-turbo` (default)
 - `openai/gpt-4.1`
-- `google/gemini-2.5-flash`
+- `google/gemini-3.5-flash-lite`
 - `anthropic/claude-3-5-sonnet`
 - Any other model following the `provider/model` format
 

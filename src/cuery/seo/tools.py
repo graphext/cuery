@@ -293,7 +293,7 @@ class SerpTopicExtractor(Configurable):
     """Additional use-case specific instructions or context for the topic extraction."""
     max_samples: int = 500
     """Maximum number of samples to use for topic extraction."""
-    model: str = Field("google/gemini-2.5-flash-preview-05-20", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
+    model: str = Field("google/gemini-3.5-flash-lite", pattern=r"^[\w\.-]+/[\w\.-]+$")  # type: ignore
     """Model to use for topic extraction."""
 
     _task: Task | None = None

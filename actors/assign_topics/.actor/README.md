@@ -76,7 +76,7 @@ Define your topic hierarchy as a JSON object where each key is a main topic and 
 ### Supported AI Models
 
 - **OpenAI**: openai/gpt-4.1-mini, openai/gpt-4.0-preview, openai/gpt-3.5-turbo
-- **Google**: google/gemini-2.5-flash-preview-05-20, google/gemini-1.5-pro
+- **Google**: google/gemini-3.5-flash-lite, google/gemini-1.5-pro
 - **Anthropic**: anthropic/claude-3-sonnet, anthropic/claude-3-haiku
 
 ## Use Cases

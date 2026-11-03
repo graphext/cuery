@@ -937,7 +937,7 @@ wheels = [
 
 [[package]]
 name = "cuery"
-version = "0.33.17"
+version = "0.33.18"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

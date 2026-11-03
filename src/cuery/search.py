@@ -56,6 +56,7 @@ VALID_MODELS = {
         "gpt-5",
     ],
     "google": [
+        "gemini-3.5-flash-lite",
         "gemini-2.5-pro",
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
@@ -273,8 +274,12 @@ async def query_gemini(
     thinking_budget: int = -1,
     use_search: bool = True,
     validate: bool = True,
+    thinking_level: Literal["minimal", "low", "medium", "high"] = "minimal",
 ) -> SearchResult | GGResponse:
     """Call Gemini with Google Search grounding (supports Gemini > 2.0 only).
+
+    Gemini 3.5 uses thinking_level (minimal by default); thinking_budget is
+    retained for explicit Gemini 2.5 calls. Use medium/high for deeper reasoning.
 
     API Docs:
     - https://ai.google.dev/gemini-api/docs/google-search
@@ -303,7 +308,9 @@ async def query_gemini(
         )
         config["tool_config"] = tool_config
 
-    if "2.5" in model:
+    if model.removeprefix("google/") == "gemini-3.5-flash-lite":
+        config["thinking_config"] = gaitypes.ThinkingConfig(thinking_level=thinking_level)
+    elif "2.5" in model:
         config["thinking_config"] = gaitypes.ThinkingConfig(thinking_budget=thinking_budget)
 
     params = {

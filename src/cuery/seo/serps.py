@@ -103,7 +103,7 @@ class SerpConfig(ApifySerpConfig):
     """List of competitor names to identify in SERP data."""
     topic_max_samples: int = 500
     """Maximum number of samples to use for topic and intent extraction from SERP data."""
-    topic_model: str | None = "google/gemini-2.5-flash-preview-05-20"
+    topic_model: str | None = "google/gemini-3.5-flash-lite"
     """Model to use for topic extraction from SERP organic results."""
     topic_min_ldist: int = 2
     """Minimum Levenshtein distance between topic labels."""
@@ -395,7 +395,7 @@ def add_ranks(
 async def topic_and_intent(  # noqa: PLR0913
     df: DataFrame,
     max_samples: int,
-    topic_model: str = "google/gemini-2.5-flash-preview-05-20",
+    topic_model: str = "google/gemini-3.5-flash-lite",
     assignment_model: str = "openai/gpt-6-luna",
     max_retries: int = 5,
     text_column: str = "term",
