@@ -29,6 +29,7 @@ import json
 import os
 import tempfile
 import urllib.parse
+from copy import deepcopy
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -46,7 +47,7 @@ from google.ads.googleads.v20.services.services.keyword_plan_idea_service.pagers
 )
 from numpy import ndarray
 from pandas import DataFrame, Series
-from pydantic import Field, ValidationInfo, field_validator, model_validator
+from pydantic import ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from .. import resources
 from ..utils import LOG, Configurable, decode_json_b64
@@ -54,6 +55,8 @@ from ..utils import LOG, Configurable, decode_json_b64
 
 class GoogleKwdConfig(Configurable):
     """Configuration for Google Ads API access."""
+
+    model_config = ConfigDict(hide_input_in_errors=True)
 
     keywords: tuple[str, ...] | None = None
     """The (initial) keywords to fetch data for.
@@ -88,6 +91,11 @@ class GoogleKwdConfig(Configurable):
     """End date (year and month) for metrics in YYYY-MM format (e.g., '2023-12').
     Either provide both `metrics_start` and `metrics_end` or neither.
     """
+
+    credentials: str | Path | dict | None = Field(default=None, repr=False, exclude=True)
+    """Optional Google Ads credential path or dictionary (legacy actor compatibility)."""
+    customer: str | None = Field(default=None, repr=False, exclude=True)
+    """Optional customer override (legacy actor compatibility)."""
 
     @field_validator("ideas")
     @classmethod
@@ -170,9 +178,9 @@ def config_from_env() -> dict:
     }
 
 
-def connect_ads_client() -> GoogleAdsClient:
+def connect_ads_client(config: str | Path | dict | None = None) -> GoogleAdsClient:
     """Load Google Ads client from credentials."""
-    config = config_from_env()
+    config = config_from_env() if config is None else deepcopy(config)
 
     if isinstance(config, dict):
         if json_key := config.pop("json_key", None):
@@ -222,11 +230,11 @@ def is_domain(url: str) -> bool:
 
 
 @lru_cache(maxsize=3)
-def fetch_keywords(
+def _fetch_keywords_cached(
     cfg: GoogleKwdConfig,
 ) -> GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse:
     """Fetch metrics for a fixed list of keywords or generate keyword ideas from Google Ads API."""
-    client = connect_ads_client()
+    client = connect_ads_client(cfg.credentials)
     ads_service = client.get_service("GoogleAdsService")
     kwd_service = client.get_service("KeywordPlanIdeaService")
 
@@ -272,7 +280,7 @@ def fetch_keywords(
 
     request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
 
-    request.customer_id = os.environ.get(
+    request.customer_id = cfg.customer or os.environ.get(
         "GOOGLE_ADS_CUSTOMER_ID", os.environ.get("GOOGLE_ADS_LOGIN_CUSTOMER_ID", "")
     )
 
@@ -298,6 +306,15 @@ def fetch_keywords(
         return kwd_service.generate_keyword_ideas(request=request)
 
     return kwd_service.generate_keyword_historical_metrics(request=request)
+
+
+def fetch_keywords(
+    cfg: GoogleKwdConfig,
+) -> GenerateKeywordIdeasPager | GenerateKeywordHistoricalMetricsResponse:
+    """Do not retain per-call credentials or customer overrides in the shared cache."""
+    if cfg.credentials is not None or cfg.customer is not None:
+        return _fetch_keywords_cached.__wrapped__(cfg)
+    return _fetch_keywords_cached(cfg)
 
 
 def collect_columns(df: DataFrame, columns: list[str]) -> Series:

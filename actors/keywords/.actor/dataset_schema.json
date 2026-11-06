@@ -1,0 +1,76 @@
+{
+    "actorSpecification": 1,
+    "title": "SEO Keyword Planner",
+    "description": "Fetch, expand and enrich keywords using Google Ads API. Generates detailed keyword metrics including search volumes and trends, CPC, competition data etc.",
+    "views": {
+        "keywords": {
+            "title": "Keywords",
+            "description": "Keywords and their metrics",
+            "transformation": {
+                "fields": [
+                    "keyword",
+                    "avg_monthly_searches",
+                    "competition",
+                    "competition_index",
+                    "average_cpc_micros",
+                    "low_top_of_page_bid_micros",
+                    "high_top_of_page_bid_micros",
+                    "concepts",
+                    "concept_groups",
+                    "search_volume",
+                    "search_volume_date",
+                    "search_volume_growth_yoy",
+                    "search_volume_growth_3m",
+                    "search_volume_trend"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "keyword": {
+                        "format": "text"
+                    },
+                    "avg_monthly_searches": {
+                        "format": "number"
+                    },
+                    "competition": {
+                        "format": "number"
+                    },
+                    "competition_index": {
+                        "format": "number"
+                    },
+                    "average_cpc_micros": {
+                        "format": "number"
+                    },
+                    "low_top_of_page_bid_micros": {
+                        "format": "number"
+                    },
+                    "high_top_of_page_bid_micros": {
+                        "format": "number"
+                    },
+                    "concepts": {
+                        "format": "array"
+                    },
+                    "concept_groups": {
+                        "format": "array"
+                    },
+                    "search_volume": {
+                        "format": "array"
+                    },
+                    "search_volume_date": {
+                        "format": "array"
+                    },
+                    "search_volume_growth_yoy": {
+                        "format": "number"
+                    },
+                    "search_volume_growth_3m": {
+                        "format": "number"
+                    },
+                    "search_volume_trend": {
+                        "format": "number"
+                    }
+                }
+            }
+        }
+    }
+}

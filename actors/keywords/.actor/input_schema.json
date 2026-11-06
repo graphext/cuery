@@ -1,0 +1,75 @@
+{
+    "title": "SEO Keyword Planner",
+    "description": "Fetch, expand and enrich keywords using Google Ads API. Generates detailed keyword metrics including search volumes and trends, CPC, competition data etc.",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "keywords": {
+            "title": "Seed Keywords",
+            "type": "array",
+            "description": "The (initial) keywords to fetch data for. These keywords will be used to generate related keyword suggestions (if ideas is True) with search volume and competition data.\n\n**Important Limitations:**\n• Maximum 20 keywords for keyword idea generation (when `ideas` is enabled)\n• No limit for basic keyword analysis (when `ideas` is disabled)\n• If more than 20 keywords are provided with `ideas` enabled, idea generation will be automatically disabled\n\n**Tips:**\n• Use 2-5 seed keywords for best results with idea generation\n• Include both broad and specific terms\n• Use keywords relevant to your niche\n• Avoid very generic terms (e.g., 'marketing' alone)\n\n**Examples:**\n• ['seo', 'search engine optimization', 'organic traffic']\n• ['digital marketing', 'social media marketing', 'content marketing']\n• ['web development', 'react developer', 'javascript programming']\n\n**Note:** Either keywords or page (or both) must be provided.",
+            "editor": "stringList",
+            "prefill": [
+                "digital marketing",
+                "seo",
+                "web positioning"
+            ]
+        },
+        "url": {
+            "title": "Page URL",
+            "type": "string",
+            "description": "The page to fetch data for (if applicable).",
+            "editor": "textfield"
+        },
+        "whole_site": {
+            "title": "Whole Site",
+            "type": "boolean",
+            "description": "Whether to fetch keyword ideas for the whole site (if url is provided).",
+            "editor": "checkbox",
+            "default": false
+        },
+        "ideas": {
+            "title": "Generate Keyword Ideas",
+            "type": "boolean",
+            "description": "Whether to generate additional keyword ideas based on the seed keywords. If enabled, the system will suggest related keywords with search volume and competition data.\n\n**Important Limitations:**\n• This feature is only available when providing 20 or fewer seed keywords\n• If more than 20 keywords are provided, this setting will be automatically disabled\n• This may increase processing time and result in a larger dataset\n\n**Recommendation:** For keyword idea generation, use 5-20 high-quality seed keywords for best results.",
+            "editor": "checkbox",
+            "default": false
+        },
+        "max_ideas": {
+            "title": "Maximum Keyword Ideas",
+            "type": "integer",
+            "description": "Maximum number of additional keyword ideas to fetch (if ideas is True). This limits the number of related keywords returned based on the seed keywords.\n\n**Important:**\n• Only effective when `ideas` is enabled and you have 20 or fewer seed keywords\n• If `ideas` is disabled, this setting has no effect\n• If more than 20 seed keywords are provided, idea generation is automatically disabled\n• Recommended range: 100-1000 ideas for balanced results and processing time",
+            "editor": "number",
+            "default": 100,
+            "minimum": 1,
+            "maximum": 10000
+        },
+        "language": {
+            "title": "Language Code",
+            "type": "string",
+            "description": "The language to use for keyword data (e.g., ‘en’ for English).",
+            "editor": "textfield"
+        },
+        "country": {
+            "title": "Target Country",
+            "type": "string",
+            "description": "The geographical target for keyword data (e.g., ‘us’ for United States).",
+            "editor": "textfield"
+        },
+        "metrics_start": {
+            "title": "Metrics Start Date",
+            "type": "string",
+            "description": "Start date (year and month) for metrics in YYYY-MM format (e.g., ‘2023-01’). This determines the beginning of the historical search volume data range.\n\n**Important Limitations:**\n• Google Ads API typically provides data for the last 2 years only\n• Dates older than 2 years may result in errors\n• Must be before the end date\n• Cannot be in the future\n\n**Examples:**\n• 2024-07 (July 2024)\n• 2023-12 (December 2023)\n• 2024-01 (January 2024)\n\n**Recommended:** Use recent dates within the last 12-24 months for best data availability.",
+            "editor": "textfield",
+            "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "metrics_end": {
+            "title": "Metrics End Date",
+            "type": "string",
+            "description": "End date (year and month) for metrics in YYYY-MM format (e.g., ‘2023-12’). This determines the end of the historical search volume data range.\n\n**Important Limitations:**\n• Cannot be in the future\n• Must be after the start date\n• Maximum 2-year range from start date\n• Should not exceed current month\n\n**Examples:**\n• 2025-07 (July 2025)\n• 2024-12 (December 2024)\n• 2025-01 (January 2025)\n\n**Tip:** For most current data, use the current month or the previous month as the end date.",
+            "editor": "textfield",
+            "pattern": "^\\d{4}-\\d{2}$"
+        }
+    },
+    "required": []
+}

@@ -8,7 +8,7 @@ cd "$SCRIPT_DIR"
 # CI authenticates reads and uploads through Prefix Repository Access (OIDC).
 UPLOAD="${1:---upload}"
 
-micromamba install -y -c conda-forge python=3.11 rattler-build requests tqdm
+micromamba install -y -c conda-forge python=3.11 'rattler-build>=0.80.0' requests tqdm
 eval "$(micromamba shell hook -s bash)"
 micromamba activate
 if [ "${GITHUB_ACTIONS:-}" == "true" ]; then
@@ -18,12 +18,10 @@ if [ "${GITHUB_ACTIONS:-}" == "true" ]; then
     export RATTLER_AUTH_FILE="$PREFIX_AUTH_DIR/credentials.json"
     rattler-build auth login https://prefix.dev --workload-identity
 fi
-CUTOFF=$(python -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(days=7)).isoformat())')
-rattler-build build \
+rattler-build --config-file "$SCRIPT_DIR/rattler-build.toml" build \
     -c https://repo.prefix.dev/graphext -c conda-forge \
     --experimental \
     --channel-priority disabled \
-    --exclude-newer "$CUTOFF" \
     --output-dir ~/.rattler-build/ \
     --recipe recipe.yaml
 

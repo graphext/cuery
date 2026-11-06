@@ -1,0 +1,21 @@
+# PyArrow 26.0.1 and required native artifacts approved on 2026-11-06.
+# Preserve the seven-day policy for every other dependency and artifact.
+[exclude-newer]
+cutoff = "7d"
+
+[exclude-newer.exemptions]
+"pyarrow" = { version = "==26.0.1", build = "py311h38be061_0", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "1b90d310484ac34e8ce2183bf30057da364ce9bc99fb8ddccb175a03292465ee", cutoff = "2026-11-06T11:39:37Z" }
+"pyarrow-core" = { version = "==26.0.1", build = "py311h1358635_0_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "6c086210368b53fd8da6d9053de54b7e810c31ab4e1b51f5bb63b0e4fd680459", cutoff = "2026-11-06T11:39:37Z" }
+"libparquet" = { version = "==26.0.1", build = "h2d6894f_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "17b77aa533b3496c075b2428743c41a3e1baee2485fd6f85583402664e5d2ff8", cutoff = "2026-11-06T11:39:37Z" }
+"libarrow-substrait" = { version = "==26.0.1", build = "hbad6200_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "d32638cb0700029202ca6e2563499a823707912add0c42d68b563bc821f94c03", cutoff = "2026-11-06T11:39:37Z" }
+"libarrow-s3" = { version = "==26.0.1", build = "hb32f990_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "2e7a8fd5e018e8a450d988da69821759c4876ba809ec8a7ecd15a5167ddd1835", cutoff = "2026-11-06T11:39:37Z" }
+"libarrow-dataset" = { version = "==26.0.1", build = "h35cad7b_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "a57b26262304eb4afe3c11821f4391885a42dee58da8f733a44b058cb7c6e0fa", cutoff = "2026-11-06T11:39:37Z" }
+"libarrow-acero" = { version = "==26.0.1", build = "h35cad7b_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "3e895c0ddfd462b691d1d21fcd045cd59c5e34c3a348fb8c4eba05cebf27c037", cutoff = "2026-11-06T11:39:37Z" }
+"libarrow-compute" = { version = "==26.0.1", build = "h2e1e52a_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "0d99a653576daad68e2bc356719ec2ea708e143c86f6b8a4fd9a9c7c4bacf9af", cutoff = "2026-11-06T11:39:37Z" }
+"libarrow" = { version = "==26.0.1", build = "hb81f139_2_cpu", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "76638e36735c2c8f968b090814c1b583e2c8f2b56b05e155c4b82fb9f286e652", cutoff = "2026-11-06T11:39:37Z" }
+"simdjson" = { version = "==5.1.1", build = "h4dbf13b_0", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "3d6c44e9dbdf5d56033fde09f61f0dccba28bb7fb03f14baf9b040ecdb164536", cutoff = "2026-11-06T11:39:37Z" }
+"libthrift" = { version = "==0.25.0", build = "h22fcfe2_1", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "70c6e9d07c960739ebbac5519225aa0f80556ad1755597c99f7188eeeb37fa33", cutoff = "2026-11-06T11:39:37Z" }
+"libgoogle-cloud-storage" = { version = "==3.12.0", build = "hc022eae_2", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "5ab3dc54b70ac41500d18ee1fcd34d1130f1878586516ececdbdd6e58eb07f68", cutoff = "2026-11-06T11:39:37Z" }
+"libgoogle-cloud" = { version = "==3.12.0", build = "h11de800_2", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "22761516387c9dd7b9ee4e245334a38f811c5f01a980b983e5d76f75a0823bec", cutoff = "2026-11-06T11:39:37Z" }
+"azure-storage-files-datalake-cpp" = { version = "==12.17.0", build = "h1958eb7_0", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "9db642111b5b7dae9cd10eeb0c5a11c6e492a8fa79c6b2f9327e49b2ab09db89", cutoff = "2026-11-06T11:39:37Z" }
+"azure-storage-blobs-cpp" = { version = "==12.19.0", build = "hc6754e2_0", subdir = "linux-64", channel = "https://conda.anaconda.org/conda-forge", sha256 = "f922b4a351b37ada01cad3e2b06d2b4cad75d63c996b4d03626687990d2eee00", cutoff = "2026-11-06T11:39:37Z" }
